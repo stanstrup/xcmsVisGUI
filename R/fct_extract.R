@@ -60,32 +60,45 @@ chrom_to_df <- function(chr, meta, labels = NULL) {
   out
 }
 
-#' Extract a single spectrum (m/z + intensity) nearest a retention time.
-extract_spectrum <- function(path, rt, ms_level = 1L) {
+#' Extract a single spectrum at a retention time OR a scan (acquisition) number.
+#' The global filter `f` is applied (intensity/m/z/polarity/charge/spectrumId);
+#' ms_level and the rt/scan selection come from the Spectrum tab controls.
+extract_spectrum <- function(path, rt = NA_real_, scan = NA_integer_,
+                             ms_level = 1L, f = list()) {
   sp <- Spectra::Spectra(path, source = Spectra::MsBackendMzR())
-  sp <- Spectra::filterMsLevel(sp, as.integer(ms_level))
+  ff <- f; ff$ms_level <- as.integer(ms_level)
+  ff$rt_min <- NA_real_; ff$rt_max <- NA_real_     # selection drives rt, not filter
+  sp <- apply_filters_spectra(sp, ff)
+  n <- length(sp)
+  empty <- tibble::tibble(mz = numeric(), intensity = numeric(), rt = numeric(),
+                          scan = integer())
+  if (!n) return(empty)
   rts <- Spectra::rtime(sp)
-  if (!length(rts)) return(tibble::tibble(mz = numeric(), intensity = numeric(), rt = numeric()))
-  idx <- which.min(abs(rts - rt))
+  if (!is.null(scan) && is.finite(scan)) {
+    anum <- tryCatch(Spectra::acquisitionNum(sp), error = function(e) NULL)
+    idx <- if (!is.null(anum) && any(anum == scan, na.rm = TRUE)) which(anum == scan)[1]
+           else min(max(as.integer(scan), 1L), n)
+  } else {
+    idx <- which.min(abs(rts - rt))
+  }
+  anum <- tryCatch(Spectra::acquisitionNum(sp), error = function(e) rep(NA_integer_, n))
   one <- sp[idx]
   tibble::tibble(mz = Spectra::mz(one)[[1]], intensity = Spectra::intensity(one)[[1]],
-                 rt = rts[idx])
+                 rt = rts[idx], scan = anum[idx])
 }
 
 #' Extract all peaks (rt, m/z, intensity) from one file as a long tibble (MS map/3D).
-extract_peaks <- function(path, ms_level = 1L, rt_range = NULL, mz_range = NULL) {
+#' Applies the full global filter `f` (incl. intensity / spectrumId / charge).
+extract_peaks <- function(path, f = list()) {
   sp <- Spectra::Spectra(path, source = Spectra::MsBackendMzR())
-  sp <- Spectra::filterMsLevel(sp, as.integer(ms_level))
-  if (!is.null(rt_range)) sp <- Spectra::filterRt(sp, rt_range)
+  sp <- apply_filters_spectra(sp, f)
+  if (!length(sp)) return(tibble::tibble(rt = numeric(), mz = numeric(), intensity = numeric()))
   rt <- Spectra::rtime(sp)
   pd <- Spectra::peaksData(sp)
   lens <- vapply(pd, nrow, integer(1))
   mat <- do.call(rbind, pd)
   if (is.null(mat)) return(tibble::tibble(rt = numeric(), mz = numeric(), intensity = numeric()))
-  df <- tibble::tibble(rt = rep(rt, lens), mz = mat[, "mz"], intensity = mat[, "intensity"])
-  if (!is.null(mz_range))
-    df <- df[df$mz >= mz_range[1] & df$mz <= mz_range[2], , drop = FALSE]
-  df
+  tibble::tibble(rt = rep(rt, lens), mz = mat[, "mz"], intensity = mat[, "intensity"])
 }
 
 #' Bin long peak data into an rt x m/z grid for heatmap / surface display.

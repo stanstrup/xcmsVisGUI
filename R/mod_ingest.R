@@ -15,16 +15,13 @@ mod_ingest_ui <- function(id) {
             textInput(ns("folder"), NULL, width = "100%",
                       placeholder = "Paste a folder or file path…")),
         actionButton(ns("add_folder"), "Add", class = "btn-primary")),
-    # 2) browse, or drag & drop
+    # 2) or browse server-side (no upload/copy)
     div(class = "d-flex gap-2 mb-2",
         shinyFilesButton(ns("files"), "Browse…", "Select MS data files",
                          multiple = TRUE, icon = icon("folder-open"),
                          class = "btn-outline-secondary btn-sm"),
         actionButton(ns("clear"), "Clear", icon = icon("trash"),
                      class = "btn-outline-secondary btn-sm")),
-    fileInput(ns("upload"), NULL, multiple = TRUE,
-              accept = c(".mzML", ".mzXML", ".CDF", ".cdf"),
-              buttonLabel = "Drop / choose", placeholder = "drag & drop files"),
     div(class = "d-flex gap-2 mb-2",
         actionButton(ns("sel_all"),  "All",    class = "btn-sm btn-outline-secondary"),
         actionButton(ns("sel_none"), "None",   class = "btn-sm btn-outline-secondary"),
@@ -108,12 +105,6 @@ mod_ingest_server <- function(id, rv) {
         showNotification("Path not found.", type = "error")
       }
       updateTextInput(session, "folder", value = "")
-    })
-
-    # Drag & drop / chosen upload (copied to a temp path by Shiny)
-    observeEvent(input$upload, {
-      up <- input$upload; req(nrow(up) > 0)
-      add_paths(up$datapath, names = up$name)
     })
 
     # --- Reader finished: update the row, then pump the next --------------

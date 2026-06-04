@@ -67,6 +67,28 @@ make_rv <- function() {
   )
 }
 
+#' Persist 2D zoom across re-renders. Call ONCE inside a moduleServer with the
+#' plot's plotly `source`; it returns a function to pipe a plotly object through
+#' (re-applies the last user zoom; cleared on double-click / autorange).
+zoom_keeper <- function(source) {
+  z <- reactiveValues(x = NULL, y = NULL)
+  observeEvent(event_data("plotly_relayout", source = source), {
+    e <- suppressWarnings(event_data("plotly_relayout", source = source))
+    if (is.null(e)) return()
+    if (isTRUE(e[["xaxis.autorange"]])) z$x <- NULL
+    if (isTRUE(e[["yaxis.autorange"]])) z$y <- NULL
+    if (!is.null(e[["xaxis.range[0]"]]))
+      z$x <- c(e[["xaxis.range[0]"]], e[["xaxis.range[1]"]])
+    if (!is.null(e[["yaxis.range[0]"]]))
+      z$y <- c(e[["yaxis.range[0]"]], e[["yaxis.range[1]"]])
+  }, ignoreInit = TRUE)
+  function(p) {
+    if (!is.null(z$x)) p <- plotly::layout(p, xaxis = list(range = z$x))
+    if (!is.null(z$y)) p <- plotly::layout(p, yaxis = list(range = z$y))
+    p
+  }
+}
+
 #' Convenience: ids of files currently included for plotting.
 included_file_ids <- function(rv) {
   f <- rv$files

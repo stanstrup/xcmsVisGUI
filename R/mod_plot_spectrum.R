@@ -136,9 +136,10 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       p
     })
 
+    keep_zoom <- zoom_keeper("spec")
     output$plot <- renderPlotly({
       ggplotly(plot_gg(), source = "spec", tooltip = "text", dynamicTicks = FALSE) %>%
-        layout(uirevision = "spec")
+        keep_zoom() %>% event_register("plotly_relayout")
     })
 
     # --- Scan list browser (click a row to load that scan) -----------------
@@ -160,7 +161,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     output$scantable <- DT::renderDT({
       tab <- scan_tab()
       disp <- tab[, c("scan", "rt_disp", "msLevel", "polarity", "precursorMZ",
-                      "charge", "tic", "basePeakMZ")]
+                      "tic", "basePeakMZ")]
       names(disp)[2] <- paste0("rt(", rv$settings$time_unit, ")")
       DT::datatable(disp, rownames = FALSE, selection = "single", filter = "top",
                     options = list(pageLength = 15, scrollX = TRUE))

@@ -70,10 +70,11 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
         ggplot2::theme_bw()
     })
 
+    keep_zoom <- zoom_keeper("tic")
     output$plot <- renderPlotly({
       ggplotly(plot_gg(), source = "tic", tooltip = "text", dynamicTicks = FALSE) %>%
-        layout(uirevision = "tic") %>%
-        event_register("plotly_click")
+        keep_zoom() %>%
+        event_register("plotly_click") %>% event_register("plotly_relayout")
     })
 
     # Click -> selection that drives the Spectrum tab. suppressWarnings hides the

@@ -30,9 +30,6 @@ apply_filters <- function(x, f) {
   ii <- .flt_int(f)
   if (!is.null(ii))
     x <- MsExperiment::filterSpectra(x, Spectra::filterIntensity, intensity = ii)
-  if (!is.null(f$charge) && is.finite(f$charge))
-    x <- MsExperiment::filterSpectra(x, Spectra::filterPrecursorCharge,
-                                     z = as.integer(f$charge))
   if (!is.null(f$spectrum_id) && nzchar(f$spectrum_id))
     x <- MsExperiment::filterSpectra(x, .filter_spectrumid, pat = f$spectrum_id)
   x
@@ -51,8 +48,6 @@ apply_filters_spectra <- function(sp, f) {
     sp <- Spectra::filterPolarity(sp, if (identical(f$polarity, "pos")) 1L else 0L)
   ii <- .flt_int(f)
   if (!is.null(ii)) sp <- Spectra::filterIntensity(sp, intensity = ii)
-  if (!is.null(f$charge) && is.finite(f$charge))
-    sp <- Spectra::filterPrecursorCharge(sp, z = as.integer(f$charge))
   if (!is.null(f$spectrum_id) && nzchar(f$spectrum_id))
     sp <- .filter_spectrumid(sp, f$spectrum_id)
   sp

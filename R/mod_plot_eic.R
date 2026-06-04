@@ -176,10 +176,11 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       p
     })
 
+    keep_zoom <- zoom_keeper("eic")
     output$plot <- renderPlotly({
       ggplotly(plot_gg(), source = "eic", tooltip = "text", dynamicTicks = FALSE) %>%
-        layout(uirevision = "eic") %>%
-        event_register("plotly_click")
+        keep_zoom() %>%
+        event_register("plotly_click") %>% event_register("plotly_relayout")
     })
 
     click <- reactive(suppressWarnings(event_data("plotly_click", source = "eic")))

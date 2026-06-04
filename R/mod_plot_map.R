@@ -60,6 +60,7 @@ mod_plot_map_server <- function(id, rv, included) {
       })
     })
 
+    keep_zoom <- zoom_keeper("map")
     output$plot_out <- renderPlotly({
       if (is.null(input$plot) || input$plot == 0)
         validate("Press ‘Plot’ to render the MS map for the included file(s).")
@@ -99,9 +100,9 @@ mod_plot_map_server <- function(id, rv, included) {
                        marker = list(color = c(0, cmax), colorscale = cs, cmin = 0,
                                      cmax = cmax, size = 0.1, colorbar = list(title = "int")),
                        hoverinfo = "skip", showlegend = FALSE)
-        p %>% layout(xaxis = list(title = rt_axis_label(unit)), yaxis = list(title = "m/z"),
-                     uirevision = "map2d") %>%
-          event_register("plotly_click")
+        p %>% layout(xaxis = list(title = rt_axis_label(unit)), yaxis = list(title = "m/z")) %>%
+          keep_zoom() %>%
+          event_register("plotly_click") %>% event_register("plotly_relayout")
 
       } else if (input$mode == "surface") {
         b <- bin_peaks(pk, rt_bin = input$rt_bin, mz_bin = input$mz_bin, aggfun = max)

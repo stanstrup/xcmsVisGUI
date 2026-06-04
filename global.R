@@ -72,8 +72,12 @@ mirai::everywhere(suppressPackageStartupMessages(library(mzR)))
 # Tidy up the pool when the R session ends.
 onStop(function() try(mirai::daemons(0), silent = TRUE))
 
+# Allow large drag-and-drop uploads (mzML files are tens of MB).
+options(shiny.maxRequestSize = 5 * 1024^3)
+
 # --- Constants ------------------------------------------------------------
 MS_FILE_EXTS <- c("mzML", "mzXML", "CDF", "cdf", "mzml", "mzxml")
+MS_FILE_REGEX <- "\\.(mzML|mzXML|CDF)$"
 
 # ColorBrewer qualitative palettes for groups/EIC traces, sequential for maps.
 QUAL_PALETTES <- c("Set1", "Set2", "Dark2", "Paired", "Accent")

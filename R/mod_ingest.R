@@ -9,21 +9,26 @@
 mod_ingest_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    div(
-      class = "d-flex gap-2 mb-2",
-      shinyFilesButton(
-        ns("files"), "Add files…", "Select MS data files",
-        multiple = TRUE, icon = icon("folder-open"), class = "btn-primary"
-      ),
-      actionButton(ns("clear"), "Clear", icon = icon("trash"),
-                   class = "btn-outline-secondary")
-    ),
-    div(
-      class = "d-flex gap-2 mb-2",
-      actionButton(ns("sel_all"),  "All",    class = "btn-sm btn-outline-secondary"),
-      actionButton(ns("sel_none"), "None",   class = "btn-sm btn-outline-secondary"),
-      actionButton(ns("sel_inv"),  "Invert", class = "btn-sm btn-outline-secondary")
-    ),
+    # 1) paste a folder (or single file) path — the fast path
+    div(class = "d-flex gap-2 mb-2",
+        div(style = "flex:1;",
+            textInput(ns("folder"), NULL, width = "100%",
+                      placeholder = "Paste a folder or file path…")),
+        actionButton(ns("add_folder"), "Add", class = "btn-primary")),
+    # 2) browse, or drag & drop
+    div(class = "d-flex gap-2 mb-2",
+        shinyFilesButton(ns("files"), "Browse…", "Select MS data files",
+                         multiple = TRUE, icon = icon("folder-open"),
+                         class = "btn-outline-secondary btn-sm"),
+        actionButton(ns("clear"), "Clear", icon = icon("trash"),
+                     class = "btn-outline-secondary btn-sm")),
+    fileInput(ns("upload"), NULL, multiple = TRUE,
+              accept = c(".mzML", ".mzXML", ".CDF", ".cdf"),
+              buttonLabel = "Drop / choose", placeholder = "drag & drop files"),
+    div(class = "d-flex gap-2 mb-2",
+        actionButton(ns("sel_all"),  "All",    class = "btn-sm btn-outline-secondary"),
+        actionButton(ns("sel_none"), "None",   class = "btn-sm btn-outline-secondary"),
+        actionButton(ns("sel_inv"),  "Invert", class = "btn-sm btn-outline-secondary")),
     helpText("Tick a file to include it in plots. Files stay loaded when unticked."),
     DT::DTOutput(ns("file_table"))
   )
@@ -62,30 +67,53 @@ mod_ingest_server <- function(id, rv) {
       reader$invoke(path = path)
     }
 
-    # --- Add picked files to the table as "reading" -----------------------
-    observeEvent(input$files, {
-      parsed <- parseFilePaths(roots, input$files)
-      req(nrow(parsed) > 0)
-      paths <- as.character(parsed$datapath)
-      paths <- paths[!normalizePath(paths) %in% normalizePath(rv$files$path)]
-      req(length(paths) > 0)
-
+    # --- Add files from any source ----------------------------------------
+    add_paths <- function(paths, names = basename(paths)) {
+      keep <- !normalizePath(paths, mustWork = FALSE) %in%
+        normalizePath(rv$files$path, mustWork = FALSE)
+      paths <- paths[keep]; names <- names[keep]
+      if (!length(paths)) return(invisible())
       new_rows <- tibble(
-        id = paste0("f", as.integer(Sys.time()), "_", seq_along(paths)),
-        path = paths,
-        name = basename(paths),
-        sample_group = "group1",
-        include = TRUE,
-        status = "reading",
-        n_spectra = NA_integer_,
-        rt_min = NA_real_, rt_max = NA_real_,
-        mz_min = NA_real_, mz_max = NA_real_,
+        id = paste0("f", as.integer(Sys.time()), "_",
+                    seq.int(nrow(rv$files) + 1, length.out = length(paths))),
+        path = paths, name = names, sample_group = "group1",
+        include = TRUE, status = "reading", n_spectra = NA_integer_,
+        rt_min = NA_real_, rt_max = NA_real_, mz_min = NA_real_, mz_max = NA_real_,
         ms_levels = NA_character_, polarities = NA_character_,
-        charges = NA_character_, message = NA_character_
-      )
+        charges = NA_character_, message = NA_character_)
       rv$files <- bind_rows(rv$files, new_rows)
       queue(c(queue(), new_rows$id))
       pump()
+    }
+
+    # shinyFiles browse
+    observeEvent(input$files, {
+      parsed <- parseFilePaths(roots, input$files)
+      req(nrow(parsed) > 0)
+      add_paths(as.character(parsed$datapath))
+    })
+
+    # Pasted folder or file path
+    observeEvent(input$add_folder, {
+      p <- trimws(input$folder); req(nzchar(p))
+      if (dir.exists(p)) {
+        fls <- list.files(p, pattern = MS_FILE_REGEX, full.names = TRUE,
+                          ignore.case = TRUE)
+        if (!length(fls)) showNotification("No MS files found in that folder.",
+                                           type = "warning")
+        add_paths(fls)
+      } else if (file.exists(p)) {
+        add_paths(p)
+      } else {
+        showNotification("Path not found.", type = "error")
+      }
+      updateTextInput(session, "folder", value = "")
+    })
+
+    # Drag & drop / chosen upload (copied to a temp path by Shiny)
+    observeEvent(input$upload, {
+      up <- input$upload; req(nrow(up) > 0)
+      add_paths(up$datapath, names = up$name)
     })
 
     # --- Reader finished: update the row, then pump the next --------------

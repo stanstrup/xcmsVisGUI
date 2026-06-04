@@ -9,7 +9,7 @@
 mod_ingest_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    # Paste a folder (loads all MS files in it) or a single file path.
+    # 1) paste a folder (loads all MS files in it) or a single file path — no copy
     div(class = "d-flex gap-2 mb-2",
         div(style = "flex:1;",
             textInput(ns("folder"), NULL, width = "100%",
@@ -17,7 +17,13 @@ mod_ingest_ui <- function(id) {
         actionButton(ns("add_folder"), "Add", class = "btn-primary"),
         actionButton(ns("clear"), NULL, icon = icon("trash"),
                      class = "btn-outline-secondary", title = "Clear all files")),
-    helpText("Type/paste a directory (adds every MS file inside) or a single file."),
+    # 2) standard OS file browser (note: copies files to a temp dir)
+    fileInput(ns("browse"), NULL, multiple = TRUE,
+              accept = c(".mzML", ".mzXML", ".CDF", ".cdf"),
+              buttonLabel = "Browse…", placeholder = "or use the file browser"),
+    helpText("Paste a directory path (adds every MS file inside, no copy) — best ",
+             "for many/large files. The Browse button is the standard OS dialog but ",
+             "copies files to a temp folder."),
     div(class = "d-flex gap-2 mb-2",
         actionButton(ns("sel_all"),  "All",    class = "btn-sm btn-outline-secondary"),
         actionButton(ns("sel_none"), "None",   class = "btn-sm btn-outline-secondary"),
@@ -89,6 +95,12 @@ mod_ingest_server <- function(id, rv) {
         showNotification("Path not found.", type = "error")
       }
       updateTextInput(session, "folder", value = "")
+    })
+
+    # Standard OS file browser (Shiny copies the chosen files to temp paths)
+    observeEvent(input$browse, {
+      up <- input$browse; req(nrow(up) > 0)
+      add_paths(up$datapath, names = up$name)
     })
 
     # --- Reader finished: update the row, then pump the next --------------

@@ -80,7 +80,8 @@ MS_FILE_EXTS <- c("mzML", "mzXML", "CDF", "cdf", "mzml", "mzxml")
 MS_FILE_REGEX <- "\\.(mzML|mzXML|CDF)$"
 
 # ColorBrewer qualitative palettes for groups/EIC traces, sequential for maps.
-QUAL_PALETTES <- c("Set1", "Set2", "Dark2", "Paired", "Accent")
+QUAL_PALETTES <- c("Set1", "Set2", "Set3", "Dark2", "Paired", "Accent",
+                   "Pastel1", "Pastel2")
 VIRIDIS_PALETTES <- c("viridis", "magma", "plasma", "inferno", "cividis",
                       "mako", "rocket", "turbo")
 SEQ_PALETTES  <- c(VIRIDIS_PALETTES, "YlOrRd", "YlGnBu", "Blues", "Spectral")

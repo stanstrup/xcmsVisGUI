@@ -76,7 +76,7 @@ mod_plot_precursors_server <- function(id, rv, included) {
 
     keep_zoom <- zoom_keeper("prec")
     output$plot <- renderPlotly({
-      ggplotly(plot_gg(), source = "prec", tooltip = "text", dynamicTicks = FALSE) %>%
+      ggplotly(plot_gg(), source = "prec", tooltip = "text", dynamicTicks = TRUE) %>%
         keep_zoom() %>%
         event_register("plotly_click") %>% event_register("plotly_relayout")
     })

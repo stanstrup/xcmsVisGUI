@@ -24,9 +24,11 @@ mod_plot_eic_ui <- function(id) {
         textAreaInput(ns("paste"), NULL, rows = 3,
                       placeholder = "195.0877, 300.20\n335.10"),
         div(class = "d-flex gap-2",
-            numericInput(ns("paste_tol"), "tol", value = 10, min = 0, width = "80px"),
+            numericInput(ns("paste_tol"), "± tol", value = 10, min = 0, width = "80px"),
             selectInput(ns("paste_unit"), "unit", c("ppm", "Da"), width = "90px"),
             actionButton(ns("parse"), "Add to list", class = "btn-sm btn-outline-primary mt-4")),
+        helpText("tol is ± half-window: window = m/z ± m/z·ppm/1e6 (or ± Da). ",
+                 "So 10 ppm spans 20 ppm total — increase it if EICs look too narrow."),
         hr(),
         selectInput(ns("color_by"), "Color by",
                     c("Target" = "target", "File" = "sample_name",
@@ -178,7 +180,7 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
 
     keep_zoom <- zoom_keeper("eic")
     output$plot <- renderPlotly({
-      ggplotly(plot_gg(), source = "eic", tooltip = "text", dynamicTicks = FALSE) %>%
+      ggplotly(plot_gg(), source = "eic", tooltip = "text", dynamicTicks = TRUE) %>%
         keep_zoom() %>%
         event_register("plotly_click") %>% event_register("plotly_relayout")
     })

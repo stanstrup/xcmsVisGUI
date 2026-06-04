@@ -72,7 +72,7 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
 
     keep_zoom <- zoom_keeper("tic")
     output$plot <- renderPlotly({
-      ggplotly(plot_gg(), source = "tic", tooltip = "text", dynamicTicks = FALSE) %>%
+      ggplotly(plot_gg(), source = "tic", tooltip = "text", dynamicTicks = TRUE) %>%
         keep_zoom() %>%
         event_register("plotly_click") %>% event_register("plotly_relayout")
     })

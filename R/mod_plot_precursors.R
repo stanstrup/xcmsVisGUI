@@ -1,20 +1,21 @@
-# mod_plot_precursors — precursor-ion map for DDA data (xcmsVis::gplotPrecursorIons).
-# Plots MS2 precursor m/z vs retention time for one file. Only files that
-# actually contain MS2 spectra are offered.
+# mod_plot_precursors — precursor-ion map (DDA) for the included MS2 files.
+# Each point is a precursor selected for fragmentation. Click a point to show its
+# spectrum on the Spectrum tab.
 
 mod_plot_precursors_ui <- function(id) {
   ns <- NS(id)
   card(
     full_screen = TRUE,
-    card_header(
-      "Precursor ions (DDA)",
-      div(class = "float-end", mod_export_ui(ns("export")))
-    ),
+    card_header("Precursor ions (DDA)",
+                div(class = "float-end", mod_export_ui(ns("export")))),
     layout_sidebar(
       sidebar = sidebar(
         width = 240, position = "right", open = "open",
-        selectInput(ns("file"), "File (with MS2)", choices = NULL),
-        helpText("Each point is a precursor selected for fragmentation.")
+        selectInput(ns("color_by"), "Color by",
+                    c("File" = "sample_name", "Sample group" = "sample_group",
+                      "None" = "none")),
+        helpText("Uses the included files that contain MS2. Click a point to ",
+                 "view its spectrum.")
       ),
       plotlyOutput(ns("plot"), height = "100%")
     )
@@ -24,7 +25,6 @@ mod_plot_precursors_ui <- function(id) {
 mod_plot_precursors_server <- function(id, rv, included) {
   moduleServer(id, function(input, output, session) {
 
-    # Files whose summary reports an MS level > 1.
     ms2_files <- reactive({
       inc <- included()
       if (nrow(inc) == 0) return(inc)
@@ -33,35 +33,59 @@ mod_plot_precursors_server <- function(id, rv, included) {
       inc[has2, , drop = FALSE]
     })
 
-    observe({
+    prec_df <- reactive({
       f2 <- ms2_files()
-      choices <- if (nrow(f2)) stats::setNames(f2$id, f2$name) else character(0)
-      updateSelectInput(session, "file", choices = choices,
-                        selected = isolate(input$file) %||% (choices[1] %||% NULL))
+      validate(need(nrow(f2) > 0,
+                    "No included file contains MS2 spectra (need DDA data)."))
+      withProgress(message = "Reading precursors…", value = 0.5, {
+        dplyr::bind_rows(lapply(seq_len(nrow(f2)), function(i) {
+          d <- extract_precursors(f2$path[i])
+          if (nrow(d)) {
+            d$sample_id <- f2$id[i]; d$sample_name <- f2$name[i]
+            d$sample_group <- f2$sample_group[i]
+          }
+          d
+        }))
+      })
     })
 
     plot_gg <- reactive({
-      validate(need(nrow(ms2_files()) > 0,
-                    "No included file contains MS2 spectra (need DDA data)."))
-      req(input$file)
-      f <- rv$files[rv$files$id == input$file, ]
-      req(nrow(f) == 1)
-      withProgress(message = "Reading precursors…", value = 0.5, {
-        df <- extract_precursors(f$path)
-      })
-      validate(need(nrow(df) > 0, "No precursor ions found in this file."))
+      df <- prec_df(); validate(need(nrow(df) > 0, "No precursor ions found."))
       unit <- rv$settings$time_unit
       df$rt_disp <- rt_to_disp(df$rt, unit)
-      df$.tip <- sprintf("precursor m/z: %.4f\nrt: %.4g %s", df$precursorMZ, df$rt_disp, unit)
-      ggplot2::ggplot(df, ggplot2::aes(x = rt_disp, y = precursorMZ, text = .tip)) +
-        ggplot2::geom_point(color = brewer_qual(1, rv$settings$qual_palette),
-                            alpha = 0.5, size = 1.2) +
-        ggplot2::labs(x = rt_axis_label(unit), y = "precursor m/z") +
+      df$.tip <- sprintf("precursor m/z: %.4f\nscan: %s\nrt: %.4g %s | %s",
+                         df$precursorMZ, ifelse(is.na(df$scan), "?", df$scan),
+                         df$rt_disp, unit, df$sample_name)
+      cby <- input$color_by
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = rt_disp, y = precursorMZ,
+                                            key = sample_id, text = .tip))
+      if (identical(cby, "none")) {
+        p <- p + ggplot2::geom_point(
+          color = brewer_qual(1, rv$settings$qual_palette), alpha = 0.5, size = 1.2)
+      } else {
+        df$.color <- df[[cby]]
+        p <- ggplot2::ggplot(df, ggplot2::aes(x = rt_disp, y = precursorMZ,
+                                              color = .color, key = sample_id, text = .tip)) +
+          ggplot2::geom_point(alpha = 0.5, size = 1.2) +
+          ggplot2::scale_color_manual(
+            values = brewer_named(unique(df$.color), rv$settings$qual_palette))
+      }
+      p + ggplot2::labs(x = rt_axis_label(unit), y = "precursor m/z", color = NULL) +
         ggplot2::theme_bw()
     })
 
+    keep_zoom <- zoom_keeper("prec")
     output$plot <- renderPlotly({
-      ggplotly(plot_gg(), source = "prec", tooltip = "text", dynamicTicks = FALSE)
+      ggplotly(plot_gg(), source = "prec", tooltip = "text", dynamicTicks = FALSE) %>%
+        keep_zoom() %>%
+        event_register("plotly_click") %>% event_register("plotly_relayout")
+    })
+
+    click <- reactive(suppressWarnings(event_data("plotly_click", source = "prec")))
+    observeEvent(click(), {
+      ev <- click(); req(ev)
+      rv$selection <- list(plot = "prec", file_id = ev$key,
+                           rt = rt_to_sec(ev$x, rv$settings$time_unit), mz = ev$y)
     })
 
     mod_export_server("export", plot_gg, rv, "precursors")

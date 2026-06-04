@@ -139,10 +139,23 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     keep_zoom <- zoom_keeper("spec")
     output$plot <- renderPlotly({
       ggplotly(plot_gg(), source = "spec", tooltip = "text", dynamicTicks = FALSE) %>%
-        keep_zoom() %>% event_register("plotly_relayout")
+        keep_zoom() %>%
+        event_register("plotly_click") %>% event_register("plotly_relayout")
     })
 
-    # --- Scan list browser (click a row to load that scan) -----------------
+    # Click a peak -> add its m/z to the EIC target list.
+    click <- reactive(suppressWarnings(event_data("plotly_click", source = "spec")))
+    observeEvent(click(), {
+      ev <- click(); req(ev, !is.null(ev$x))
+      mz <- ev$x
+      rv$eic_targets <- dplyr::bind_rows(rv$eic_targets, tibble::tibble(
+        label = sprintf("m%.4f", mz), mz = mz, tol = 10, unit = "ppm",
+        rt_min = NA_real_, rt_max = NA_real_, enabled = TRUE))
+      showNotification(sprintf("Added m/z %.4f to the EIC list.", mz),
+                       type = "message", duration = 2)
+    })
+
+    # --- Scan list browser (typed filters; click a row to load that scan) ---
     ns <- session$ns
     scan_tab <- reactive({
       f <- cur_row()
@@ -150,26 +163,48 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       tab$rt_disp <- round(rt_to_disp(tab$rt, rv$settings$time_unit), 4)
       tab
     })
+    filtered_scans <- reactive({
+      tab <- scan_tab()
+      keep <- rep(TRUE, nrow(tab))
+      if (isTRUE(is.finite(input$sl_scan_min))) keep <- keep & tab$scan >= input$sl_scan_min
+      if (isTRUE(is.finite(input$sl_scan_max))) keep <- keep & tab$scan <= input$sl_scan_max
+      if (isTRUE(is.finite(input$sl_rt_min)))   keep <- keep & tab$rt_disp >= input$sl_rt_min
+      if (isTRUE(is.finite(input$sl_rt_max)))   keep <- keep & tab$rt_disp <= input$sl_rt_max
+      if (!is.null(input$sl_ms) && input$sl_ms != "all")
+        keep <- keep & tab$msLevel == as.integer(input$sl_ms)
+      if (!is.null(input$sl_sid) && nzchar(input$sl_sid))
+        keep <- keep & grepl(input$sl_sid, tab$spectrumId, fixed = TRUE)
+      tab[keep, , drop = FALSE]
+    })
     observeEvent(input$scanlist, {
+      ms_choices <- c("all", sort(unique(scan_tab()$msLevel)))
       showModal(modalDialog(
         title = paste("Scans —", cur_row()$name), size = "xl", easyClose = TRUE,
-        helpText("Click a row to load that scan."),
+        helpText("Type filters (blank = no limit); click a row to load that scan."),
+        layout_columns(
+          col_widths = c(2, 2, 2, 2, 1, 3),
+          numericInput(ns("sl_scan_min"), "scan ≥", NA),
+          numericInput(ns("sl_scan_max"), "scan ≤", NA),
+          numericInput(ns("sl_rt_min"), paste0("rt(", rv$settings$time_unit, ") ≥"), NA),
+          numericInput(ns("sl_rt_max"), paste0("rt(", rv$settings$time_unit, ") ≤"), NA),
+          selectInput(ns("sl_ms"), "MS", choices = ms_choices),
+          textInput(ns("sl_sid"), "spectrumId contains")),
         DT::DTOutput(ns("scantable")),
         footer = modalButton("Close")
       ))
     })
     output$scantable <- DT::renderDT({
-      tab <- scan_tab()
+      tab <- filtered_scans()
       disp <- tab[, c("scan", "rt_disp", "msLevel", "polarity", "precursorMZ",
-                      "tic", "basePeakMZ")]
+                      "tic", "basePeakMZ", "spectrumId")]
       names(disp)[2] <- paste0("rt(", rv$settings$time_unit, ")")
-      DT::datatable(disp, rownames = FALSE, selection = "single", filter = "top",
+      DT::datatable(disp, rownames = FALSE, selection = "single",
                     options = list(pageLength = 15, scrollX = TRUE))
     })
     observeEvent(input$scantable_rows_selected, {
       i <- input$scantable_rows_selected; req(length(i) == 1)
       updateRadioButtons(session, "layout", selected = "single")
-      updateNumericInput(session, "scan", value = scan_tab()$scan[i])
+      updateNumericInput(session, "scan", value = filtered_scans()$scan[i])
       removeModal()
     })
 

@@ -53,7 +53,11 @@ mod_plot_map_server <- function(id, rv, included) {
       withProgress(message = "Reading peaks…", value = 0.3, {
         pieces <- lapply(seq_len(nrow(inc)), function(i) {
           d <- extract_peaks(inc$path[i], rv$filter)
-          if (nrow(d)) d$sample_id <- inc$id[i]
+          if (nrow(d)) {
+            d$sample_id <- inc$id[i]
+            st <- file_scan_table(inc$path[i])
+            d$scan <- st$scan[match(round(d$rt, 3), round(st$rt, 3))]
+          }
           d
         })
         dplyr::bind_rows(pieces)
@@ -87,13 +91,18 @@ mod_plot_map_server <- function(id, rv, included) {
         K <- 32L; cols <- brewer_seq(rv$settings$seq_palette, invert = inv)(K)
         pk$grp <- pmax(1L, pmin(K, ceiling(pmin(pk$intensity, cmax) / cmax * K)))
         p <- plot_ly(source = "map")
+        if (is.null(pk$scan)) pk$scan <- NA_integer_
         for (g in sort(unique(pk$grp))) {
           d <- pk[pk$grp == g, , drop = FALSE]
           x <- as.vector(rbind(d$rt_disp, d$rt1_disp, NA_real_))
           y <- as.vector(rbind(d$mz, d$mz, NA_real_))
+          txt <- sprintf("m/z %.4f\nrt %.4g %s\nscan %s\nint %.3g",
+                         d$mz, d$rt_disp, unit, ifelse(is.na(d$scan), "?", d$scan),
+                         d$intensity)
+          t <- as.vector(rbind(txt, txt, NA_character_))
           p <- add_trace(p, x = x, y = y, type = "scattergl", mode = "lines",
                          line = list(color = cols[g], width = input$psize),
-                         hoverinfo = "skip", showlegend = FALSE)
+                         text = t, hoverinfo = "text", showlegend = FALSE)
         }
         p <- add_trace(p, x = rep(pk$rt_disp[1], 2), y = rep(pk$mz[1], 2),
                        type = "scattergl", mode = "markers",

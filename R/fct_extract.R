@@ -126,8 +126,9 @@ file_scan_table <- function(path) {
   tab <- data.frame(
     scan = h$acquisitionNum, rt = h$retentionTime, msLevel = h$msLevel,
     polarity = col("polarity"), precursorMZ = col("precursorMZ"),
-    charge = col("precursorCharge"), tic = col("totIonCurrent"),
-    basePeakMZ = col("basePeakMZ"), basePeakInt = col("basePeakIntensity"))
+    tic = col("totIonCurrent"), basePeakMZ = col("basePeakMZ"),
+    spectrumId = if ("spectrumId" %in% colnames(h)) h$spectrumId else NA_character_,
+    stringsAsFactors = FALSE)
   assign(key, tab, envir = .scan_cache)
   tab
 }
@@ -147,12 +148,13 @@ add_scan_numbers <- function(df, meta) {
   df
 }
 
-#' Precursor ions (rt + precursor m/z) for MS>1 spectra in a file (DDA map).
+#' Precursor ions (rt, precursor m/z, scan) for MS>1 spectra in a file (DDA map).
 extract_precursors <- function(path) {
   sp <- Spectra::Spectra(path, source = Spectra::MsBackendMzR())
   ms <- Spectra::msLevel(sp); pmz <- Spectra::precursorMz(sp); rt <- Spectra::rtime(sp)
+  scn <- tryCatch(Spectra::acquisitionNum(sp), error = function(e) rep(NA_integer_, length(sp)))
   idx <- which(ms > 1 & is.finite(pmz) & pmz > 0)
-  tibble::tibble(rt = rt[idx], precursorMZ = pmz[idx])
+  tibble::tibble(rt = rt[idx], precursorMZ = pmz[idx], scan = scn[idx])
 }
 
 #' Polarity label from the integer code Spectra uses (0 neg, 1 pos, -1 unknown).

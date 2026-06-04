@@ -9,19 +9,15 @@
 mod_ingest_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    # 1) paste a folder (or single file) path — the fast path
+    # Paste a folder (loads all MS files in it) or a single file path.
     div(class = "d-flex gap-2 mb-2",
         div(style = "flex:1;",
             textInput(ns("folder"), NULL, width = "100%",
                       placeholder = "Paste a folder or file path…")),
-        actionButton(ns("add_folder"), "Add", class = "btn-primary")),
-    # 2) or browse server-side (no upload/copy)
-    div(class = "d-flex gap-2 mb-2",
-        shinyFilesButton(ns("files"), "Browse…", "Select MS data files",
-                         multiple = TRUE, icon = icon("folder-open"),
-                         class = "btn-outline-secondary btn-sm"),
-        actionButton(ns("clear"), "Clear", icon = icon("trash"),
-                     class = "btn-outline-secondary btn-sm")),
+        actionButton(ns("add_folder"), "Add", class = "btn-primary"),
+        actionButton(ns("clear"), NULL, icon = icon("trash"),
+                     class = "btn-outline-secondary", title = "Clear all files")),
+    helpText("Type/paste a directory (adds every MS file inside) or a single file."),
     div(class = "d-flex gap-2 mb-2",
         actionButton(ns("sel_all"),  "All",    class = "btn-sm btn-outline-secondary"),
         actionButton(ns("sel_none"), "None",   class = "btn-sm btn-outline-secondary"),
@@ -34,11 +30,6 @@ mod_ingest_ui <- function(id) {
 mod_ingest_server <- function(id, rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-
-    # --- shinyFiles wiring ------------------------------------------------
-    roots <- c(Home = fs::path_home(), getVolumes()())
-    shinyFileChoose(input, "files", roots = roots, session = session,
-                    filetypes = MS_FILE_EXTS)
 
     # --- Read queue + single-file async reader ----------------------------
     queue <- reactiveVal(character())     # file ids waiting to be read
@@ -82,13 +73,6 @@ mod_ingest_server <- function(id, rv) {
       queue(c(queue(), new_rows$id))
       pump()
     }
-
-    # shinyFiles browse
-    observeEvent(input$files, {
-      parsed <- parseFilePaths(roots, input$files)
-      req(nrow(parsed) > 0)
-      add_paths(as.character(parsed$datapath))
-    })
 
     # Pasted folder or file path
     observeEvent(input$add_folder, {

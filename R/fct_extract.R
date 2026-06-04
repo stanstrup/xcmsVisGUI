@@ -111,6 +111,34 @@ bin_peaks <- function(df, rt_bin = 10, mz_bin = 1, aggfun = max) {
                    intensity = aggfun(intensity), .groups = "drop")
 }
 
+#' Cached per-file scan table (rt seconds, acquisition number, MS level) via mzR.
+.scan_cache <- new.env(parent = emptyenv())
+file_scan_table <- function(path) {
+  key <- normalizePath(path, winslash = "/", mustWork = FALSE)
+  hit <- get0(key, envir = .scan_cache, inherits = FALSE)
+  if (!is.null(hit)) return(hit)
+  x <- mzR::openMSfile(path); on.exit(mzR::close(x))
+  h <- mzR::header(x)
+  tab <- data.frame(rt = h$retentionTime, scan = h$acquisitionNum, msLevel = h$msLevel)
+  assign(key, tab, envir = .scan_cache)
+  tab
+}
+
+#' Add a `scan` (acquisition number) column to a chromatogram tibble by matching
+#' retention time per file. `meta` must carry id + path columns.
+add_scan_numbers <- function(df, meta) {
+  if (!nrow(df) || is.null(meta$path)) { df$scan <- NA_integer_; return(df) }
+  df$scan <- NA_integer_
+  for (fid in unique(df$sample_id)) {
+    p <- meta$path[meta$id == fid]
+    if (!length(p) || is.na(p)) next
+    st <- file_scan_table(p)
+    idx <- df$sample_id == fid
+    df$scan[idx] <- st$scan[match(round(df$rt[idx], 3), round(st$rt, 3))]
+  }
+  df
+}
+
 #' Precursor ions (rt + precursor m/z) for MS>1 spectra in a file (DDA map).
 extract_precursors <- function(path) {
   sp <- Spectra::Spectra(path, source = Spectra::MsBackendMzR())

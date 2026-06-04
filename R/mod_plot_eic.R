@@ -31,6 +31,7 @@ mod_plot_eic_ui <- function(id) {
         selectInput(ns("color_by"), "Color by",
                     c("Target" = "target", "File" = "sample_name",
                       "Sample group" = "sample_group")),
+        checkboxInput(ns("points"), "Show data points", value = FALSE),
         checkboxInput(ns("facet"), "Facet by file", value = FALSE),
         helpText("Click a trace to show its spectrum.")
       ),
@@ -127,10 +128,11 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       rtr <- numeric()
       if (any(is.finite(rmin_s)) || any(is.finite(rmax_s)))
         rtr <- c(min(rmin_s, na.rm = TRUE), max(rmax_s, na.rm = TRUE))
+      ms <- if (is.finite(rv$filter$ms_level)) as.integer(rv$filter$ms_level) else 1L
       withProgress(message = "Extracting EICs…", value = 0.5, {
-        chr <- if (length(rtr) == 2) chromatogram(x, mz = mzmat, rt = rtr)
-               else chromatogram(x, mz = mzmat)
-        df <- chrom_to_df(chr, meta(), labels = tg$label)
+        chr <- if (length(rtr) == 2) chromatogram(x, mz = mzmat, rt = rtr, msLevel = ms)
+               else chromatogram(x, mz = mzmat, msLevel = ms)
+        df <- add_scan_numbers(chrom_to_df(chr, meta(), labels = tg$label), meta())
       })
       # per-target rt clipping (display unit -> seconds)
       if (any(is.finite(rmin_s)) || any(is.finite(rmax_s))) {
@@ -152,8 +154,9 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       df$rt_disp <- rt_to_disp(df$rt, unit)
       df$.color <- df[[cby]]
       pal <- brewer_named(unique(df$.color), rv$settings$qual_palette)
-      df$.tip <- sprintf("%s | %s\nrt: %.4g %s\nint: %.3g",
-                         df$target, df$sample_name, df$rt_disp, unit, df$intensity)
+      df$.tip <- sprintf("%s | %s\nscan: %s\nrt: %.4g %s\nint: %.3g",
+                         df$target, df$sample_name, ifelse(is.na(df$scan), "?", df$scan),
+                         df$rt_disp, unit, df$intensity)
       p <- ggplot2::ggplot(df, ggplot2::aes(
         x = rt_disp, y = intensity, color = .color,
         group = interaction(target, sample_id), key = sample_id, text = .tip))
@@ -162,6 +165,7 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
         p <- p + ggplot2::geom_line(ggplot2::aes(linetype = target), linewidth = 0.5)
       else
         p <- p + ggplot2::geom_line(linewidth = 0.5)
+      if (isTRUE(input$points)) p <- p + ggplot2::geom_point(size = 0.9)
       p <- p +
         ggplot2::scale_color_manual(values = pal) +
         ggplot2::labs(x = rt_axis_label(unit), y = "intensity", color = NULL,
@@ -174,6 +178,7 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
 
     output$plot <- renderPlotly({
       ggplotly(plot_gg(), source = "eic", tooltip = "text", dynamicTicks = TRUE) %>%
+        layout(uirevision = "eic") %>%
         event_register("plotly_click")
     })
 

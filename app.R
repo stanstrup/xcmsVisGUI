@@ -83,7 +83,8 @@ server <- function(input, output, session) {
   })
   meta <- reactive({
     inc <- included()
-    tibble::tibble(id = inc$id, name = inc$name, sample_group = inc$sample_group)
+    tibble::tibble(id = inc$id, name = inc$name, path = inc$path,
+                   sample_group = inc$sample_group)
   })
 
   mod_plot_tic_bpc_server("tic", rv, dataset, meta, data_key)

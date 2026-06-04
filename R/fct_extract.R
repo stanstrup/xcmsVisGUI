@@ -122,7 +122,12 @@ file_scan_table <- function(path) {
   if (!is.null(hit)) return(hit)
   x <- mzR::openMSfile(path); on.exit(mzR::close(x))
   h <- mzR::header(x)
-  tab <- data.frame(rt = h$retentionTime, scan = h$acquisitionNum, msLevel = h$msLevel)
+  col <- function(nm) if (nm %in% colnames(h)) h[[nm]] else NA
+  tab <- data.frame(
+    scan = h$acquisitionNum, rt = h$retentionTime, msLevel = h$msLevel,
+    polarity = col("polarity"), precursorMZ = col("precursorMZ"),
+    charge = col("precursorCharge"), tic = col("totIonCurrent"),
+    basePeakMZ = col("basePeakMZ"), basePeakInt = col("basePeakIntensity"))
   assign(key, tab, envir = .scan_cache)
   tab
 }

@@ -61,7 +61,7 @@ mod_plot_precursors_server <- function(id, rv, included) {
     })
 
     output$plot <- renderPlotly({
-      ggplotly(plot_gg(), source = "prec", tooltip = "text", dynamicTicks = TRUE)
+      ggplotly(plot_gg(), source = "prec", tooltip = "text", dynamicTicks = FALSE)
     })
 
     mod_export_server("export", plot_gg, rv, "precursors")

@@ -52,9 +52,10 @@ mod_filter_server <- function(id, rv, included) {
         if (length(r$polarities) > 1)
           selectInput(ns("polarity"), "Polarity",
                       choices = c("any", "pos", "neg"), selected = "any"),
-        if (length(r$charges))
-          selectInput(ns("charge"), "Precursor charge",
-                      choices = c("any", as.character(r$charges)), selected = "any"),
+        selectizeInput(ns("charge"), "Charge",
+                       choices = c("any", as.character(r$charges)), selected = "any",
+                       options = list(create = TRUE,
+                                      placeholder = "any (type a charge to add)")),
         textInput(ns("spectrum_id"), "Spectrum ID contains",
                   placeholder = "e.g. function=1 process=0"),
         helpText("Leave a box blank for no limit.")

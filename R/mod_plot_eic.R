@@ -177,7 +177,7 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
     })
 
     output$plot <- renderPlotly({
-      ggplotly(plot_gg(), source = "eic", tooltip = "text", dynamicTicks = TRUE) %>%
+      ggplotly(plot_gg(), source = "eic", tooltip = "text", dynamicTicks = FALSE) %>%
         layout(uirevision = "eic") %>%
         event_register("plotly_click")
     })

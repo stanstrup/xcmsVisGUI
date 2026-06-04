@@ -68,7 +68,7 @@ server <- function(input, output, session) {
 
   mod_plot_tic_bpc_server("tic", rv, dataset, meta, data_key)
   mod_plot_eic_server("eic", rv, dataset, meta, data_key)
-  mod_plot_spectrum_server("spec", rv)
+  mod_plot_spectrum_server("spec", rv, included)
   mod_plot_msmap_server("msmap", rv, included)
   mod_plot_3d_server("threeD", rv, included)
   mod_plot_precursors_server("prec", rv, included)

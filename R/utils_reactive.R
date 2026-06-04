@@ -74,20 +74,24 @@ make_rv <- function() {
 #' when the plot re-renders for data/cosmetic reasons. Cleared on double-click.
 zoom_keeper <- function(source) {
   z <- reactiveValues(x = NULL, y = NULL)
+  # Only STORE ranges from user zoom/pan. We must NOT clear on autorange here:
+  # a re-render emits an autorange relayout that would wipe the saved zoom.
   observeEvent(event_data("plotly_relayout", source = source), {
     e <- suppressWarnings(event_data("plotly_relayout", source = source))
     if (is.null(e)) return()
-    if (isTRUE(e[["xaxis.autorange"]])) z$x <- NULL
-    if (isTRUE(e[["yaxis.autorange"]])) z$y <- NULL
     if (!is.null(e[["xaxis.range[0]"]]))
       z$x <- c(e[["xaxis.range[0]"]], e[["xaxis.range[1]"]])
     if (!is.null(e[["yaxis.range[0]"]]))
       z$y <- c(e[["yaxis.range[0]"]], e[["yaxis.range[1]"]])
   }, ignoreInit = TRUE)
+  # A genuine reset is a double-click -> forget the zoom.
+  observeEvent(event_data("plotly_doubleclick", source = source), {
+    z$x <- NULL; z$y <- NULL
+  }, ignoreInit = TRUE)
   function(p) {
     zx <- isolate(z$x); zy <- isolate(z$y)
-    if (!is.null(zx)) p <- plotly::layout(p, xaxis = list(range = zx))
-    if (!is.null(zy)) p <- plotly::layout(p, yaxis = list(range = zy))
+    if (!is.null(zx)) p <- plotly::layout(p, xaxis = list(range = zx, autorange = FALSE))
+    if (!is.null(zy)) p <- plotly::layout(p, yaxis = list(range = zy, autorange = FALSE))
     p
   }
 }

@@ -151,7 +151,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     output$plot <- renderPlotly({
       ggplotly(plot_gg(), source = "spec", tooltip = "text", dynamicTicks = TRUE) %>%
         keep_zoom() %>%
-        event_register("plotly_click") %>% event_register("plotly_relayout")
+        event_register("plotly_click") %>% event_register("plotly_relayout") %>% event_register("plotly_doubleclick")
     })
 
     # Click a peak -> add its m/z to the EIC target list.

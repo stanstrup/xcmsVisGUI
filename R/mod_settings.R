@@ -15,6 +15,8 @@ mod_settings_ui <- function(id) {
     ),
     card(
       card_header("Appearance & export"),
+      radioButtons(ns("time_unit"), "Retention-time unit", inline = TRUE,
+                   choices = c("Minutes" = "min", "Seconds" = "sec"), selected = "min"),
       selectInput(ns("qual_palette"), "Qualitative palette (groups, EICs)",
                   choices = QUAL_PALETTES),
       selectInput(ns("seq_palette"), "Sequential palette (maps, 3D)",
@@ -38,6 +40,7 @@ mod_settings_server <- function(id, rv) {
 
     # Push every control into rv$settings so other modules react to changes.
     observe({
+      rv$settings$time_unit     <- input$time_unit
       rv$settings$qual_palette  <- input$qual_palette
       rv$settings$seq_palette   <- input$seq_palette
       rv$settings$export_format <- input$export_format

@@ -49,14 +49,16 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
       lvls <- unique(df[[cby]])
       pal <- brewer_named(lvls, rv$settings$qual_palette)
       df$.color <- df[[cby]]
-      df$.tip <- sprintf("%s\nrt: %.0f s\nint: %.3g",
-                         df$sample_name, df$rt, df$intensity)
+      unit <- rv$settings$time_unit
+      df$rt_disp <- rt_to_disp(df$rt, unit)
+      df$.tip <- sprintf("%s\nrt: %.4g %s\nint: %.3g",
+                         df$sample_name, df$rt_disp, unit, df$intensity)
       ggplot2::ggplot(df, ggplot2::aes(
-        x = rt, y = intensity, group = sample_id, color = .color,
+        x = rt_disp, y = intensity, group = sample_id, color = .color,
         key = sample_id, text = .tip)) +
         ggplot2::geom_line(linewidth = 0.5) +
         ggplot2::scale_color_manual(values = pal) +
-        ggplot2::labs(x = "retention time (s)", y = "intensity",
+        ggplot2::labs(x = rt_axis_label(unit), y = "intensity",
                       color = NULL,
                       title = paste0(chrom_label(), " — ", length(unique(df$sample_id)),
                                      " file(s)")) +
@@ -73,7 +75,8 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
     click <- reactive(suppressWarnings(event_data("plotly_click", source = "tic")))
     observeEvent(click(), {
       ev <- click(); req(ev)
-      rv$selection <- list(plot = "tic", file_id = ev$key, rt = ev$x, mz = NA_real_)
+      rv$selection <- list(plot = "tic", file_id = ev$key,
+                           rt = rt_to_sec(ev$x, rv$settings$time_unit), mz = NA_real_)
     })
 
     mod_export_server("export", plot_gg, rv, reactive(tolower(chrom_label())))

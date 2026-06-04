@@ -78,3 +78,12 @@ MS_FILE_EXTS <- c("mzML", "mzXML", "CDF", "cdf", "mzml", "mzxml")
 # ColorBrewer qualitative palettes for groups/EIC traces, sequential for maps.
 QUAL_PALETTES <- c("Set1", "Set2", "Dark2", "Paired", "Accent")
 SEQ_PALETTES  <- c("YlOrRd", "Viridis-like (YlGnBu)" = "YlGnBu", "Blues", "Spectral")
+
+# --- Retention-time unit helpers ------------------------------------------
+# Data is always handled internally in SECONDS (xcms/Spectra native). These
+# convert to/from the user-facing display unit (minutes by default).
+rt_factor <- function(unit) if (identical(unit, "sec")) 1 else 60   # sec per display-unit
+rt_to_disp <- function(rt_sec, unit) rt_sec / rt_factor(unit)
+rt_to_sec  <- function(rt_disp, unit) rt_disp * rt_factor(unit)
+rt_axis_label <- function(unit) if (identical(unit, "sec")) "retention time (s)" else
+  "retention time (min)"

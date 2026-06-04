@@ -48,6 +48,7 @@ make_rv <- function() {
     # User settings (mod_settings).
     settings = list(
       backend      = "MsBackendMzR",
+      time_unit    = "min",          # "min" | "sec" — display unit for rt
       qual_palette = "Set1",
       seq_palette  = "YlOrRd",
       daemons      = max(1L, parallel::detectCores() - 1L),

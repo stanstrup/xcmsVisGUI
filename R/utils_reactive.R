@@ -68,8 +68,10 @@ make_rv <- function() {
 }
 
 #' Persist 2D zoom across re-renders. Call ONCE inside a moduleServer with the
-#' plot's plotly `source`; it returns a function to pipe a plotly object through
-#' (re-applies the last user zoom; cleared on double-click / autorange).
+#' plot's plotly `source`; it returns a function to pipe a plotly object through.
+#' The stored range is read with isolate() so a user zoom does NOT re-trigger the
+#' render (that caused an autorange/snap-back feedback loop); it is only re-applied
+#' when the plot re-renders for data/cosmetic reasons. Cleared on double-click.
 zoom_keeper <- function(source) {
   z <- reactiveValues(x = NULL, y = NULL)
   observeEvent(event_data("plotly_relayout", source = source), {
@@ -83,8 +85,9 @@ zoom_keeper <- function(source) {
       z$y <- c(e[["yaxis.range[0]"]], e[["yaxis.range[1]"]])
   }, ignoreInit = TRUE)
   function(p) {
-    if (!is.null(z$x)) p <- plotly::layout(p, xaxis = list(range = z$x))
-    if (!is.null(z$y)) p <- plotly::layout(p, yaxis = list(range = z$y))
+    zx <- isolate(z$x); zy <- isolate(z$y)
+    if (!is.null(zx)) p <- plotly::layout(p, xaxis = list(range = zx))
+    if (!is.null(zy)) p <- plotly::layout(p, yaxis = list(range = zy))
     p
   }
 }

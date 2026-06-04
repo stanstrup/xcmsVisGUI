@@ -1,0 +1,18 @@
+# R
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# renv: keep renv.lock, activate.R, settings.json tracked; ignore the library.
+# (renv/.gitignore already excludes renv/library etc.)
+
+# Transient outputs / logs / scratch launchers
+*.out
+*.log
+launch-test.R
+Rplots.pdf
+*.tmp
+
+# Claude Code harness
+.claude/

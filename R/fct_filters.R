@@ -1,6 +1,30 @@
-# Filter helpers for the global filter state.
-# The actual filtering is applied inside the mzR compute_* functions
-# (fct_extract.R) via filter_scans(); this file only derives slider bounds.
+# Compose the global filter state into Spectra/xcms filter calls.
+# rt / m/z / MS level filter directly on MsExperiment; polarity and intensity
+# go through filterSpectra() (no direct MsExperiment method).
+
+#' Apply the global filter list `f` (rv$filter) to an MsExperiment.
+apply_filters <- function(x, f) {
+  if (!is.null(f$ms_level) && is.finite(f$ms_level))
+    x <- xcms::filterMsLevel(x, as.integer(f$ms_level))
+  if (isTRUE(is.finite(f$rt_min) || is.finite(f$rt_max))) {
+    rt <- c(if (is.finite(f$rt_min)) f$rt_min else -Inf,
+            if (is.finite(f$rt_max)) f$rt_max else  Inf)
+    x <- xcms::filterRt(x, rt = rt)
+  }
+  if (isTRUE(is.finite(f$mz_min) || is.finite(f$mz_max))) {
+    mz <- c(if (is.finite(f$mz_min)) f$mz_min else 0,
+            if (is.finite(f$mz_max)) f$mz_max else Inf)
+    x <- Spectra::filterMzRange(x, mz = mz)
+  }
+  if (!is.null(f$polarity) && !identical(f$polarity, "any")) {
+    pol <- if (identical(f$polarity, "pos")) 1L else 0L
+    x <- MsExperiment::filterSpectra(x, Spectra::filterPolarity, polarity = pol)
+  }
+  if (!is.null(f$int_min) && is.finite(f$int_min) && f$int_min > 0)
+    x <- MsExperiment::filterSpectra(x, Spectra::filterIntensity,
+                                     intensity = c(f$int_min, Inf))
+  x
+}
 
 #' Combined data ranges across the included files (for slider bounds).
 #' @param files_df included rows of rv$files (status "ready").

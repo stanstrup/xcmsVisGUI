@@ -127,7 +127,6 @@ mod_ingest_server <- function(id, rv) {
     observeEvent(input$clear, {
       rv$files <- rv$files[0, ]
       queue(character()); current(NULL)
-      clear_ms_cache()
     })
 
     # --- Render the file list --------------------------------------------

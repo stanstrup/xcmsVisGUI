@@ -1,51 +1,13 @@
-# Fast data layer built directly on mzR.
+# Data extraction on Spectra / MsExperiment / xcms.
 #
-# Benchmark on real 30 MB centroided mzML files showed the bottleneck is NOT
-# disk or mzR (openMSfile + header + peaks = ~0.6 s) but Spectra's
-# MsBackendMzR initialization (~84 s) and xcms::chromatogram() (~93 s). So we
-# bypass Spectra/MsExperiment entirely: read each file once with mzR, cache the
-# header + peak list in memory, and compute every plot from that (manual EIC per
-# xcms issue #809). Repeat operations are then sub-second.
+# IMPORTANT: all reads run under BiocParallel SerialParam (registered in global.R
+# and in the mirai workers). The default SnowParam backend makes MsBackendMzR
+# initialization ~100x slower on Windows — see BENCHMARK.md / SPECTRA_ISSUE.md.
 
-# --- Per-file in-memory cache --------------------------------------------
-.ms_cache <- new.env(parent = emptyenv())
-ms_cache_cap <- 60L   # ~ files kept in RAM (≈35-70 MB each); oldest evicted
-
-#' Read one file via mzR into a compact structure (header vectors + peak list).
-read_ms_data <- function(path) {
-  x <- mzR::openMSfile(path)
-  on.exit(mzR::close(x))
-  h <- mzR::header(x)
-  pks <- mzR::peaks(x)
-  if (!is.list(pks)) pks <- list(pks)        # single-spectrum files
-  list(
-    rt          = h$retentionTime,
-    msLevel     = h$msLevel,
-    polarity    = h$polarity,
-    tic         = h$totIonCurrent,
-    bpi         = h$basePeakIntensity,
-    bpmz        = h$basePeakMZ,
-    precursorMZ = h$precursorMZ,
-    peaks       = pks
-  )
-}
-
-#' Cached accessor. Reads + caches on first use; evicts oldest beyond the cap.
-get_ms_data <- function(path) {
-  key <- normalizePath(path, winslash = "/", mustWork = FALSE)
-  hit <- get0(key, envir = .ms_cache, inherits = FALSE)
-  if (!is.null(hit)) return(hit)
-  d <- read_ms_data(path)
-  assign(key, d, envir = .ms_cache)
-  ks <- ls(.ms_cache)
-  if (length(ks) > ms_cache_cap) rm(list = ks[1], envir = .ms_cache)
-  d
-}
-
-clear_ms_cache <- function() rm(list = ls(.ms_cache), envir = .ms_cache)
-
-# --- Fast header summary for the file list (async reader) ----------------
-#' mzR-only header summary; ~0.1 s/file. Self-contained for use in a mirai worker.
+#' Fast file header summary for the file list, via mzR only (~0.1 s/file, no
+#' BiocParallel). Runs in a mirai worker. Spectra's read path is avoided here
+#' because even under SerialParam it is ~5 s/file (too slow for 100+ files).
+#' Returns list(summary=...) or list(error=...).
 read_ms_header <- function(path) {
   out <- tryCatch({
     x <- mzR::openMSfile(path)
@@ -67,98 +29,62 @@ read_ms_header <- function(path) {
   out
 }
 
-# --- Filtering (on cached structures) ------------------------------------
-#' Indices of spectra in `d` passing the rt / MS-level / polarity filter.
-filter_scans <- function(d, f) {
-  keep <- rep(TRUE, length(d$rt))
-  if (!is.null(f$ms_level) && is.finite(f$ms_level)) keep <- keep & d$msLevel == f$ms_level
-  if (!is.null(f$rt_min)   && is.finite(f$rt_min))   keep <- keep & d$rt >= f$rt_min
-  if (!is.null(f$rt_max)   && is.finite(f$rt_max))   keep <- keep & d$rt <= f$rt_max
-  if (!is.null(f$polarity) && !identical(f$polarity, "any")) {
-    pol <- if (identical(f$polarity, "pos")) 1L else 0L
-    keep <- keep & d$polarity == pol
+#' Build an MsExperiment from included files, injecting our sample metadata.
+build_msexp <- function(files_df) {
+  x <- MsExperiment::readMsExperiment(spectraFiles = files_df$path,
+                                      BPPARAM = BiocParallel::SerialParam())
+  sd <- MsExperiment::sampleData(x)
+  sd$sample_id    <- files_df$id
+  sd$sample_name  <- files_df$name
+  sd$sample_group <- files_df$sample_group
+  MsExperiment::sampleData(x) <- sd
+  x
+}
+
+#' Convert an (M/X)Chromatograms object to a tidy tibble for ggplot.
+chrom_to_df <- function(chr, meta, labels = NULL) {
+  nr <- nrow(chr); nc <- ncol(chr)
+  if (is.null(labels)) labels <- paste0("target", seq_len(nr))
+  pieces <- vector("list", nr * nc); k <- 0L
+  for (i in seq_len(nr)) for (j in seq_len(nc)) {
+    cell <- chr[i, j]
+    rt  <- xcms::rtime(cell); int <- xcms::intensity(cell)
+    if (!length(rt)) next
+    k <- k + 1L
+    pieces[[k]] <- tibble::tibble(
+      target = labels[i], sample_id = meta$id[j], sample_name = meta$name[j],
+      sample_group = meta$sample_group[j], rt = rt, intensity = int)
   }
-  which(keep)
+  out <- dplyr::bind_rows(pieces[seq_len(k)])
+  out$intensity[is.na(out$intensity)] <- 0
+  out
 }
 
-# whether m/z or intensity constraints require looking at peak data
-.has_mz_int_filter <- function(f) {
-  (!is.null(f$mz_min) && is.finite(f$mz_min)) ||
-  (!is.null(f$mz_max) && is.finite(f$mz_max)) ||
-  (!is.null(f$int_min) && is.finite(f$int_min) && f$int_min > 0)
+#' Extract a single spectrum (m/z + intensity) nearest a retention time.
+extract_spectrum <- function(path, rt, ms_level = 1L) {
+  sp <- Spectra::Spectra(path, source = Spectra::MsBackendMzR())
+  sp <- Spectra::filterMsLevel(sp, as.integer(ms_level))
+  rts <- Spectra::rtime(sp)
+  if (!length(rts)) return(tibble::tibble(mz = numeric(), intensity = numeric(), rt = numeric()))
+  idx <- which.min(abs(rts - rt))
+  one <- sp[idx]
+  tibble::tibble(mz = Spectra::mz(one)[[1]], intensity = Spectra::intensity(one)[[1]],
+                 rt = rts[idx])
 }
 
-# sum intensity of one peak matrix within an m/z window, above an intensity floor
-.window_sum <- function(m, lo, hi, int_min = 0) {
-  s <- m[, 1] >= lo & m[, 1] <= hi
-  if (int_min > 0) s <- s & m[, 2] >= int_min
-  if (any(s)) sum(m[s, 2]) else 0
-}
-
-# --- Compute: TIC / BPC --------------------------------------------------
-#' @param agg "tic" or "bpc"
-compute_chrom <- function(paths, meta, f, agg = "tic") {
-  mz_int <- .has_mz_int_filter(f)
-  lo <- if (is.finite(f$mz_min)) f$mz_min else 0
-  hi <- if (is.finite(f$mz_max)) f$mz_max else Inf
-  imin <- if (is.finite(f$int_min)) f$int_min else 0
-  pieces <- vector("list", length(paths))
-  for (i in seq_along(paths)) {
-    d <- get_ms_data(paths[i])
-    idx <- filter_scans(d, f)
-    if (!length(idx)) next
-    if (!mz_int) {
-      val <- if (agg == "tic") d$tic[idx] else d$bpi[idx]
-    } else {
-      val <- vapply(d$peaks[idx], function(m) {
-        s <- m[, 1] >= lo & m[, 1] <= hi & m[, 2] >= imin
-        if (!any(s)) return(0)
-        if (agg == "tic") sum(m[s, 2]) else max(m[s, 2])
-      }, numeric(1))
-    }
-    pieces[[i]] <- tibble::tibble(
-      target = toupper(agg), sample_id = meta$id[i], sample_name = meta$name[i],
-      rt = d$rt[idx], intensity = val)
-  }
-  dplyr::bind_rows(pieces)
-}
-
-# --- Compute: EICs (manual, issue #809) ----------------------------------
-#' @param mz_windows two-column matrix of c(low, high) per target
-#' @param labels character labels per target (row of mz_windows)
-compute_eic <- function(paths, meta, mz_windows, labels, f) {
-  imin <- if (is.finite(f$int_min)) f$int_min else 0
-  out <- list(); k <- 0L
-  for (i in seq_along(paths)) {
-    d <- get_ms_data(paths[i])
-    idx <- filter_scans(d, f)
-    if (!length(idx)) next
-    rt <- d$rt[idx]; pk <- d$peaks[idx]
-    for (j in seq_len(nrow(mz_windows))) {
-      lo <- mz_windows[j, 1]; hi <- mz_windows[j, 2]
-      ints <- vapply(pk, .window_sum, numeric(1), lo = lo, hi = hi, int_min = imin)
-      k <- k + 1L
-      out[[k]] <- tibble::tibble(
-        target = labels[j], sample_id = meta$id[i], sample_name = meta$name[i],
-        rt = rt, intensity = ints)
-    }
-  }
-  dplyr::bind_rows(out)
-}
-
-# --- Compute: long peak table for one file (MS map / 3D) -----------------
-compute_peaks <- function(path, f) {
-  d <- get_ms_data(path)
-  idx <- filter_scans(d, f)
-  if (!length(idx)) return(tibble::tibble(rt = numeric(), mz = numeric(),
-                                          intensity = numeric()))
-  rt <- d$rt[idx]; pk <- d$peaks[idx]
-  lens <- vapply(pk, nrow, integer(1))
-  mat <- do.call(rbind, pk)
-  df <- tibble::tibble(rt = rep(rt, lens), mz = mat[, 1], intensity = mat[, 2])
-  if (is.finite(f$mz_min))  df <- df[df$mz >= f$mz_min, , drop = FALSE]
-  if (is.finite(f$mz_max))  df <- df[df$mz <= f$mz_max, , drop = FALSE]
-  if (is.finite(f$int_min) && f$int_min > 0) df <- df[df$intensity >= f$int_min, , drop = FALSE]
+#' Extract all peaks (rt, m/z, intensity) from one file as a long tibble (MS map/3D).
+extract_peaks <- function(path, ms_level = 1L, rt_range = NULL, mz_range = NULL) {
+  sp <- Spectra::Spectra(path, source = Spectra::MsBackendMzR())
+  sp <- Spectra::filterMsLevel(sp, as.integer(ms_level))
+  if (!is.null(rt_range)) sp <- Spectra::filterRt(sp, rt_range)
+  rt <- Spectra::rtime(sp)
+  pd <- Spectra::peaksData(sp)
+  lens <- vapply(pd, nrow, integer(1))
+  mat <- do.call(rbind, pd)
+  if (is.null(mat)) return(tibble::tibble(rt = numeric(), mz = numeric(), intensity = numeric()))
+  df <- tibble::tibble(rt = rep(rt, lens), mz = mat[, "mz"], intensity = mat[, "intensity"])
+  if (!is.null(mz_range))
+    df <- df[df$mz >= mz_range[1] & df$mz <= mz_range[2], , drop = FALSE]
   df
 }
 
@@ -172,26 +98,7 @@ bin_peaks <- function(df, rt_bin = 10, mz_bin = 1, aggfun = max) {
                    intensity = aggfun(intensity), .groups = "drop")
 }
 
-# --- Compute: single spectrum at a retention time ------------------------
-get_spectrum_at <- function(path, rt, ms_level = 1L) {
-  d <- get_ms_data(path)
-  idx <- which(d$msLevel == as.integer(ms_level))
-  if (!length(idx)) idx <- seq_along(d$rt)
-  i <- idx[which.min(abs(d$rt[idx] - rt))]
-  m <- d$peaks[[i]]
-  tibble::tibble(mz = m[, 1], intensity = m[, 2], rt = d$rt[i])
-}
-
-# --- Compute: precursor ions (DDA) ---------------------------------------
-compute_precursors <- function(path) {
-  d <- get_ms_data(path)
-  idx <- which(d$msLevel > 1 & is.finite(d$precursorMZ) & d$precursorMZ > 0)
-  tibble::tibble(rt = d$rt[idx], precursorMZ = d$precursorMZ[idx])
-}
-
-# --- Misc ----------------------------------------------------------------
-#' Polarity label from the integer code mzR uses (0 neg, 1 pos, -1 unknown).
-#' `x` may be a comma-separated string of codes (e.g. "0, 1").
+#' Polarity label from the integer code Spectra uses (0 neg, 1 pos, -1 unknown).
 polarity_label <- function(x) {
   if (length(x) == 0 || is.na(x)) return(NA_character_)
   codes <- trimws(strsplit(as.character(x), ",")[[1]])

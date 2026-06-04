@@ -49,20 +49,25 @@ server <- function(input, output, session) {
   # global filter should trigger re-extraction (not status/group edits).
   data_key <- reactive(list(paths = sort(included()$path), filter = rv$filter))
 
-  # Included paths (validated) + sample metadata. Plot modules read file data
-  # via the mzR cache (fct_extract), so there is no shared MsExperiment object.
-  paths <- reactive({
+  # Raw MsExperiment cached on the path set (built under SerialParam, so fast);
+  # the global filter is applied lazily on top.
+  raw_msexp <- reactive({
     inc <- included()
     validate(need(nrow(inc) > 0, "Add files and tick at least one to include."))
-    inc$path
+    build_msexp(inc)
+  }) %>% bindCache(sort(included()$path))
+
+  dataset <- reactive({
+    x <- raw_msexp()           # force here so validate() surfaces cleanly
+    apply_filters(x, rv$filter)
   })
   meta <- reactive({
     inc <- included()
     tibble::tibble(id = inc$id, name = inc$name, sample_group = inc$sample_group)
   })
 
-  mod_plot_tic_bpc_server("tic", rv, paths, meta, data_key)
-  mod_plot_eic_server("eic", rv, paths, meta, data_key)
+  mod_plot_tic_bpc_server("tic", rv, dataset, meta, data_key)
+  mod_plot_eic_server("eic", rv, dataset, meta, data_key)
   mod_plot_spectrum_server("spec", rv)
   mod_plot_msmap_server("msmap", rv, included)
   mod_plot_3d_server("threeD", rv, included)

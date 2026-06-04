@@ -29,7 +29,7 @@ mod_plot_spectrum_server <- function(id, rv) {
       s <- rv$selection; req(s)
       f <- sel_file()
       withProgress(message = "Reading spectrum…", value = 0.5, {
-        get_spectrum_at(f$path, rt = s$rt, ms_level = 1L)
+        extract_spectrum(f$path, rt = s$rt, ms_level = 1L)
       })
     })
 

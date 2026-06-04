@@ -34,7 +34,7 @@ mod_plot_eic_ui <- function(id) {
   )
 }
 
-mod_plot_eic_server <- function(id, rv, paths, meta, data_key) {
+mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
   moduleServer(id, function(input, output, session) {
 
     # Seed one example row the first time the module is used.
@@ -95,26 +95,22 @@ mod_plot_eic_server <- function(id, rv, paths, meta, data_key) {
       tg[isTRUE_vec(tg$enabled) & is.finite(tg$mz), , drop = FALSE]
     })
 
-    # Cached on (path set + filter + the enabled target rows). Manual EIC
-    # extraction (xcms #809) from the mzR cache — sub-second per file.
+    # Cached on (path set + filter + the enabled target rows). Extracted with
+    # xcms::chromatogram (fast under SerialParam).
     eic_df <- reactive({
-      p <- paths(); m <- meta()
+      x <- dataset(); req(x)
       tg <- enabled_targets()
       validate(need(nrow(tg) > 0, "Add at least one enabled target with a valid m/z."))
       tol_da <- ifelse(tg$unit == "ppm", tg$mz * tg$tol / 1e6, tg$tol)
       mzmat <- cbind(tg$mz - tol_da, tg$mz + tol_da)
-      withProgress(message = "Reading EICs…", value = 0.5, {
-        df <- compute_eic(p, m, mzmat, tg$label, rv$filter)
+      rtr <- numeric()
+      if (any(is.finite(tg$rt_min)) || any(is.finite(tg$rt_max)))
+        rtr <- c(min(tg$rt_min, na.rm = TRUE), max(tg$rt_max, na.rm = TRUE))
+      withProgress(message = "Extracting EICs…", value = 0.5, {
+        chr <- if (length(rtr) == 2) chromatogram(x, mz = mzmat, rt = rtr)
+               else chromatogram(x, mz = mzmat)
+        chrom_to_df(chr, meta(), labels = tg$label)
       })
-      # Per-target retention-time window (from the table), if set.
-      if (any(is.finite(tg$rt_min)) || any(is.finite(tg$rt_max))) {
-        lims <- tibble::tibble(target = tg$label, rmin = tg$rt_min, rmax = tg$rt_max)
-        df <- dplyr::left_join(df, lims, by = "target")
-        df <- df[(is.na(df$rmin) | df$rt >= df$rmin) &
-                 (is.na(df$rmax) | df$rt <= df$rmax), ]
-        df$rmin <- NULL; df$rmax <- NULL
-      }
-      df
     }) %>% bindCache(data_key(), enabled_targets())
 
     plot_gg <- reactive({

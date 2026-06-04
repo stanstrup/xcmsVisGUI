@@ -35,9 +35,19 @@ library(rlang)
 library(stringr)
 library(fs)
 
-# MS file reading is done directly with mzR (namespace calls); no need to attach
-# the heavy Spectra/xcms stack, which dominated startup and read time.
-suppressPackageStartupMessages(library(mzR))
+# The RforMassSpectrometry stack. xcms pulls in Spectra/MsExperiment.
+suppressPackageStartupMessages({
+  library(Spectra)
+  library(MsExperiment)
+  library(xcms)
+  library(xcmsVis)
+  library(BiocParallel)
+})
+
+# CRITICAL: register SerialParam. The default BiocParallel backend (SnowParam on
+# Windows) makes MsBackendMzR reads ~100x slower by spawning a socket cluster per
+# call — see BENCHMARK.md / SPECTRA_ISSUE.md. SerialParam makes reads sub-second.
+register(SerialParam())
 
 # --- Async backend (mirai) ------------------------------------------------
 # Daemons power the ExtendedTask file readers. Count is overridable from the
@@ -54,11 +64,10 @@ set_daemons <- function(n = .default_daemons) {
 # Establish the initial pool. everywhere() ships the packages a worker needs
 # to read a file so the mirai expressions don't have to library() each time.
 set_daemons()
-mirai::everywhere({
-  suppressPackageStartupMessages({
-    library(mzR)
-  })
-})
+# Workers only read file-header summaries via mzR (read_ms_header) — fast and
+# free of BiocParallel. Heavy plotting/filtering happens in the main process via
+# Spectra/xcms under SerialParam.
+mirai::everywhere(suppressPackageStartupMessages(library(mzR)))
 
 # Tidy up the pool when the R session ends.
 onStop(function() try(mirai::daemons(0), silent = TRUE))

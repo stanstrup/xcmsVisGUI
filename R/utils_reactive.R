@@ -37,6 +37,9 @@ make_rv <- function() {
     # Last plotly click that should drive the linked spectrum view.
     selection = NULL,        # list(plot, file_id, rt, mz)
 
+    # Shared "active file" for the single-file views (Spectrum, MS map).
+    active_file = NULL,      # a file id
+
     # Global filter state (mod_filter).
     filter = list(
       rt_min = NA_real_, rt_max = NA_real_,
@@ -51,7 +54,7 @@ make_rv <- function() {
       backend      = "MsBackendMzR",
       time_unit    = "min",          # "min" | "sec" — display unit for rt
       qual_palette = "Set1",
-      seq_palette  = "YlOrRd",
+      seq_palette  = "viridis",
       daemons      = max(1L, parallel::detectCores() - 1L),
       export_format = "png",
       export_width  = 8,

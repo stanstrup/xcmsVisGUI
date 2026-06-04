@@ -77,7 +77,9 @@ MS_FILE_EXTS <- c("mzML", "mzXML", "CDF", "cdf", "mzml", "mzxml")
 
 # ColorBrewer qualitative palettes for groups/EIC traces, sequential for maps.
 QUAL_PALETTES <- c("Set1", "Set2", "Dark2", "Paired", "Accent")
-SEQ_PALETTES  <- c("YlOrRd", "Viridis-like (YlGnBu)" = "YlGnBu", "Blues", "Spectral")
+VIRIDIS_PALETTES <- c("viridis", "magma", "plasma", "inferno", "cividis",
+                      "mako", "rocket", "turbo")
+SEQ_PALETTES  <- c(VIRIDIS_PALETTES, "YlOrRd", "YlGnBu", "Blues", "Spectral")
 
 # --- Retention-time unit helpers ------------------------------------------
 # Data is always handled internally in SECONDS (xcms/Spectra native). These

@@ -19,8 +19,11 @@ brewer_qual <- function(n, palette = "Set1") {
 }
 
 #' A sequential ColorBrewer ramp function for continuous fills (heatmaps/3D).
-#' @param palette a sequential/diverging ColorBrewer palette name
+#' @param palette a sequential ColorBrewer name OR a viridisLite option
+#'   (viridis/magma/plasma/inferno/cividis/mako/rocket/turbo)
 brewer_seq <- function(palette = "YlOrRd") {
+  if (palette %in% VIRIDIS_PALETTES)
+    return(function(n) viridisLite::viridis(n, option = palette))
   base <- tryCatch(
     RColorBrewer::brewer.pal(9, palette),
     error = function(e) RColorBrewer::brewer.pal(9, "YlOrRd")

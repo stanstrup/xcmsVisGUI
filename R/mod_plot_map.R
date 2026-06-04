@@ -6,6 +6,7 @@
 # Respects the global rt/m/z/MS-level filter; rt shown in the chosen time unit.
 
 MAP_POINT_CAP <- 400000L   # scattergl stays smooth up to a few hundred k points
+MAP_LINE_CAP  <- 200000L   # line segments are 3x the vertices, so a tighter cap
 
 mod_plot_map_ui <- function(id) {
   ns <- NS(id)
@@ -15,7 +16,6 @@ mod_plot_map_ui <- function(id) {
     layout_sidebar(
       sidebar = sidebar(
         width = 260, position = "right", open = "open",
-        selectInput(ns("file"), "File", choices = NULL),
         radioButtons(ns("mode"), "View",
                      c("2D map" = "map", "3D surface" = "surface", "3D points" = "points")),
         conditionalPanel(
@@ -34,9 +34,10 @@ mod_plot_map_ui <- function(id) {
           sliderInput(ns("thr"), "Intensity percentile cutoff",
                       min = 0, max = 99, value = 90, step = 1)
         ),
-        helpText("Apply rt/m/z filters to zoom; the 2D map draws exact centroids ",
-                 "(capped at ", format(MAP_POINT_CAP, big.mark = ","), " of the most ",
-                 "intense for speed).")
+        helpText("2D map draws each centroid as a segment across its scan's rt ",
+                 "width (no binning); lower the contrast to reveal weaker peaks. ",
+                 "Apply rt/m/z filters to zoom (top ",
+                 format(MAP_LINE_CAP, big.mark = ","), " peaks shown for speed).")
       ),
       plotlyOutput(ns("plot"), height = "100%")
     )
@@ -46,16 +47,9 @@ mod_plot_map_ui <- function(id) {
 mod_plot_map_server <- function(id, rv, included) {
   moduleServer(id, function(input, output, session) {
 
-    observe({
-      inc <- included()
-      choices <- if (nrow(inc)) stats::setNames(inc$id, inc$name) else character(0)
-      updateSelectInput(session, "file", choices = choices,
-                        selected = isolate(input$file) %||% (choices[1] %||% NULL))
-    })
-
     sel_file <- reactive({
-      req(input$file)
-      f <- rv$files[rv$files$id == input$file, ]
+      req(rv$active_file)
+      f <- rv$files[rv$files$id == rv$active_file, ]
       req(nrow(f) == 1); f
     })
 
@@ -65,7 +59,7 @@ mod_plot_map_server <- function(id, rv, included) {
       withProgress(message = "Reading peaks…", value = 0.5, {
         extract_peaks(f$path, rv$filter)
       })
-    }) %>% bindCache(input$file, rv$filter)
+    }) %>% bindCache(rv$active_file, rv$filter)
 
     output$plot <- renderPlotly({
       pk <- peaks()
@@ -75,18 +69,36 @@ mod_plot_map_server <- function(id, rv, included) {
       cs <- brewer_colorscale(rv$settings$seq_palette)
 
       if (input$mode == "map") {
-        if (nrow(pk) > MAP_POINT_CAP)
-          pk <- pk[order(-pk$intensity)[seq_len(MAP_POINT_CAP)], , drop = FALSE]
+        # Each centroid is drawn as a horizontal segment spanning its scan's rt
+        # width (rt -> next scan rt), so scans connect into traces (not dots).
+        if (nrow(pk) > MAP_LINE_CAP)
+          pk <- pk[order(-pk$intensity)[seq_len(MAP_LINE_CAP)], , drop = FALSE]
         cmax <- stats::quantile(pk$intensity, input$contrast / 100, names = FALSE)
         if (!is.finite(cmax) || cmax <= 0) cmax <- max(pk$intensity)
-        plot_ly(pk, x = ~rt_disp, y = ~mz, type = "scattergl", mode = "markers",
-                source = "map",
-                marker = list(size = input$psize, color = ~intensity, colorscale = cs,
-                              cmin = 0, cmax = cmax, colorbar = list(title = "int")),
-                hoverinfo = "text",
-                text = ~sprintf("rt %.4g %s\nm/z %.4f\nint %.3g", rt_disp, unit, mz, intensity)) %>%
-          layout(xaxis = list(title = rt_axis_label(unit)),
-                 yaxis = list(title = "m/z")) %>%
+        urt <- sort(unique(pk$rt))
+        nxt <- if (length(urt) > 1)
+                 c(urt[-1], urt[length(urt)] + diff(urt)[length(urt) - 1]) else urt + 1
+        pk$rt1_disp <- rt_to_disp(nxt[match(pk$rt, urt)], unit)
+        K <- 32L; cols <- brewer_seq(rv$settings$seq_palette)(K)
+        lev <- pmin(pk$intensity, cmax) / cmax
+        pk$grp <- pmax(1L, pmin(K, ceiling(lev * K)))
+        p <- plot_ly(source = "map")
+        for (g in sort(unique(pk$grp))) {
+          d <- pk[pk$grp == g, , drop = FALSE]
+          x <- as.vector(rbind(d$rt_disp, d$rt1_disp, NA_real_))
+          y <- as.vector(rbind(d$mz, d$mz, NA_real_))
+          p <- add_trace(p, x = x, y = y, type = "scattergl", mode = "lines",
+                         line = list(color = cols[g], width = input$psize),
+                         hoverinfo = "skip", showlegend = FALSE)
+        }
+        # tiny hidden trace just to carry the colourbar
+        p <- add_trace(p, x = rep(pk$rt_disp[1], 2), y = rep(pk$mz[1], 2),
+                       type = "scattergl", mode = "markers",
+                       marker = list(color = c(0, cmax), colorscale = cs, cmin = 0,
+                                     cmax = cmax, size = 0.1, colorbar = list(title = "int")),
+                       hoverinfo = "skip", showlegend = FALSE)
+        p %>% layout(xaxis = list(title = rt_axis_label(unit)),
+                     yaxis = list(title = "m/z")) %>%
           event_register("plotly_click")
 
       } else if (input$mode == "surface") {
@@ -101,9 +113,9 @@ mod_plot_map_server <- function(id, rv, included) {
         z[cbind(match(b$mz_b, mz_ax), match(b$rt_disp, rt_ax))] <- b$intensity
         plot_ly(x = rt_ax, y = mz_ax, z = z, type = "surface", colorscale = cs) %>%
           layout(scene = list(
-            xaxis = list(title = rt_axis_label(unit), autorange = TRUE),
-            yaxis = list(title = "m/z", autorange = TRUE),
-            zaxis = list(title = "intensity", autorange = TRUE)))
+            xaxis = list(title = rt_axis_label(unit), range = range(rt_ax)),
+            yaxis = list(title = "m/z", range = range(mz_ax)),
+            zaxis = list(title = "intensity")))
 
       } else {  # 3D points
         thr <- stats::quantile(pk$intensity, input$thr / 100, names = FALSE)
@@ -115,9 +127,9 @@ mod_plot_map_server <- function(id, rv, included) {
                 mode = "markers",
                 marker = list(size = 2, color = ~intensity, colorscale = cs)) %>%
           layout(scene = list(
-            xaxis = list(title = rt_axis_label(unit), autorange = TRUE),
-            yaxis = list(title = "m/z", autorange = TRUE),
-            zaxis = list(title = "intensity", autorange = TRUE)))
+            xaxis = list(title = rt_axis_label(unit), range = range(pk$rt_disp)),
+            yaxis = list(title = "m/z", range = range(pk$mz)),
+            zaxis = list(title = "intensity")))
       }
     })
 
@@ -125,7 +137,7 @@ mod_plot_map_server <- function(id, rv, included) {
     click <- reactive(suppressWarnings(event_data("plotly_click", source = "map")))
     observeEvent(click(), {
       ev <- click(); req(ev, !is.null(ev$x))
-      rv$selection <- list(plot = "map", file_id = input$file,
+      rv$selection <- list(plot = "map", file_id = rv$active_file,
                            rt = rt_to_sec(ev$x, rv$settings$time_unit), mz = ev$y)
     })
 

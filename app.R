@@ -11,6 +11,10 @@ ui <- page_navbar(
     width = 360,
     accordion(
       accordion_panel("Files", icon = icon("folder-open"), mod_ingest_ui("ingest")),
+      accordion_panel(
+        "Active file", icon = icon("file-circle-check"),
+        helpText("Used by the Spectrum and MS map (single-file) views."),
+        selectInput("active_file", NULL, choices = NULL)),
       accordion_panel("Filters", icon = icon("filter"), mod_filter_ui("filter"))
     )
   ),
@@ -43,6 +47,23 @@ server <- function(input, output, session) {
   })
 
   mod_filter_server("filter", rv, included)
+
+  # Shared "active file" used by the single-file views (Spectrum, MS map).
+  observe({
+    inc <- included()
+    choices <- if (nrow(inc)) stats::setNames(inc$id, inc$name) else character(0)
+    updateSelectInput(session, "active_file", choices = choices,
+                      selected = isolate(rv$active_file) %||% (choices[1] %||% NULL))
+  })
+  observeEvent(input$active_file, rv$active_file <- input$active_file)
+  # A click on any plot makes that file the active one.
+  observeEvent(rv$selection, {
+    s <- rv$selection
+    if (!is.null(s$file_id) && s$file_id %in% rv$files$id) {
+      rv$active_file <- s$file_id
+      updateSelectInput(session, "active_file", selected = s$file_id)
+    }
+  })
 
   # Cache key for extraction reactives: only the included PATH SET and the
   # global filter should trigger re-extraction (not status/group edits).

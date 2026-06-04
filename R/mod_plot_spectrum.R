@@ -12,7 +12,6 @@ mod_plot_spectrum_ui <- function(id) {
     layout_sidebar(
       sidebar = sidebar(
         width = 240, position = "right", open = "open",
-        selectInput(ns("file"), "File", choices = NULL),
         selectInput(ns("ms_level"), "MS level", choices = c(1), selected = 1),
         numericInput(ns("rt"), "Jump to retention time", value = NA, step = 0.1),
         numericInput(ns("scan"), "…or scan (acquisition) number", value = NA, step = 1),
@@ -28,17 +27,9 @@ mod_plot_spectrum_ui <- function(id) {
 mod_plot_spectrum_server <- function(id, rv, included) {
   moduleServer(id, function(input, output, session) {
 
-    # Keep the file choices in sync with included files.
-    observe({
-      inc <- included()
-      choices <- if (nrow(inc)) stats::setNames(inc$id, inc$name) else character(0)
-      updateSelectInput(session, "file", choices = choices,
-                        selected = isolate(input$file) %||% (choices[1] %||% NULL))
-    })
-
     sel_file <- reactive({
-      req(input$file)
-      f <- rv$files[rv$files$id == input$file, ]
+      req(rv$active_file)
+      f <- rv$files[rv$files$id == rv$active_file, ]
       req(nrow(f) == 1); f
     })
 
@@ -50,11 +41,9 @@ mod_plot_spectrum_server <- function(id, rv, included) {
                         selected = isolate(input$ms_level) %||% lv[1])
     })
 
-    # A click anywhere sets the controls (file + rt in display unit).
+    # A click anywhere sets the rt control (the active file is set centrally).
     observeEvent(rv$selection, {
       s <- rv$selection; req(s, s$file_id)
-      if (s$file_id %in% rv$files$id)
-        updateSelectInput(session, "file", selected = s$file_id)
       if (!is.null(s$rt) && is.finite(s$rt)) {
         updateNumericInput(session, "rt", value = round(rt_to_disp(s$rt, rv$settings$time_unit), 4))
         updateNumericInput(session, "scan", value = NA)   # rt from click takes effect

@@ -63,12 +63,11 @@ chrom_to_df <- function(chr, meta, labels = NULL) {
 #' Extract a single spectrum at a retention time OR a scan (acquisition) number.
 #' The global filter `f` is applied (intensity/m/z/polarity/charge/spectrumId);
 #' ms_level and the rt/scan selection come from the Spectrum tab controls.
-extract_spectrum <- function(path, rt = NA_real_, scan = NA_integer_,
-                             ms_level = 1L, f = list()) {
+extract_spectrum <- function(path, rt = NA_real_, scan = NA_integer_, f = list()) {
   sp <- Spectra::Spectra(path, source = Spectra::MsBackendMzR())
-  ff <- f; ff$ms_level <- as.integer(ms_level)
+  ff <- f
   ff$rt_min <- NA_real_; ff$rt_max <- NA_real_     # selection drives rt, not filter
-  sp <- apply_filters_spectra(sp, ff)
+  sp <- apply_filters_spectra(sp, ff)              # ms_level comes from the filter
   n <- length(sp)
   empty <- tibble::tibble(mz = numeric(), intensity = numeric(), rt = numeric(),
                           scan = integer())

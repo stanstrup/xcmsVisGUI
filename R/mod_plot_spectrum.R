@@ -1,23 +1,20 @@
-# mod_plot_spectrum — spectrum viewer. Works independently (pick a file + rt) and
-# is also driven by clicks on a chromatogram/MS-map (which set the controls).
+# mod_plot_spectrum — spectrum viewer. Pick a file + rt/scan, or have a click on a
+# chromatogram/MS-map set them. MS level comes from the global filter.
 
 mod_plot_spectrum_ui <- function(id) {
   ns <- NS(id)
   card(
     full_screen = TRUE,
-    card_header(
-      "Spectrum",
-      div(class = "float-end", mod_export_ui(ns("export")))
-    ),
+    card_header("Spectrum", div(class = "float-end", mod_export_ui(ns("export")))),
     layout_sidebar(
       sidebar = sidebar(
         width = 240, position = "right", open = "open",
-        selectInput(ns("ms_level"), "MS level", choices = c(1), selected = 1),
+        selectInput(ns("file"), "File", choices = NULL),
         numericInput(ns("rt"), "Jump to retention time", value = NA, step = 0.1),
         numericInput(ns("scan"), "…or scan (acquisition) number", value = NA, step = 1),
-        helpText("Shows the nearest scan. Clicking a chromatogram or MS-map ",
-                 "point sets these controls automatically. Global intensity / ",
-                 "spectrum-id filters apply.")
+        helpText("Nearest scan is shown (out-of-range scan snaps to the last). ",
+                 "MS level and intensity/spectrum-id filters come from the global ",
+                 "filter. Clicking a chromatogram/MS-map sets these controls.")
       ),
       plotlyOutput(ns("plot"), height = "100%")
     )
@@ -27,32 +24,38 @@ mod_plot_spectrum_ui <- function(id) {
 mod_plot_spectrum_server <- function(id, rv, included) {
   moduleServer(id, function(input, output, session) {
 
+    observe({
+      inc <- included()
+      choices <- if (nrow(inc)) stats::setNames(inc$id, inc$name) else character(0)
+      updateSelectInput(session, "file", choices = choices,
+                        selected = isolate(input$file) %||% (choices[1] %||% NULL))
+    })
+
     sel_file <- reactive({
-      req(rv$active_file)
-      f <- rv$files[rv$files$id == rv$active_file, ]
+      req(input$file)
+      f <- rv$files[rv$files$id == input$file, ]
       req(nrow(f) == 1); f
     })
 
-    # MS-level choices follow the selected file.
+    # Cap the scan box at the file's spectrum count.
     observeEvent(sel_file(), {
-      lv <- strsplit(sel_file()$ms_levels %||% "1", ",\\s*")[[1]]
-      lv <- lv[nzchar(lv)]; if (!length(lv)) lv <- "1"
-      updateSelectInput(session, "ms_level", choices = lv,
-                        selected = isolate(input$ms_level) %||% lv[1])
+      n <- sel_file()$n_spectra
+      if (is.finite(n)) updateNumericInput(session, "scan", max = n)
     })
 
-    # A click anywhere sets the rt control (the active file is set centrally).
+    # A click sets file + rt (and clears scan so rt wins).
     observeEvent(rv$selection, {
       s <- rv$selection; req(s, s$file_id)
+      if (s$file_id %in% rv$files$id) updateSelectInput(session, "file", selected = s$file_id)
       if (!is.null(s$rt) && is.finite(s$rt)) {
-        updateNumericInput(session, "rt", value = round(rt_to_disp(s$rt, rv$settings$time_unit), 4))
-        updateNumericInput(session, "scan", value = NA)   # rt from click takes effect
+        updateNumericInput(session, "rt",
+                           value = round(rt_to_disp(s$rt, rv$settings$time_unit), 4))
+        updateNumericInput(session, "scan", value = NA)
       }
     })
 
     spec_df <- reactive({
       f <- sel_file()
-      ms <- as.integer(input$ms_level %||% 1L)
       use_scan <- !is.null(input$scan) && is.finite(input$scan)
       rt_disp <- input$rt
       validate(need(use_scan || is.finite(rt_disp),
@@ -61,7 +64,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       withProgress(message = "Reading spectrum…", value = 0.5, {
         extract_spectrum(f$path, rt = rt_sec,
                          scan = if (use_scan) as.integer(input$scan) else NA_integer_,
-                         ms_level = ms, f = rv$filter)
+                         f = rv$filter)
       })
     })
 
@@ -81,7 +84,8 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     })
 
     output$plot <- renderPlotly({
-      ggplotly(plot_gg(), source = "spec", tooltip = "text", dynamicTicks = TRUE)
+      ggplotly(plot_gg(), source = "spec", tooltip = "text", dynamicTicks = TRUE) %>%
+        layout(uirevision = "spec")
     })
 
     mod_export_server("export", plot_gg, rv, "spectrum")

@@ -9,7 +9,7 @@
 mod_ingest_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    # 1) paste a folder (loads all MS files in it) or a single file path — no copy
+    # 1) paste a folder/file path, or pick a folder server-side — both NO copy
     div(class = "d-flex gap-2 mb-2",
         div(style = "flex:1;",
             textInput(ns("folder"), NULL, width = "100%",
@@ -17,13 +17,16 @@ mod_ingest_ui <- function(id) {
         actionButton(ns("add_folder"), "Add", class = "btn-primary"),
         actionButton(ns("clear"), NULL, icon = icon("trash"),
                      class = "btn-outline-secondary", title = "Clear all files")),
+    div(class = "mb-2",
+        shinyDirButton(ns("dir"), "Choose folder…", "Choose a folder of MS files",
+                       icon = icon("folder-open"), class = "btn-outline-secondary btn-sm")),
     # 2) standard OS file browser (note: copies files to a temp dir)
     fileInput(ns("browse"), NULL, multiple = TRUE,
               accept = c(".mzML", ".mzXML", ".CDF", ".cdf"),
-              buttonLabel = "Browse…", placeholder = "or use the file browser"),
-    helpText("Paste a directory path (adds every MS file inside, no copy) — best ",
-             "for many/large files. The Browse button is the standard OS dialog but ",
-             "copies files to a temp folder."),
+              buttonLabel = "Browse files…", placeholder = "or the OS file browser"),
+    helpText("Paste a path or use ‘Choose folder…’ to load every MS file in a ",
+             "directory (no copy — best for many/large files). ‘Browse files…’ is the ",
+             "OS dialog but copies files to a temp folder."),
     div(class = "d-flex gap-2 mb-2",
         actionButton(ns("sel_all"),  "All",    class = "btn-sm btn-outline-secondary"),
         actionButton(ns("sel_none"), "None",   class = "btn-sm btn-outline-secondary"),
@@ -36,6 +39,10 @@ mod_ingest_ui <- function(id) {
 mod_ingest_server <- function(id, rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    # Server-side directory picker (no upload/copy).
+    roots <- c(Home = fs::path_home(), getVolumes()())
+    shinyDirChoose(input, "dir", roots = roots, session = session)
 
     # --- Read queue + single-file async reader ----------------------------
     queue <- reactiveVal(character())     # file ids waiting to be read
@@ -101,6 +108,15 @@ mod_ingest_server <- function(id, rv) {
     observeEvent(input$browse, {
       up <- input$browse; req(nrow(up) > 0)
       add_paths(up$datapath, names = up$name)
+    })
+
+    # Server-side folder pick -> add every MS file in it (no copy)
+    observeEvent(input$dir, {
+      p <- parseDirPath(roots, input$dir)
+      req(length(p) == 1, nzchar(p))
+      fls <- list.files(p, pattern = MS_FILE_REGEX, full.names = TRUE, ignore.case = TRUE)
+      if (!length(fls)) showNotification("No MS files in that folder.", type = "warning")
+      add_paths(fls)
     })
 
     # --- Reader finished: update the row, then pump the next --------------

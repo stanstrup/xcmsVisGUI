@@ -33,3 +33,9 @@ brewer_named <- function(levels, palette = "Set1") {
   levels <- unique(as.character(levels))
   setNames(brewer_qual(length(levels), palette), levels)
 }
+
+#' A plotly colorscale (list of [position, color]) from a sequential brewer palette.
+brewer_colorscale <- function(palette = "YlOrRd", n = 9) {
+  cols <- brewer_seq(palette)(n)
+  lapply(seq_len(n), function(i) list((i - 1) / (n - 1), cols[i]))
+}

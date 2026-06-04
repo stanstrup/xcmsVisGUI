@@ -18,8 +18,7 @@ ui <- page_navbar(
   nav_panel("TIC / BPC", icon = icon("chart-area"), mod_plot_tic_bpc_ui("tic")),
   nav_panel("EIC", icon = icon("wave-square"), mod_plot_eic_ui("eic")),
   nav_panel("Spectrum", icon = icon("bars"), mod_plot_spectrum_ui("spec")),
-  nav_panel("MS map", icon = icon("border-all"), mod_plot_msmap_ui("msmap")),
-  nav_panel("3D", icon = icon("cube"), mod_plot_3d_ui("threeD")),
+  nav_panel("MS map", icon = icon("border-all"), mod_plot_map_ui("map")),
   nav_panel("Precursors", icon = icon("crosshairs"), mod_plot_precursors_ui("prec")),
 
   nav_spacer(),
@@ -69,8 +68,7 @@ server <- function(input, output, session) {
   mod_plot_tic_bpc_server("tic", rv, dataset, meta, data_key)
   mod_plot_eic_server("eic", rv, dataset, meta, data_key)
   mod_plot_spectrum_server("spec", rv, included)
-  mod_plot_msmap_server("msmap", rv, included)
-  mod_plot_3d_server("threeD", rv, included)
+  mod_plot_map_server("map", rv, included)
   mod_plot_precursors_server("prec", rv, included)
 }
 

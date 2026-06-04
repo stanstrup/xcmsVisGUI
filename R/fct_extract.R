@@ -98,6 +98,14 @@ bin_peaks <- function(df, rt_bin = 10, mz_bin = 1, aggfun = max) {
                    intensity = aggfun(intensity), .groups = "drop")
 }
 
+#' Precursor ions (rt + precursor m/z) for MS>1 spectra in a file (DDA map).
+extract_precursors <- function(path) {
+  sp <- Spectra::Spectra(path, source = Spectra::MsBackendMzR())
+  ms <- Spectra::msLevel(sp); pmz <- Spectra::precursorMz(sp); rt <- Spectra::rtime(sp)
+  idx <- which(ms > 1 & is.finite(pmz) & pmz > 0)
+  tibble::tibble(rt = rt[idx], precursorMZ = pmz[idx])
+}
+
 #' Polarity label from the integer code Spectra uses (0 neg, 1 pos, -1 unknown).
 polarity_label <- function(x) {
   if (length(x) == 0 || is.na(x)) return(NA_character_)

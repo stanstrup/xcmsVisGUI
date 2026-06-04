@@ -47,14 +47,21 @@ mod_plot_precursors_server <- function(id, rv, included) {
       f <- rv$files[rv$files$id == input$file, ]
       req(nrow(f) == 1)
       withProgress(message = "Reading precursors…", value = 0.5, {
-        x <- build_msexp(f)
-        res <- gplotPrecursorIons(x, col = brewer_qual(1, rv$settings$qual_palette))
-        if (is.list(res) && !inherits(res, "ggplot")) res[[1]] else res
+        df <- extract_precursors(f$path)
       })
+      validate(need(nrow(df) > 0, "No precursor ions found in this file."))
+      unit <- rv$settings$time_unit
+      df$rt_disp <- rt_to_disp(df$rt, unit)
+      df$.tip <- sprintf("precursor m/z: %.4f\nrt: %.4g %s", df$precursorMZ, df$rt_disp, unit)
+      ggplot2::ggplot(df, ggplot2::aes(x = rt_disp, y = precursorMZ, text = .tip)) +
+        ggplot2::geom_point(color = brewer_qual(1, rv$settings$qual_palette),
+                            alpha = 0.5, size = 1.2) +
+        ggplot2::labs(x = rt_axis_label(unit), y = "precursor m/z") +
+        ggplot2::theme_bw()
     })
 
     output$plot <- renderPlotly({
-      ggplotly(plot_gg(), source = "prec", dynamicTicks = TRUE)
+      ggplotly(plot_gg(), source = "prec", tooltip = "text", dynamicTicks = TRUE)
     })
 
     mod_export_server("export", plot_gg, rv, "precursors")

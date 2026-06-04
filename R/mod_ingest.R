@@ -18,15 +18,15 @@ mod_ingest_ui <- function(id) {
         actionButton(ns("clear"), NULL, icon = icon("trash"),
                      class = "btn-outline-secondary", title = "Clear all files")),
     div(class = "mb-2",
-        shinyDirButton(ns("dir"), "Choose folder…", "Choose a folder of MS files",
-                       icon = icon("folder-open"), class = "btn-outline-secondary btn-sm")),
+        actionButton(ns("pick_dir"), "Choose folder…", icon = icon("folder-open"),
+                     class = "btn-outline-secondary btn-sm")),
     # 2) standard OS file browser (note: copies files to a temp dir)
     fileInput(ns("browse"), NULL, multiple = TRUE,
               accept = c(".mzML", ".mzXML", ".CDF", ".cdf"),
               buttonLabel = "Browse files…", placeholder = "or the OS file browser"),
-    helpText("Paste a path or use ‘Choose folder…’ to load every MS file in a ",
-             "directory (no copy — best for many/large files). ‘Browse files…’ is the ",
-             "OS dialog but copies files to a temp folder."),
+    helpText("Paste a path or use ‘Choose folder…’ (native OS folder dialog, no copy) ",
+             "to load every MS file in a directory — best for many/large files. ",
+             "‘Browse files…’ is the OS file dialog but copies files to a temp folder."),
     div(class = "d-flex gap-2 mb-2",
         actionButton(ns("sel_all"),  "All",    class = "btn-sm btn-outline-secondary"),
         actionButton(ns("sel_none"), "None",   class = "btn-sm btn-outline-secondary"),
@@ -39,10 +39,6 @@ mod_ingest_ui <- function(id) {
 mod_ingest_server <- function(id, rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-
-    # Server-side directory picker (no upload/copy).
-    roots <- c(Home = fs::path_home(), getVolumes()())
-    shinyDirChoose(input, "dir", roots = roots, session = session)
 
     # --- Read queue + single-file async reader ----------------------------
     queue <- reactiveVal(character())     # file ids waiting to be read
@@ -110,10 +106,11 @@ mod_ingest_server <- function(id, rv) {
       add_paths(up$datapath, names = up$name)
     })
 
-    # Server-side folder pick -> add every MS file in it (no copy)
-    observeEvent(input$dir, {
-      p <- parseDirPath(roots, input$dir)
-      req(length(p) == 1, nzchar(p))
+    # Native OS folder dialog (server-side, no copy). Windows: utils::choose.dir().
+    observeEvent(input$pick_dir, {
+      p <- tryCatch(utils::choose.dir(caption = "Choose a folder of MS files"),
+                    error = function(e) NA_character_)
+      if (is.null(p) || is.na(p) || !nzchar(p)) return()
       fls <- list.files(p, pattern = MS_FILE_REGEX, full.names = TRUE, ignore.case = TRUE)
       if (!length(fls)) showNotification("No MS files in that folder.", type = "warning")
       add_paths(fls)

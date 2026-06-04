@@ -21,6 +21,8 @@ mod_settings_ui <- function(id) {
                   choices = QUAL_PALETTES),
       selectInput(ns("seq_palette"), "Sequential palette (maps, 3D)",
                   choices = SEQ_PALETTES),
+      checkboxInput(ns("invert_scale"), "Invert colour scale (light → dark)",
+                    value = TRUE),
       hr(),
       selectInput(ns("export_format"), "Default export format",
                   choices = c("png", "svg", "pdf")),
@@ -43,6 +45,7 @@ mod_settings_server <- function(id, rv) {
       rv$settings$time_unit     <- input$time_unit
       rv$settings$qual_palette  <- input$qual_palette
       rv$settings$seq_palette   <- input$seq_palette
+      rv$settings$invert_scale  <- input$invert_scale
       rv$settings$export_format <- input$export_format
       rv$settings$export_width  <- input$export_width
       rv$settings$export_height <- input$export_height

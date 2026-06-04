@@ -15,6 +15,9 @@ read_ms_header <- function(path) {
     h <- mzR::header(x)
     mzs <- suppressWarnings(c(h$lowMZ[h$lowMZ > 0], h$highMZ[h$highMZ > 0]))
     if (!length(mzs)) mzs <- suppressWarnings(h$basePeakMZ[h$basePeakMZ > 0])
+    chg <- if ("precursorCharge" %in% colnames(h))
+      sort(unique(h$precursorCharge[is.finite(h$precursorCharge) & h$precursorCharge != 0]))
+      else integer(0)
     list(summary = list(
       n_spectra  = nrow(h),
       rt_min     = suppressWarnings(min(h$retentionTime, na.rm = TRUE)),
@@ -22,7 +25,8 @@ read_ms_header <- function(path) {
       mz_min     = if (length(mzs)) min(mzs) else NA_real_,
       mz_max     = if (length(mzs)) max(mzs) else NA_real_,
       ms_levels  = paste(sort(unique(h$msLevel)), collapse = ", "),
-      polarities = paste(sort(unique(h$polarity)), collapse = ", ")
+      polarities = paste(sort(unique(h$polarity)), collapse = ", "),
+      charges    = paste(chg, collapse = ", ")
     ))
   }, error = function(e) list(error = conditionMessage(e)))
   out$path <- path

@@ -67,7 +67,8 @@ mod_plot_map_server <- function(id, rv, included) {
       validate(need(nrow(pk) > 0, "No peaks in the current filter range."))
       unit <- rv$settings$time_unit
       pk$rt_disp <- rt_to_disp(pk$rt, unit)
-      cs <- brewer_colorscale(rv$settings$seq_palette)
+      inv <- isTRUE(rv$settings$invert_scale)
+      cs <- brewer_colorscale(rv$settings$seq_palette, invert = inv)
 
       if (input$mode == "map") {
         if (nrow(pk) > MAP_LINE_CAP)
@@ -82,7 +83,7 @@ mod_plot_map_server <- function(id, rv, included) {
           c(u[-1], u[length(u)] + gap)[match(r, u)]
         })
         pk$rt1_disp <- rt_to_disp(pk$rt1, unit)
-        K <- 32L; cols <- brewer_seq(rv$settings$seq_palette)(K)
+        K <- 32L; cols <- brewer_seq(rv$settings$seq_palette, invert = inv)(K)
         pk$grp <- pmax(1L, pmin(K, ceiling(pmin(pk$intensity, cmax) / cmax * K)))
         p <- plot_ly(source = "map")
         for (g in sort(unique(pk$grp))) {
@@ -153,7 +154,8 @@ mod_plot_map_server <- function(id, rv, included) {
       cmax <- stats::quantile(pk$intensity, input$contrast / 100, names = FALSE)
       ggplot2::ggplot(pk, ggplot2::aes(rt_disp, mz, color = pmin(intensity, cmax))) +
         ggplot2::geom_point(size = input$psize * 0.4) +
-        ggplot2::scale_color_gradientn(colours = brewer_seq(rv$settings$seq_palette)(9)) +
+        ggplot2::scale_color_gradientn(colours = brewer_seq(rv$settings$seq_palette,
+                                       invert = isTRUE(rv$settings$invert_scale))(9)) +
         ggplot2::labs(x = rt_axis_label(unit), y = "m/z", color = "int") +
         ggplot2::theme_bw()
     })

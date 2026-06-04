@@ -21,14 +21,16 @@ brewer_qual <- function(n, palette = "Set1") {
 #' A sequential ColorBrewer ramp function for continuous fills (heatmaps/3D).
 #' @param palette a sequential ColorBrewer name OR a viridisLite option
 #'   (viridis/magma/plasma/inferno/cividis/mako/rocket/turbo)
-brewer_seq <- function(palette = "YlOrRd") {
-  if (palette %in% VIRIDIS_PALETTES)
-    return(function(n) viridisLite::viridis(n, option = palette))
-  base <- tryCatch(
-    RColorBrewer::brewer.pal(9, palette),
-    error = function(e) RColorBrewer::brewer.pal(9, "YlOrRd")
-  )
-  grDevices::colorRampPalette(base)
+#' @param invert reverse the scale (so it runs light -> dark)
+brewer_seq <- function(palette = "YlOrRd", invert = FALSE) {
+  base_fun <- if (palette %in% VIRIDIS_PALETTES)
+    function(n) viridisLite::viridis(n, option = palette)
+  else {
+    base <- tryCatch(RColorBrewer::brewer.pal(9, palette),
+                     error = function(e) RColorBrewer::brewer.pal(9, "YlOrRd"))
+    grDevices::colorRampPalette(base)
+  }
+  function(n) { cols <- base_fun(n); if (invert) rev(cols) else cols }
 }
 
 #' Named color vector mapping the levels of a grouping variable to brewer colors.
@@ -37,8 +39,8 @@ brewer_named <- function(levels, palette = "Set1") {
   setNames(brewer_qual(length(levels), palette), levels)
 }
 
-#' A plotly colorscale (list of [position, color]) from a sequential brewer palette.
-brewer_colorscale <- function(palette = "YlOrRd", n = 9) {
-  cols <- brewer_seq(palette)(n)
+#' A plotly colorscale (list of [position, color]) from a sequential palette.
+brewer_colorscale <- function(palette = "YlOrRd", n = 9, invert = FALSE) {
+  cols <- brewer_seq(palette, invert)(n)
   lapply(seq_len(n), function(i) list((i - 1) / (n - 1), cols[i]))
 }

@@ -52,7 +52,9 @@ mod_filter_server <- function(id, rv, included) {
         if (length(r$polarities) > 1)
           selectInput(ns("polarity"), "Polarity",
                       choices = c("any", "pos", "neg"), selected = "any"),
-        numericInput(ns("charge"), "Precursor charge", value = NA, step = 1),
+        if (length(r$charges))
+          selectInput(ns("charge"), "Precursor charge",
+                      choices = c("any", as.character(r$charges)), selected = "any"),
         textInput(ns("spectrum_id"), "Spectrum ID contains",
                   placeholder = "e.g. function=1 process=0"),
         helpText("Leave a box blank for no limit.")
@@ -79,16 +81,17 @@ mod_filter_server <- function(id, rv, included) {
       f$ms_level <- if (is.null(fi$ms_level) || identical(fi$ms_level, "all"))
                       NA_integer_ else as.integer(fi$ms_level)
       f$polarity <- if (!is.null(fi$polarity)) fi$polarity else "any"
-      f$charge   <- if (is.null(fi$charge) || !is.finite(fi$charge)) NA_integer_
+      f$charge   <- if (is.null(fi$charge) || identical(fi$charge, "any")) NA_integer_
                     else as.integer(fi$charge)
       f$spectrum_id <- fi$spectrum_id %||% ""
       rv$filter <- f
     }, ignoreNULL = FALSE)
 
     observeEvent(input$reset, {
-      for (k in c("rt_min","rt_max","mz_min","mz_max","int_min","int_max","charge"))
+      for (k in c("rt_min","rt_max","mz_min","mz_max","int_min","int_max"))
         updateNumericInput(session, k, value = NA)
       updateTextInput(session, "spectrum_id", value = "")
+      updateSelectInput(session, "charge", selected = "any")
       r <- ranges()
       if (!is.null(r) && length(r$polarities) > 1)
         updateSelectInput(session, "polarity", selected = "any")

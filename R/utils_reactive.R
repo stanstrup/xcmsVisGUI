@@ -19,6 +19,7 @@ make_rv <- function() {
       mz_max      = numeric(),
       ms_levels   = character(),
       polarities  = character(),
+      charges     = character(),
       message     = character()
     ),
 
@@ -55,6 +56,7 @@ make_rv <- function() {
       time_unit    = "min",          # "min" | "sec" — display unit for rt
       qual_palette = "Set1",
       seq_palette  = "viridis",
+      invert_scale = TRUE,
       daemons      = max(1L, parallel::detectCores() - 1L),
       export_format = "png",
       export_width  = 8,

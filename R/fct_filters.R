@@ -81,6 +81,7 @@ combined_ranges <- function(files_df) {
     rt = rng(files_df$rt_min, files_df$rt_max),
     mz = rng(files_df$mz_min, files_df$mz_max),
     ms_levels  = sort(split_vals(files_df$ms_levels)),
-    polarities = setdiff(split_vals(files_df$polarities), c("", NA))
+    polarities = setdiff(split_vals(files_df$polarities), c("", NA)),
+    charges    = sort(as.integer(split_vals(files_df$charges)))
   )
 }

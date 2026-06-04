@@ -81,7 +81,7 @@ mod_ingest_server <- function(id, rv) {
         rt_min = NA_real_, rt_max = NA_real_,
         mz_min = NA_real_, mz_max = NA_real_,
         ms_levels = NA_character_, polarities = NA_character_,
-        message = NA_character_
+        charges = NA_character_, message = NA_character_
       )
       rv$files <- bind_rows(rv$files, new_rows)
       queue(c(queue(), new_rows$id))
@@ -114,6 +114,7 @@ mod_ingest_server <- function(id, rv) {
           rv$files$mz_max[idx]    <- s$mz_max
           rv$files$ms_levels[idx]  <- s$ms_levels
           rv$files$polarities[idx] <- polarity_label(s$polarities)
+          rv$files$charges[idx]    <- s$charges %||% NA_character_
         }
       }
       current(NULL)

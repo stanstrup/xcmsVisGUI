@@ -42,7 +42,7 @@ make_rv <- function() {
       rt_min = NA_real_, rt_max = NA_real_,
       mz_min = NA_real_, mz_max = NA_real_,
       ms_level = 1L, polarity = "any",
-      int_min = NA_real_
+      int_min = NA_real_, int_max = NA_real_
     ),
 
     # User settings (mod_settings).

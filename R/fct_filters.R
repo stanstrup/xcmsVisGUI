@@ -20,9 +20,12 @@ apply_filters <- function(x, f) {
     pol <- if (identical(f$polarity, "pos")) 1L else 0L
     x <- MsExperiment::filterSpectra(x, Spectra::filterPolarity, polarity = pol)
   }
-  if (!is.null(f$int_min) && is.finite(f$int_min) && f$int_min > 0)
+  has_imin <- !is.null(f$int_min) && is.finite(f$int_min) && f$int_min > 0
+  has_imax <- !is.null(f$int_max) && is.finite(f$int_max)
+  if (has_imin || has_imax)
     x <- MsExperiment::filterSpectra(x, Spectra::filterIntensity,
-                                     intensity = c(f$int_min, Inf))
+                                     intensity = c(if (has_imin) f$int_min else 0,
+                                                   if (has_imax) f$int_max else Inf))
   x
 }
 

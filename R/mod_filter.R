@@ -1,6 +1,6 @@
 # mod_filter — global rt / m/z / MS level / polarity / intensity filters.
-# Controls are built from the combined data ranges of the included files and
-# written (debounced) into rv$filter, which the dataset reactive applies.
+# Typed numeric inputs (blank = no constraint). rt inputs are in the display
+# unit and stored in seconds; everything is written (debounced) to rv$filter.
 
 mod_filter_ui <- function(id) {
   ns <- NS(id)
@@ -8,6 +8,17 @@ mod_filter_ui <- function(id) {
     uiOutput(ns("controls")),
     actionButton(ns("reset"), "Reset filters",
                  class = "btn-sm btn-outline-secondary mt-2")
+  )
+}
+
+# numeric min/max pair on one row, with a range hint
+.minmax <- function(ns, key, label, hint, step) {
+  tagList(
+    tags$label(class = "control-label", label),
+    if (nzchar(hint)) tags$small(class = "text-muted d-block", hint),
+    div(class = "d-flex gap-2",
+        numericInput(ns(paste0(key, "_min")), NULL, value = NA, step = step, width = "100%"),
+        numericInput(ns(paste0(key, "_max")), NULL, value = NA, step = step, width = "100%"))
   )
 }
 
@@ -25,52 +36,52 @@ mod_filter_server <- function(id, rv, included) {
       r <- ranges()
       if (is.null(r))
         return(helpText("Load and include files to enable filters."))
+      unit <- rv$settings$time_unit
+      rt_hint <- if (!is.null(r$rt))
+        sprintf("data: %.2f–%.2f %s", rt_to_disp(r$rt[1], unit),
+                rt_to_disp(r$rt[2], unit), unit) else ""
+      mz_hint <- if (!is.null(r$mz))
+        sprintf("data: %.4f–%.4f", r$mz[1], r$mz[2]) else ""
       tagList(
-        if (!is.null(r$rt))
-          sliderInput(ns("rt"), "Retention time (s)",
-                      min = floor(r$rt[1]), max = ceiling(r$rt[2]),
-                      value = c(floor(r$rt[1]), ceiling(r$rt[2]))),
-        if (!is.null(r$mz))
-          sliderInput(ns("mz"), "m/z",
-                      min = floor(r$mz[1]), max = ceiling(r$mz[2]),
-                      value = c(floor(r$mz[1]), ceiling(r$mz[2]))),
+        .minmax(ns, "rt", sprintf("Retention time (%s)", unit), rt_hint, 0.01),
+        .minmax(ns, "mz", "m/z", mz_hint, 0.0001),
+        .minmax(ns, "int", "Intensity", "", 1),
         if (length(r$ms_levels) > 1)
           selectInput(ns("ms_level"), "MS level",
                       choices = r$ms_levels, selected = r$ms_levels[1]),
         if (length(r$polarities) > 1)
           selectInput(ns("polarity"), "Polarity",
                       choices = c("any", "pos", "neg"), selected = "any"),
-        numericInput(ns("int_min"), "Min intensity", value = 0, min = 0)
+        helpText("Leave a box blank for no limit.")
       )
     })
 
-    # Debounce so dragging a slider doesn't re-extract on every tick.
     filter_inputs <- reactive({
-      list(rt = input$rt, mz = input$mz, ms_level = input$ms_level,
-           polarity = input$polarity, int_min = input$int_min)
+      list(rt_min = input$rt_min, rt_max = input$rt_max,
+           mz_min = input$mz_min, mz_max = input$mz_max,
+           int_min = input$int_min, int_max = input$int_max,
+           ms_level = input$ms_level, polarity = input$polarity)
     }) %>% debounce(600)
 
     observeEvent(filter_inputs(), {
       fi <- filter_inputs()
+      unit <- rv$settings$time_unit
+      num <- function(v) if (is.null(v) || !is.finite(v)) NA_real_ else v
       f <- rv$filter
-      if (!is.null(fi$rt)) { f$rt_min <- fi$rt[1]; f$rt_max <- fi$rt[2] }
-      else { f$rt_min <- NA_real_; f$rt_max <- NA_real_ }
-      if (!is.null(fi$mz)) { f$mz_min <- fi$mz[1]; f$mz_max <- fi$mz[2] }
-      else { f$mz_min <- NA_real_; f$mz_max <- NA_real_ }
+      f$rt_min <- rt_to_sec(num(fi$rt_min), unit)
+      f$rt_max <- rt_to_sec(num(fi$rt_max), unit)
+      f$mz_min <- num(fi$mz_min); f$mz_max <- num(fi$mz_max)
+      f$int_min <- num(fi$int_min); f$int_max <- num(fi$int_max)
       f$ms_level <- if (!is.null(fi$ms_level)) as.integer(fi$ms_level) else 1L
       f$polarity <- if (!is.null(fi$polarity)) fi$polarity else "any"
-      f$int_min  <- if (!is.null(fi$int_min)) fi$int_min else NA_real_
       rv$filter <- f
     }, ignoreNULL = FALSE)
 
     observeEvent(input$reset, {
-      r <- ranges(); req(r)
-      if (!is.null(r$rt))
-        updateSliderInput(session, "rt", value = c(floor(r$rt[1]), ceiling(r$rt[2])))
-      if (!is.null(r$mz))
-        updateSliderInput(session, "mz", value = c(floor(r$mz[1]), ceiling(r$mz[2])))
-      updateNumericInput(session, "int_min", value = 0)
-      if (length(r$polarities) > 1)
+      for (k in c("rt_min","rt_max","mz_min","mz_max","int_min","int_max"))
+        updateNumericInput(session, k, value = NA)
+      r <- ranges()
+      if (!is.null(r) && length(r$polarities) > 1)
         updateSelectInput(session, "polarity", selected = "any")
     })
   })

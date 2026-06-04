@@ -23,18 +23,18 @@ mod_plot_tic_bpc_ui <- function(id) {
   )
 }
 
-mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
+mod_plot_tic_bpc_server <- function(id, rv, paths, meta, data_key) {
   moduleServer(id, function(input, output, session) {
 
     chrom_label <- reactive(if (input$agg == "sum") "TIC" else "BPC")
 
-    # TIC/BPC via xcms::chromatogram (fast under SerialParam), cached on
-    # (path set + filter + aggregation) so group/color changes never re-extract.
+    # TIC/BPC from cached mzR data, cached on (path set + filter + aggregation)
+    # so unrelated reactivity (group edits, color choice) never re-extracts.
     chrom_df <- reactive({
-      x <- dataset(); req(x)
-      withProgress(message = "Extracting chromatograms…", value = 0.5, {
-        chr <- chromatogram(x, aggregationFun = input$agg, msLevel = 1L)
-        chrom_to_df(chr, meta(), labels = chrom_label())
+      p <- paths(); m <- meta()
+      agg <- if (input$agg == "sum") "tic" else "bpc"
+      withProgress(message = "Reading chromatograms…", value = 0.5, {
+        compute_chrom(p, m, rv$filter, agg = agg)
       })
     }) %>% bindCache(data_key(), input$agg)
 

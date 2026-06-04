@@ -42,16 +42,11 @@ mod_plot_3d_server <- function(id, rv, included) {
       req(nrow(f) == 1); f
     })
 
-    # Cache the expensive peak read on (file + filter); binning is cheap.
+    # Peaks from the mzR cache (filter applied inside); binning re-runs on bins.
     peaks <- reactive({
-      f <- sel_file(); flt <- rv$filter
-      rtr <- if (is.finite(flt$rt_min) && is.finite(flt$rt_max))
-               c(flt$rt_min, flt$rt_max) else NULL
-      mzr <- if (is.finite(flt$mz_min) && is.finite(flt$mz_max))
-               c(flt$mz_min, flt$mz_max) else NULL
+      f <- sel_file()
       withProgress(message = "Reading peaks…", value = 0.5, {
-        extract_peaks(f$path, ms_level = flt$ms_level %||% 1L,
-                      rt_range = rtr, mz_range = mzr)
+        compute_peaks(f$path, rv$filter)
       })
     }) %>% bindCache(input$file, rv$filter)
 

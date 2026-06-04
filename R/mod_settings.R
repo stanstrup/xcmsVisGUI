@@ -6,9 +6,9 @@ mod_settings_ui <- function(id) {
     col_widths = c(6, 6),
     card(
       card_header("Data reading"),
-      helpText(HTML("Files are read via <code>Spectra</code>/<code>xcms</code> with ",
-               "<code>BiocParallel::SerialParam()</code> registered — the default ",
-               "<code>SnowParam</code> backend is ~100× slower (see BENCHMARK.md).")),
+      helpText(HTML("Files are read directly with <code>mzR</code> and cached in ",
+               "memory (~35–70 MB/file). Benchmarks showed this is far faster ",
+               "than any Spectra backend, whose initialisation dominated the cost.")),
       sliderInput(ns("daemons"), "Parallel readers (mirai daemons)",
                   min = 1, max = max(2L, parallel::detectCores()),
                   value = max(1L, parallel::detectCores() - 1L), step = 1)

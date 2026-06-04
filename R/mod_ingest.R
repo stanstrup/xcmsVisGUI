@@ -42,11 +42,11 @@ mod_ingest_server <- function(id, rv) {
     queue <- reactiveVal(character())     # file ids waiting to be read
     current <- reactiveVal(NULL)          # file id currently being read
 
-    reader <- ExtendedTask$new(function(path, backend) {
+    reader <- ExtendedTask$new(function(path) {
       mirai::mirai(
-        read_file_summary(path, backend),
-        read_file_summary = read_file_summary,
-        path = path, backend = backend
+        read_ms_header(path),
+        read_ms_header = read_ms_header,
+        path = path
       )
     })
 
@@ -59,7 +59,7 @@ mod_ingest_server <- function(id, rv) {
       queue(q[-1])
       current(id)
       path <- rv$files$path[rv$files$id == id]
-      reader$invoke(path = path, backend = rv$settings$backend)
+      reader$invoke(path = path)
     }
 
     # --- Add picked files to the table as "reading" -----------------------
@@ -127,6 +127,7 @@ mod_ingest_server <- function(id, rv) {
     observeEvent(input$clear, {
       rv$files <- rv$files[0, ]
       queue(character()); current(NULL)
+      clear_ms_cache()
     })
 
     # --- Render the file list --------------------------------------------

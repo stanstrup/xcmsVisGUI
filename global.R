@@ -35,13 +35,9 @@ library(rlang)
 library(stringr)
 library(fs)
 
-# The RforMassSpectrometry stack. xcms pulls in Spectra/MsExperiment.
-suppressPackageStartupMessages({
-  library(Spectra)
-  library(MsExperiment)
-  library(xcms)
-  library(xcmsVis)
-})
+# MS file reading is done directly with mzR (namespace calls); no need to attach
+# the heavy Spectra/xcms stack, which dominated startup and read time.
+suppressPackageStartupMessages(library(mzR))
 
 # --- Async backend (mirai) ------------------------------------------------
 # Daemons power the ExtendedTask file readers. Count is overridable from the
@@ -60,7 +56,7 @@ set_daemons <- function(n = .default_daemons) {
 set_daemons()
 mirai::everywhere({
   suppressPackageStartupMessages({
-    library(Spectra)
+    library(mzR)
   })
 })
 

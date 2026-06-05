@@ -13,3 +13,8 @@
 ^\.claude$
 ^renv-setup\.R$
 ^test-smoke\.R$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^data-raw$
+^vignettes/articles$

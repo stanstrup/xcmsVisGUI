@@ -1,0 +1,23 @@
+url: https://stanstrup.github.io/xcmsVisGUI
+
+template:
+  bootstrap: 5
+
+navbar:
+  structure:
+    left:  [articles, reference]
+    right: [search, github]
+
+articles:
+- title: Guides
+  navbar: ~
+  contents:
+  - articles/usage
+
+reference:
+- title: Launch the app
+  contents:
+  - run_app
+- title: package
+  contents:
+  - xcmsVisGUI-package

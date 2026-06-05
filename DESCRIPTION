@@ -9,6 +9,8 @@ Description: A local Shiny desktop application for interactively visualising raw
     multiple EICs per file, click-to-spectrum, 2D/3D maps, and
     publication-quality export.
 License: GPL-3
+URL: https://stanstrup.github.io/xcmsVisGUI, https://github.com/stanstrup/xcmsVisGUI
+BugReports: https://github.com/stanstrup/xcmsVisGUI/issues
 Encoding: UTF-8
 Imports:
     shiny,
@@ -43,5 +45,6 @@ Suggests:
     faahKO
 biocViews:
 Config/testthat/edition: 3
+Config/Needs/website: pkgdown
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 8.0.0

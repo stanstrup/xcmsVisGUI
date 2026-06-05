@@ -20,3 +20,6 @@ Rplots.pdf
 
 # Claude Code harness
 .claude/
+
+# pkgdown built site
+/docs/

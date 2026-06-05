@@ -17,6 +17,10 @@ jobs:
       R_KEEP_PKG_SOURCE: yes
       # Run the real-data tests for real: install the Suggested Bioc data packages.
       _R_CHECK_FORCE_SUGGESTS_: true
+      # This is an renv project; disable renv's .Rprofile autoloader on CI so the
+      # r-lib/pak steps resolve deps from DESCRIPTION into the default library
+      # instead of fighting the (CI-empty) renv library.
+      RENV_CONFIG_AUTOLOADER_ENABLED: false
     steps:
       - uses: actions/checkout@v4
 

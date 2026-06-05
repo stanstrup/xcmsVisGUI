@@ -1,0 +1,40 @@
+# R CMD check (runs the testthat suite, including the real-data filter-equivalence
+# and extraction tests on msdata/faahKO). Standard r-lib workflow.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+name: R-CMD-check
+
+permissions: read-all
+
+jobs:
+  R-CMD-check:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+      # Run the real-data tests for real: install the Suggested Bioc data packages.
+      _R_CHECK_FORCE_SUGGESTS_: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
+
+      # setup-r-dependencies reads DESCRIPTION (Imports/Suggests/Remotes) and uses
+      # pak, which resolves Bioconductor deps (Spectra/xcms/mzR/msdata/faahKO/...),
+      # the github::stanstrup/xcmsVis remote, and the needed system libraries.
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck
+          needs: check
+
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          upload-snapshots: true
+          # Suggests are required so the real-data tests actually run (don't skip).
+          args: 'c("--no-manual", "--as-cran")'

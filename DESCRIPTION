@@ -4,10 +4,10 @@ Version: 0.0.0.9000
 Authors@R:
     person("Jan", "Stanstrup", email = "stanstrup@gmail.com", role = c("aut", "cre"))
 Description: A local Shiny desktop application for interactively visualising raw
-    LC-MS data on the RforMassSpectrometry stack (Spectra, MsExperiment, xcms),
-    delegating all plotting to the xcmsVis package. Features asynchronous file
-    reading, file inclusion control, rich filtering, multiple EICs per file,
-    click-to-spectrum, 2D/3D maps, and publication-quality export.
+    LC-MS data on the RforMassSpectrometry stack (Spectra, MsExperiment, xcms).
+    Features asynchronous file reading, file inclusion control, rich filtering,
+    multiple EICs per file, click-to-spectrum, 2D/3D maps, and
+    publication-quality export.
 License: GPL-3
 Encoding: UTF-8
 Imports:
@@ -30,20 +30,15 @@ Imports:
     xcms,
     BiocParallel,
     mzR,
-    xcmsVis,
     grDevices,
     stats,
-    utils,
     tools,
     parallel
 Suggests:
     testthat (>= 3.0.0),
     withr,
-    MsDataHub,
     msdata,
     faahKO
-Remotes:
-    github::stanstrup/xcmsVis
 biocViews:
 Config/testthat/edition: 3
 Roxygen: list(markdown = TRUE)

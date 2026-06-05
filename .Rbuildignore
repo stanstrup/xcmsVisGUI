@@ -1,2 +1,15 @@
 ^renv$
 ^renv\.lock$
+^run\.R$
+^benchmarks$
+^\.Rprofile$
+^\.github$
+^\.git$
+^.*\.md$
+^.*\.log$
+^.*\.out$
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.claude$
+^renv-setup\.R$
+^test-smoke\.R$

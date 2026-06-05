@@ -164,17 +164,16 @@ mod_ingest_server <- function(id, rv) {
     # caused the list to flash empty and was slow.
     disp_df <- reactive({
       f <- rv$files
-      cols <- c("Include", "File", "Group", "Status", "Spectra",
-                "RT range", "MS levels", "Polarity")
+      cols <- c(" ", "File", "Group", "St", "MS", "Pol")
       if (nrow(f) == 0) {
         empty <- as.data.frame(matrix(character(), 0, length(cols)))
         names(empty) <- cols
         return(empty)
       }
       status_badge <- dplyr::case_when(
-        f$status == "ready"   ~ "✅ ready",
-        f$status == "reading" ~ "⏳ reading",
-        TRUE                  ~ "❌ error"
+        f$status == "ready"   ~ "✅",
+        f$status == "reading" ~ "⏳",
+        TRUE                  ~ "❌"
       )
       check <- vapply(seq_len(nrow(f)), function(i) {
         as.character(tags$input(
@@ -185,11 +184,8 @@ mod_ingest_server <- function(id, rv) {
         ))
       }, character(1))
       data.frame(
-        Include = check, File = f$name, Group = f$sample_group,
-        Status = status_badge, Spectra = f$n_spectra,
-        `RT range` = ifelse(is.na(f$rt_min), "",
-                            sprintf("%.0f–%.0f", f$rt_min, f$rt_max)),
-        `MS levels` = f$ms_levels, Polarity = f$polarities,
+        ` ` = check, File = f$name, Group = f$sample_group,
+        St = status_badge, MS = f$ms_levels, Pol = f$polarities,
         check.names = FALSE, stringsAsFactors = FALSE
       )
     })
@@ -197,11 +193,14 @@ mod_ingest_server <- function(id, rv) {
     output$file_table <- DT::renderDT({
       isolate(DT::datatable(
         disp_df(), escape = FALSE, rownames = FALSE, selection = "none",
+        class = "compact stripe hover", width = "100%",
         editable = list(target = "cell", columns = 2),  # Group editable
-        options = list(dom = "t", paging = FALSE, ordering = FALSE,
-                       language = list(emptyTable = "No files yet — click “Add files…”."),
-                       columnDefs = list(list(className = "dt-center",
-                                              targets = c(0, 3, 4))))
+        options = list(dom = "t", paging = FALSE, ordering = FALSE, autoWidth = FALSE,
+                       language = list(emptyTable = "No files yet."),
+                       columnDefs = list(
+                         list(className = "dt-center", targets = c(0, 3, 4, 5)),
+                         list(width = "22px", targets = c(0, 3)),     # ✓ + status
+                         list(width = "auto", targets = 1)))           # File name
       ))
     })
     file_proxy <- DT::dataTableProxy("file_table")

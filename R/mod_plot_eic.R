@@ -13,7 +13,7 @@ mod_plot_eic_ui <- function(id) {
     ),
     layout_sidebar(
       sidebar = sidebar(
-        width = 360, position = "right", open = "open",
+        width = 420, position = "right", open = "open",
         DT::DTOutput(ns("targets")),
         div(class = "d-flex gap-2 mt-2",
             actionButton(ns("add"), "Add row", class = "btn-sm btn-outline-primary"),
@@ -45,13 +45,6 @@ mod_plot_eic_ui <- function(id) {
 mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-
-    observe({
-      if (nrow(rv$eic_targets) == 0)
-        rv$eic_targets <- tibble::tibble(
-          label = "target1", mz = 300.2, tol = 10, unit = "ppm",
-          rt_min = NA_real_, rt_max = NA_real_, enabled = TRUE)
-    })
 
     # --- Target table: enabled as a checkbox, other columns editable --------
     output$targets <- DT::renderDT({

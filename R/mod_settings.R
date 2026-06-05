@@ -47,6 +47,24 @@ mod_settings_ui <- function(id) {
 mod_settings_server <- function(id, rv) {
   moduleServer(id, function(input, output, session) {
 
+    # Restore persisted settings into the controls on startup; the per-field
+    # observers below then propagate them into rv$settings. Runs once.
+    saved <- load_settings()
+    if (length(saved)) {
+      if (!is.null(saved$time_unit))    updateRadioButtons(session, "time_unit", selected = saved$time_unit)
+      if (!is.null(saved$qual_palette)) updateSelectInput(session, "qual_palette", selected = saved$qual_palette)
+      if (!is.null(saved$seq_palette))  updateSelectInput(session, "seq_palette", selected = saved$seq_palette)
+      if (!is.null(saved$invert_scale)) updateCheckboxInput(session, "invert_scale", value = saved$invert_scale)
+      if (!is.null(saved$default_tol))      updateNumericInput(session, "default_tol", value = saved$default_tol)
+      if (!is.null(saved$default_tol_unit)) updateSelectInput(session, "default_tol_unit", selected = saved$default_tol_unit)
+      if (!is.null(saved$daemons))      updateSliderInput(session, "daemons", value = saved$daemons)
+      if (!is.null(saved$export_format))updateSelectInput(session, "export_format", selected = saved$export_format)
+      if (!is.null(saved$export_width)) updateNumericInput(session, "export_width", value = saved$export_width)
+      if (!is.null(saved$export_height))updateNumericInput(session, "export_height", value = saved$export_height)
+      if (!is.null(saved$export_units)) updateSelectInput(session, "export_units", selected = saved$export_units)
+      if (!is.null(saved$export_dpi))   updateNumericInput(session, "export_dpi", value = saved$export_dpi)
+    }
+
     # Push each control into its own rv$settings field. Per-field observers (not
     # one observe over all inputs) so changing one setting writes only that field
     # and invalidates only its consumers (rv$settings is a nested reactiveValues).
@@ -69,5 +87,11 @@ mod_settings_server <- function(id, rv) {
       rv$settings$daemons <- set_daemons(daemon_n())
       mirai::everywhere(suppressPackageStartupMessages(library(mzR)))
     }, ignoreInit = TRUE)
+
+    # Persist settings across restarts (debounced; ignoreInit so loading doesn't
+    # immediately rewrite). reactiveValuesToList tracks every field.
+    settings_snapshot <- reactive(reactiveValuesToList(rv$settings)) %>% debounce(1000)
+    observeEvent(settings_snapshot(), save_settings(settings_snapshot()),
+                 ignoreInit = TRUE)
   })
 }

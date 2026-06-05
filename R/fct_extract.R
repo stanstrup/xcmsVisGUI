@@ -49,6 +49,9 @@ build_msexp <- function(files_df) {
 }
 
 #' Convert an (M/X)Chromatograms object to a tidy tibble for ggplot.
+#' @importFrom tibble tibble
+#' @importFrom dplyr bind_rows
+#' @noRd
 chrom_to_df <- function(chr, meta, labels = NULL) {
   nr <- nrow(chr); nc <- ncol(chr)
   if (is.null(labels)) labels <- paste0("target", seq_len(nr))
@@ -58,11 +61,11 @@ chrom_to_df <- function(chr, meta, labels = NULL) {
     rt  <- xcms::rtime(cell); int <- xcms::intensity(cell)
     if (!length(rt)) next
     k <- k + 1L
-    pieces[[k]] <- tibble::tibble(
+    pieces[[k]] <- tibble(
       target = labels[i], sample_id = meta$id[j], sample_name = meta$name[j],
       sample_group = meta$sample_group[j], rt = rt, intensity = int)
   }
-  out <- dplyr::bind_rows(pieces[seq_len(k)])
+  out <- bind_rows(pieces[seq_len(k)])
   out$intensity[is.na(out$intensity)] <- 0
   out
 }
@@ -85,16 +88,18 @@ get_spectra <- function(path) {
 #' Extract a single spectrum at a retention time OR a scan (acquisition) number.
 #' The global filter `f` is applied (intensity/m/z/polarity/charge/spectrumId);
 #' ms_level and the rt/scan selection come from the Spectrum tab controls.
+#' @importFrom tibble tibble
+#' @noRd
 extract_spectrum <- function(path, rt = NA_real_, scan = NA_integer_, f = list()) {
   sp <- get_spectra(path)
-  empty <- tibble::tibble(mz = numeric(), intensity = numeric(), rt = numeric(),
+  empty <- tibble(mz = numeric(), intensity = numeric(), rt = numeric(),
                           scan = integer())
   one_to_df <- function(one) {
     if (!length(one)) return(empty)
     mzv <- Spectra::mz(one)[[1]]; iv <- Spectra::intensity(one)[[1]]
     if (!length(mzv)) return(empty)
     a <- tryCatch(Spectra::acquisitionNum(one), error = function(e) NA_integer_)
-    tibble::tibble(mz = mzv, intensity = iv, rt = Spectra::rtime(one)[1], scan = a[1])
+    tibble(mz = mzv, intensity = iv, rt = Spectra::rtime(one)[1], scan = a[1])
   }
   if (!is.null(scan) && is.finite(scan)) {
     # An explicit acquisition-number pick must resolve against the FULL file: the
@@ -122,10 +127,12 @@ extract_spectrum <- function(path, rt = NA_real_, scan = NA_integer_, f = list()
 
 #' Extract all peaks (rt, m/z, intensity) from one file as a long tibble (MS map/3D).
 #' Applies the full global filter `f` (incl. intensity / spectrumId / charge).
+#' @importFrom tibble tibble
+#' @noRd
 extract_peaks <- function(path, f = list()) {
   sp <- get_spectra(path)
   sp <- apply_filters_spectra(sp, f)
-  if (!length(sp)) return(tibble::tibble(rt = numeric(), mz = numeric(), intensity = numeric()))
+  if (!length(sp)) return(tibble(rt = numeric(), mz = numeric(), intensity = numeric()))
   rt <- Spectra::rtime(sp)
   # peaksData() is an S4 SimpleList; coerce to a base list so do.call(rbind, ...)
   # and vapply work without relying on BiocGenerics::rbind being attached
@@ -133,17 +140,20 @@ extract_peaks <- function(path, f = list()) {
   pd <- as.list(Spectra::peaksData(sp))
   lens <- vapply(pd, nrow, integer(1))
   mat <- do.call(rbind, pd)
-  if (is.null(mat)) return(tibble::tibble(rt = numeric(), mz = numeric(), intensity = numeric()))
-  tibble::tibble(rt = rep(rt, lens), mz = mat[, "mz"], intensity = mat[, "intensity"])
+  if (is.null(mat)) return(tibble(rt = numeric(), mz = numeric(), intensity = numeric()))
+  tibble(rt = rep(rt, lens), mz = mat[, "mz"], intensity = mat[, "intensity"])
 }
 
 #' Bin long peak data into an rt x m/z grid for heatmap / surface display.
+#' @importFrom tibble tibble
+#' @importFrom dplyr group_by summarise
+#' @noRd
 bin_peaks <- function(df, rt_bin = 10, mz_bin = 1, aggfun = max) {
   if (nrow(df) == 0)
-    return(tibble::tibble(rt_b = numeric(), mz_b = numeric(), intensity = numeric()))
+    return(tibble(rt_b = numeric(), mz_b = numeric(), intensity = numeric()))
   df$rt_b <- round(df$rt / rt_bin) * rt_bin
   df$mz_b <- round(df$mz / mz_bin) * mz_bin
-  dplyr::summarise(dplyr::group_by(df, rt_b, mz_b),
+  summarise(group_by(df, rt_b, mz_b),
                    intensity = aggfun(intensity), .groups = "drop")
 }
 
@@ -176,7 +186,7 @@ scan_for_rt <- function(rt, scan_table) {
 
 #' Run a per-file `extractor(path)` over the included files, attach the requested
 #' sample metadata, optionally join scan numbers by rt, and bind into one tibble.
-#' The extractor is wrapped with purrr::possibly so an unreadable file is SKIPPED
+#' The extractor is wrapped with possibly so an unreadable file is SKIPPED
 #' (its name passed to `on_error`) rather than aborting the whole multi-file plot.
 #' Keeps the Shiny layer out: the caller supplies `on_error` for any notification.
 #' @param files_df included files (needs id, path, name, sample_group)
@@ -184,9 +194,12 @@ scan_for_rt <- function(rt, scan_table) {
 #' @param cols metadata to attach: any of sample_id / sample_name / sample_group
 #' @param scan join acquisition numbers by rt (MS map)
 #' @param on_error function(failed_names) called once if any file failed
+#' @importFrom purrr possibly
+#' @importFrom dplyr bind_rows
+#' @noRd
 extract_over_files <- function(files_df, extractor, cols = "sample_id",
                                scan = FALSE, on_error = NULL) {
-  safe <- purrr::possibly(extractor, otherwise = NULL)
+  safe <- possibly(extractor, otherwise = NULL)
   pieces <- lapply(seq_len(nrow(files_df)), function(i) {
     d <- safe(files_df$path[i])
     if (is.null(d)) return(NULL)              # read failed -> skip this file
@@ -200,7 +213,7 @@ extract_over_files <- function(files_df, extractor, cols = "sample_id",
   })
   failed <- vapply(pieces, is.null, logical(1))
   if (any(failed) && !is.null(on_error)) on_error(files_df$name[failed])
-  dplyr::bind_rows(pieces)                     # bind_rows drops NULLs
+  bind_rows(pieces)                     # bind_rows drops NULLs
 }
 
 #' Empty the per-file caches (.scan_cache + .spectra_cache). Called when the user
@@ -229,19 +242,23 @@ add_scan_numbers <- function(df, meta) {
 }
 
 #' Precursor ions (rt, precursor m/z, scan) for MS>1 spectra in a file (DDA map).
+#' @importFrom tibble tibble
+#' @noRd
 extract_precursors <- function(path) {
   sp <- get_spectra(path)
   ms <- Spectra::msLevel(sp); pmz <- Spectra::precursorMz(sp); rt <- Spectra::rtime(sp)
   scn <- tryCatch(Spectra::acquisitionNum(sp), error = function(e) rep(NA_integer_, length(sp)))
   idx <- which(ms > 1 & is.finite(pmz) & pmz > 0)
-  tibble::tibble(rt = rt[idx], precursorMZ = pmz[idx], scan = scn[idx])
+  tibble(rt = rt[idx], precursorMZ = pmz[idx], scan = scn[idx])
 }
 
 #' Polarity label from the integer code Spectra uses (0 neg, 1 pos, -1 unknown).
+#' @importFrom dplyr recode
+#' @noRd
 polarity_label <- function(x) {
   if (length(x) == 0 || is.na(x)) return(NA_character_)
   codes <- trimws(strsplit(as.character(x), ",")[[1]])
-  lab <- dplyr::recode(codes, "0" = "neg", "1" = "pos", "-1" = "", .default = codes)
+  lab <- recode(codes, "0" = "neg", "1" = "pos", "-1" = "", .default = codes)
   lab <- lab[nzchar(lab)]
   if (length(lab) == 0) NA_character_ else paste(unique(lab), collapse = ", ")
 }

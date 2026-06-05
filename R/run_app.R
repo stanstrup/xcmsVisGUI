@@ -32,6 +32,8 @@ app_ui <- function() {
 
 #' App server: builds the central reactive graph (included files -> data_key ->
 #' raw_msexp (cached) -> dataset) and wires it into every module.
+#' @importFrom tibble tibble
+#' @noRd
 app_server <- function(input, output, session) {
   rv <- make_rv()
 
@@ -64,8 +66,8 @@ app_server <- function(input, output, session) {
   })
   meta <- reactive({
     inc <- included()
-    tibble::tibble(id = inc$id, name = inc$name, path = inc$path,
-                   sample_group = inc$sample_group)
+    tibble(id = inc$id, name = inc$name, path = inc$path,
+           sample_group = inc$sample_group)
   })
 
   mod_plot_tic_bpc_server("tic", rv, dataset, meta, data_key)
@@ -84,10 +86,11 @@ app_server <- function(input, output, session) {
 #' @param ... passed to [shiny::runApp()] (e.g. `port`, `launch.browser`).
 #' @return Invisibly, the result of [shiny::runApp()].
 #' @export
+#' @importFrom mirai daemons
 #' @examples
 #' if (interactive()) run_app()
 run_app <- function(...) {
   setup_runtime()
-  on.exit(try(mirai::daemons(0), silent = TRUE), add = TRUE)
-  shiny::runApp(shiny::shinyApp(app_ui(), app_server), ...)
+  on.exit(try(daemons(0), silent = TRUE), add = TRUE)
+  runApp(shinyApp(app_ui(), app_server), ...)
 }

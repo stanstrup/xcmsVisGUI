@@ -3,18 +3,21 @@
 #' A local desktop Shiny app for visualising raw LC-MS data (TIC/BPC, EICs,
 #' spectra, 2D/3D MS maps, DDA precursors). Launch with [run_app()].
 #'
-#' Most cross-package calls are `::`-qualified (see the `fct_*` files); only the
-#' functions used bare in the UI/glue code are imported here. The
-#' RforMassSpectrometry stack (Spectra/MsExperiment/xcms/...) is used via `::`.
+#' Import policy: every used function is declared with a per-function
+#' `@importFrom` so the code calls bare names. Two deliberate exceptions:
+#'   * `shiny` and `bslib` are imported whole (`@import`) — they are the UI
+#'     framework used in essentially every function and have no conflicts with
+#'     our other imports; enumerating them per function adds noise, not safety.
+#'   * the RforMassSpectrometry S4 stack (Spectra/xcms/MsExperiment/BiocParallel/
+#'     mzR) is called with `::`. Those packages export many overlapping generics
+#'     (`rtime`, `intensity`, `mz`, `filterMsLevel`, `spectra`, ...) and some
+#'     collide with base (`close`, `filter`); `::` keeps the intended method
+#'     source explicit and dispatch unambiguous — the "unresolvable conflict" case.
+#' `%>%` (magrittr) and `%||%` (rlang) are imported here once as operators.
 #'
 #' @keywords internal
 #' @import shiny
 #' @import bslib
-#' @import dplyr
-#' @import tibble
-#' @importFrom plotly plot_ly add_trace layout ggplotly renderPlotly plotlyOutput event_register event_data
-#' @importFrom mirai mirai daemons everywhere
-#' @importFrom xcms chromatogram
 #' @importFrom magrittr %>%
 #' @importFrom rlang %||%
 "_PACKAGE"

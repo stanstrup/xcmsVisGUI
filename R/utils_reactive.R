@@ -2,6 +2,9 @@
 
 #' Create the app-wide reactive store. One instance lives in the main server
 #' and is passed to every module.
+#' @importFrom tibble tibble
+#' @importFrom parallel detectCores
+#' @noRd
 make_rv <- function() {
   reactiveValues(
     # Per-file metadata; grows as async reads resolve. One row per file.
@@ -50,7 +53,7 @@ make_rv <- function() {
       invert_scale = TRUE,
       default_tol      = 10,         # default EIC tolerance for new targets
       default_tol_unit = "ppm",      # "ppm" | "Da"
-      daemons      = max(1L, parallel::detectCores() - 1L),
+      daemons      = max(1L, detectCores() - 1L),
       export_format = "png",
       export_width  = 8,
       export_height = 5,
@@ -64,35 +67,42 @@ make_rv <- function() {
 #' matching the rv$eic_targets schema. `label` defaults to "m<mz>"; vectorised
 #' over `mz`. Single home for the target-row literal used by EIC add/paste and
 #' the spectrum click-to-add.
+#' @importFrom tibble tibble
+#' @noRd
 new_eic_target <- function(mz, tol = 10, unit = "ppm",
                            label = sprintf("m%.4f", mz)) {
-  tibble::tibble(label = label, mz = mz, tol = tol, unit = unit,
-                 rt_min = NA_real_, rt_max = NA_real_, enabled = TRUE)
+  tibble(label = label, mz = mz, tol = tol, unit = unit,
+         rt_min = NA_real_, rt_max = NA_real_, enabled = TRUE)
 }
 
 #' Standard notification for files skipped by extract_over_files (one bad file in
 #' a multi-file plot is reported, not fatal). Pass as the `on_error` callback.
+#' @noRd
 notify_read_failures <- function(names) {
-  shiny::showNotification(
+  showNotification(
     paste0("Skipped unreadable file(s): ", paste(names, collapse = ", ")),
     type = "warning", duration = 6)
 }
 
 #' Register the click/relayout/doubleclick events on a plotly object. Used by
 #' every interactive plot so clicks and zoom-persistence reach the server.
+#' @importFrom plotly event_register
+#' @noRd
 register_plotly_events <- function(p) {
   p %>%
-    plotly::event_register("plotly_click") %>%
-    plotly::event_register("plotly_relayout") %>%
-    plotly::event_register("plotly_doubleclick")
+    event_register("plotly_click") %>%
+    event_register("plotly_relayout") %>%
+    event_register("plotly_doubleclick")
 }
 
 #' Convert a ggplot to plotly and finalize it for an interactive plot module:
 #' tooltip from the `text` aes, dynamic ticks, zoom persistence, and event
 #' registration. `keep_zoom` is the function returned by `zoom_keeper(source)`.
 #' Collapses the identical render tail repeated in every ggplot-based plot module.
+#' @importFrom plotly ggplotly
+#' @noRd
 finalize_plotly <- function(gg, source, keep_zoom) {
-  plotly::ggplotly(gg, source = source, tooltip = "text", dynamicTicks = TRUE) %>%
+  ggplotly(gg, source = source, tooltip = "text", dynamicTicks = TRUE) %>%
     keep_zoom() %>%
     register_plotly_events()
 }
@@ -101,11 +111,12 @@ finalize_plotly <- function(gg, source, keep_zoom) {
 #' view). `file_id` comes from the click `key` aesthetic; `mz_from(ev)` yields the
 #' m/z (default NA). Call ONCE inside a moduleServer. `suppressWarnings` hides the
 #' benign "source not registered" notice emitted before the first render.
+#' @importFrom plotly event_data
+#' @noRd
 wire_selection <- function(source, plot, rv, mz_from = function(ev) NA_real_) {
-  click <- shiny::reactive(suppressWarnings(
-    plotly::event_data("plotly_click", source = source)))
-  shiny::observeEvent(click(), {
-    ev <- click(); shiny::req(ev)
+  click <- reactive(suppressWarnings(event_data("plotly_click", source = source)))
+  observeEvent(click(), {
+    ev <- click(); req(ev)
     rv$selection <- list(plot = plot, file_id = ev$key,
                          rt = rt_to_sec(ev$x, rv$settings$time_unit),
                          mz = mz_from(ev))
@@ -117,6 +128,8 @@ wire_selection <- function(source, plot, rv, mz_from = function(ev) NA_real_) {
 #' The stored range is read with isolate() so a user zoom does NOT re-trigger the
 #' render (that caused an autorange/snap-back feedback loop); it is only re-applied
 #' when the plot re-renders for data/cosmetic reasons. Cleared on double-click.
+#' @importFrom plotly event_data layout
+#' @noRd
 zoom_keeper <- function(source) {
   z <- reactiveValues(x = NULL, y = NULL)
   # Only STORE ranges from user zoom/pan. We must NOT clear on autorange here:
@@ -135,8 +148,8 @@ zoom_keeper <- function(source) {
   }, ignoreInit = TRUE)
   function(p) {
     zx <- isolate(z$x); zy <- isolate(z$y)
-    if (!is.null(zx)) p <- plotly::layout(p, xaxis = list(range = zx, autorange = FALSE))
-    if (!is.null(zy)) p <- plotly::layout(p, yaxis = list(range = zy, autorange = FALSE))
+    if (!is.null(zx)) p <- layout(p, xaxis = list(range = zx, autorange = FALSE))
+    if (!is.null(zy)) p <- layout(p, yaxis = list(range = zy, autorange = FALSE))
     p
   }
 }

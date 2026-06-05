@@ -1,6 +1,8 @@
 # mod_plot_tic_bpc — TIC/BPC overlay of included files, colored by metadata.
 # Click a trace to load that scan's spectrum (rv$selection).
 
+#' @importFrom plotly plotlyOutput
+#' @noRd
 mod_plot_tic_bpc_ui <- function(id) {
   ns <- NS(id)
   card(
@@ -24,6 +26,9 @@ mod_plot_tic_bpc_ui <- function(id) {
   )
 }
 
+#' @importFrom ggplot2 ggplot aes geom_line geom_point scale_color_manual labs theme_bw
+#' @importFrom plotly renderPlotly
+#' @noRd
 mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
   moduleServer(id, function(input, output, session) {
 
@@ -35,7 +40,7 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
       x <- dataset(); req(x)
       ms <- chrom_ms_level(rv$filter)
       withProgress(message = "Extracting chromatograms…", value = 0.5, {
-        chr <- chromatogram(x, aggregationFun = input$agg, msLevel = ms)
+        chr <- xcms::chromatogram(x, aggregationFun = input$agg, msLevel = ms)
         add_scan_numbers(chrom_to_df(chr, meta(), labels = chrom_label()), meta())
       })
     }) %>% bindCache(data_key(), input$agg)
@@ -56,18 +61,18 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
       df$.tip <- sprintf("%s\nscan: %s\nrt: %.4g %s\nint: %.3g",
                          df$sample_name, ifelse(is.na(df$scan), "?", df$scan),
                          df$rt_disp, unit, df$intensity)
-      p <- ggplot2::ggplot(df, ggplot2::aes(
+      p <- ggplot(df, aes(
         x = rt_disp, y = intensity, group = sample_id, color = .color,
         key = sample_id, text = .tip)) +
-        ggplot2::geom_line(linewidth = 0.5)
-      if (isTRUE(input$points)) p <- p + ggplot2::geom_point(size = 0.9)
+        geom_line(linewidth = 0.5)
+      if (isTRUE(input$points)) p <- p + geom_point(size = 0.9)
       p +
-        ggplot2::scale_color_manual(values = pal) +
-        ggplot2::labs(x = rt_axis_label(unit), y = "intensity",
+        scale_color_manual(values = pal) +
+        labs(x = rt_axis_label(unit), y = "intensity",
                       color = NULL,
                       title = paste0(chrom_label(), " — ", length(unique(df$sample_id)),
                                      " file(s)")) +
-        ggplot2::theme_bw()
+        theme_bw()
     })
 
     keep_zoom <- zoom_keeper("tic")

@@ -10,9 +10,19 @@ A local desktop Shiny app for visualising raw LC-MS data (TIC/BPC, EICs,
 spectra, 2D/3D MS maps, DDA precursors). Launch with \code{\link[=run_app]{run_app()}}.
 }
 \details{
-Most cross-package calls are \code{::}-qualified (see the \verb{fct_*} files); only the
-functions used bare in the UI/glue code are imported here. The
-RforMassSpectrometry stack (Spectra/MsExperiment/xcms/...) is used via \code{::}.
+Import policy: every used function is declared with a per-function
+\verb{@importFrom} so the code calls bare names. Two deliberate exceptions:
+\itemize{
+\item \code{shiny} and \code{bslib} are imported whole (\verb{@import}) — they are the UI
+framework used in essentially every function and have no conflicts with
+our other imports; enumerating them per function adds noise, not safety.
+\item the RforMassSpectrometry S4 stack (Spectra/xcms/MsExperiment/BiocParallel/
+mzR) is called with \code{::}. Those packages export many overlapping generics
+(\code{rtime}, \code{intensity}, \code{mz}, \code{filterMsLevel}, \code{spectra}, ...) and some
+collide with base (\code{close}, \code{filter}); \code{::} keeps the intended method
+source explicit and dispatch unambiguous — the "unresolvable conflict" case.
+\verb{\%>\%} (magrittr) and \verb{\%||\%} (rlang) are imported here once as operators.
+}
 }
 \author{
 \strong{Maintainer}: Jan Stanstrup \email{stanstrup@gmail.com}

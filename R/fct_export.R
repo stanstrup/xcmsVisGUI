@@ -5,6 +5,9 @@
 #' @param gg a ggplot object
 #' @param file destination path
 #' @param settings rv$settings list (format/width/height/units/dpi)
+#' @importFrom ggplot2 ggsave
+#' @importFrom grDevices cairo_pdf svg
+#' @noRd
 save_gg <- function(gg, file, settings) {
   fmt <- settings$export_format %||% "png"
   args <- list(
@@ -16,10 +19,10 @@ save_gg <- function(gg, file, settings) {
   if (fmt == "png") {
     args$device <- "png"; args$dpi <- settings$export_dpi %||% 300
   } else if (fmt == "pdf") {
-    args$device <- grDevices::cairo_pdf
+    args$device <- cairo_pdf
   } else if (fmt == "svg") {
     # Prefer svglite; fall back to grDevices::svg (cairo) if unavailable.
-    args$device <- if (requireNamespace("svglite", quietly = TRUE)) "svg" else grDevices::svg
+    args$device <- if (requireNamespace("svglite", quietly = TRUE)) "svg" else svg
   }
-  do.call(ggplot2::ggsave, args)
+  do.call(ggsave, args)
 }

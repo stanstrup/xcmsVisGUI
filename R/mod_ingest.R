@@ -8,6 +8,8 @@
 # "reading" to "ready" one by one. A queue feeds the single-file reader;
 # concurrency can be added later by widening the pool of in-flight readers.
 
+#' @importFrom DT DTOutput
+#' @noRd
 mod_ingest_ui <- function(id) {
   ns <- NS(id)
   tagList(
@@ -34,10 +36,15 @@ mod_ingest_ui <- function(id) {
         actionButton(ns("sel_none"), "None",   class = "btn-sm btn-outline-secondary"),
         actionButton(ns("sel_inv"),  "Invert", class = "btn-sm btn-outline-secondary")),
     helpText("Tick a file to include it in plots. Files stay loaded when unticked."),
-    DT::DTOutput(ns("file_table"))
+    DTOutput(ns("file_table"))
   )
 }
 
+#' @importFrom mirai mirai
+#' @importFrom tibble tibble
+#' @importFrom dplyr bind_rows case_when
+#' @importFrom DT renderDT datatable dataTableProxy replaceData
+#' @noRd
 mod_ingest_server <- function(id, rv) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -47,7 +54,7 @@ mod_ingest_server <- function(id, rv) {
     current <- reactiveVal(NULL)          # file id currently being read
 
     reader <- ExtendedTask$new(function(path) {
-      mirai::mirai(
+      mirai(
         read_ms_header(path),
         read_ms_header = read_ms_header,
         path = path
@@ -108,9 +115,17 @@ mod_ingest_server <- function(id, rv) {
       add_paths(up$datapath, names = up$name)
     })
 
-    # Native OS folder dialog (server-side, no copy). Windows: utils::choose.dir().
+    # Native OS folder dialog (server-side, no copy). choose.dir() is Windows-only
+    # and not exported by utils elsewhere, so fetch it dynamically (a static
+    # utils::choose.dir would fail load / R CMD check on non-Windows).
     observeEvent(input$pick_dir, {
-      p <- tryCatch(utils::choose.dir(caption = "Choose a folder of MS files"),
+      choose_dir <- get0("choose.dir", envir = asNamespace("utils"))
+      if (is.null(choose_dir)) {
+        showNotification("Folder dialog is Windows-only; paste a path instead.",
+                         type = "warning")
+        return()
+      }
+      p <- tryCatch(choose_dir(caption = "Choose a folder of MS files"),
                     error = function(e) NA_character_)
       if (is.null(p) || is.na(p) || !nzchar(p)) return()
       fls <- list.files(p, pattern = MS_FILE_REGEX, full.names = TRUE, ignore.case = TRUE)
@@ -173,7 +188,7 @@ mod_ingest_server <- function(id, rv) {
         names(empty) <- cols
         return(empty)
       }
-      status_badge <- dplyr::case_when(
+      status_badge <- case_when(
         f$status == "ready"   ~ "✅",
         f$status == "reading" ~ "⏳",
         TRUE                  ~ "❌"
@@ -193,8 +208,8 @@ mod_ingest_server <- function(id, rv) {
       )
     })
 
-    output$file_table <- DT::renderDT({
-      isolate(DT::datatable(
+    output$file_table <- renderDT({
+      isolate(datatable(
         disp_df(), escape = FALSE, rownames = FALSE, selection = "none",
         class = "compact stripe hover", width = "100%",
         editable = list(target = "cell", columns = 2),  # Group editable
@@ -206,9 +221,9 @@ mod_ingest_server <- function(id, rv) {
                          list(width = "auto", targets = 1)))           # File name
       ))
     })
-    file_proxy <- DT::dataTableProxy("file_table")
+    file_proxy <- dataTableProxy("file_table")
     observeEvent(disp_df(), {
-      DT::replaceData(file_proxy, disp_df(), rownames = FALSE, resetPaging = FALSE)
+      replaceData(file_proxy, disp_df(), rownames = FALSE, resetPaging = FALSE)
     }, ignoreInit = TRUE)
 
     # Checkbox toggles

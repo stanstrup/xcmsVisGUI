@@ -3,6 +3,9 @@
 # traces are overlaid and colored by target, file, or group (ColorBrewer).
 # Click a trace to load the spectrum at that retention time.
 
+#' @importFrom DT DTOutput
+#' @importFrom plotly plotlyOutput
+#' @noRd
 mod_plot_eic_ui <- function(id) {
   ns <- NS(id)
   card(
@@ -14,7 +17,7 @@ mod_plot_eic_ui <- function(id) {
     layout_sidebar(
       sidebar = sidebar(
         width = 420, position = "right", open = "open",
-        DT::DTOutput(ns("targets")),
+        DTOutput(ns("targets")),
         div(class = "d-flex gap-2 mt-2",
             actionButton(ns("add"), "Add row", class = "btn-sm btn-outline-primary"),
             actionButton(ns("del"), "Remove selected", class = "btn-sm btn-outline-secondary")),
@@ -42,14 +45,20 @@ mod_plot_eic_ui <- function(id) {
   )
 }
 
+#' @importFrom DT renderDT datatable
+#' @importFrom dplyr bind_rows left_join
+#' @importFrom tibble tibble
+#' @importFrom ggplot2 ggplot aes geom_line geom_point scale_color_manual labs theme_bw facet_wrap
+#' @importFrom plotly renderPlotly
+#' @noRd
 mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
     # --- Target table: enabled as a checkbox, other columns editable --------
-    output$targets <- DT::renderDT({
+    output$targets <- renderDT({
       tg <- rv$eic_targets
-      if (nrow(tg) == 0) return(DT::datatable(tg[, c("label","mz")], rownames = FALSE,
+      if (nrow(tg) == 0) return(datatable(tg[, c("label","mz")], rownames = FALSE,
                                               options = list(dom = "t")))
       check <- vapply(seq_len(nrow(tg)), function(i) as.character(tags$input(
         type = "checkbox", checked = if (isTRUE(tg$enabled[i])) "checked" else NULL,
@@ -59,7 +68,7 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       disp <- data.frame(`✓` = check, label = tg$label, mz = tg$mz, tol = tg$tol,
                          unit = tg$unit, rt_min = tg$rt_min, rt_max = tg$rt_max,
                          check.names = FALSE, stringsAsFactors = FALSE)
-      DT::datatable(
+      datatable(
         disp, escape = FALSE, rownames = FALSE, selection = "multiple",
         editable = list(target = "cell", columns = 1:6),   # all but the checkbox
         options = list(dom = "t", paging = FALSE, ordering = FALSE,
@@ -85,7 +94,7 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
 
     observeEvent(input$add, {
       n <- nrow(rv$eic_targets) + 1
-      rv$eic_targets <- dplyr::bind_rows(rv$eic_targets, new_eic_target(
+      rv$eic_targets <- bind_rows(rv$eic_targets, new_eic_target(
         NA_real_, tol = rv$settings$default_tol, unit = rv$settings$default_tol_unit,
         label = paste0("target", n)))
     })
@@ -104,7 +113,7 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       vals <- suppressWarnings(as.numeric(trimws(strsplit(input$paste, "[,\n;]+")[[1]])))
       vals <- vals[is.finite(vals)]
       req(length(vals) > 0)
-      rv$eic_targets <- dplyr::bind_rows(rv$eic_targets,
+      rv$eic_targets <- bind_rows(rv$eic_targets,
         new_eic_target(vals, tol = input$paste_tol, unit = input$paste_unit))
       updateTextAreaInput(session, "paste", value = "")
     })
@@ -129,14 +138,14 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
         rtr <- c(min(rmin_s, na.rm = TRUE), max(rmax_s, na.rm = TRUE))
       ms <- chrom_ms_level(rv$filter)
       withProgress(message = "Extracting EICs…", value = 0.5, {
-        chr <- if (length(rtr) == 2) chromatogram(x, mz = mzmat, rt = rtr, msLevel = ms)
-               else chromatogram(x, mz = mzmat, msLevel = ms)
+        chr <- if (length(rtr) == 2) xcms::chromatogram(x, mz = mzmat, rt = rtr, msLevel = ms)
+               else xcms::chromatogram(x, mz = mzmat, msLevel = ms)
         df <- add_scan_numbers(chrom_to_df(chr, meta(), labels = tg$label), meta())
       })
       # per-target rt clipping (display unit -> seconds)
       if (any(is.finite(rmin_s)) || any(is.finite(rmax_s))) {
-        lims <- tibble::tibble(target = tg$label, rmin = rmin_s, rmax = rmax_s)
-        df <- dplyr::left_join(df, lims, by = "target")
+        lims <- tibble(target = tg$label, rmin = rmin_s, rmax = rmax_s)
+        df <- left_join(df, lims, by = "target")
         df <- df[(is.na(df$rmin) | df$rt >= df$rmin) &
                  (is.na(df$rmax) | df$rt <= df$rmax), ]
         df$rmin <- NULL; df$rmax <- NULL
@@ -156,22 +165,22 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       df$.tip <- sprintf("%s | %s\nscan: %s\nrt: %.4g %s\nint: %.3g",
                          df$target, df$sample_name, ifelse(is.na(df$scan), "?", df$scan),
                          df$rt_disp, unit, df$intensity)
-      p <- ggplot2::ggplot(df, ggplot2::aes(
+      p <- ggplot(df, aes(
         x = rt_disp, y = intensity, color = .color,
         group = interaction(target, sample_id), key = sample_id, text = .tip))
       # when not coloring by target, distinguish targets by line type
       if (cby != "target" && length(unique(df$target)) > 1)
-        p <- p + ggplot2::geom_line(ggplot2::aes(linetype = target), linewidth = 0.5)
+        p <- p + geom_line(aes(linetype = target), linewidth = 0.5)
       else
-        p <- p + ggplot2::geom_line(linewidth = 0.5)
-      if (isTRUE(input$points)) p <- p + ggplot2::geom_point(size = 0.9)
+        p <- p + geom_line(linewidth = 0.5)
+      if (isTRUE(input$points)) p <- p + geom_point(size = 0.9)
       p <- p +
-        ggplot2::scale_color_manual(values = pal) +
-        ggplot2::labs(x = rt_axis_label(unit), y = "intensity", color = NULL,
+        scale_color_manual(values = pal) +
+        labs(x = rt_axis_label(unit), y = "intensity", color = NULL,
                       linetype = NULL) +
-        ggplot2::theme_bw()
+        theme_bw()
       if (isTRUE(input$facet) && length(unique(df$sample_id)) > 1)
-        p <- p + ggplot2::facet_wrap(~ sample_name, ncol = 1, scales = "free_y")
+        p <- p + facet_wrap(~ sample_name, ncol = 1, scales = "free_y")
       p
     })
 

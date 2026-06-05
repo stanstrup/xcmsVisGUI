@@ -8,6 +8,8 @@
 MAP_POINT_CAP <- 400000L
 MAP_LINE_CAP  <- 200000L
 
+#' @importFrom plotly plotlyOutput
+#' @noRd
 mod_plot_map_ui <- function(id) {
   ns <- NS(id)
   card(
@@ -48,6 +50,10 @@ mod_plot_map_ui <- function(id) {
   )
 }
 
+#' @importFrom plotly plot_ly add_trace layout event_data renderPlotly
+#' @importFrom ggplot2 ggplot aes geom_point scale_color_gradientn labs theme_bw
+#' @importFrom stats quantile ave
+#' @noRd
 mod_plot_map_server <- function(id, rv, included) {
   moduleServer(id, function(input, output, session) {
 
@@ -76,11 +82,11 @@ mod_plot_map_server <- function(id, rv, included) {
       if (input$mode == "map") {
         if (nrow(pk) > MAP_LINE_CAP)
           pk <- pk[order(-pk$intensity)[seq_len(MAP_LINE_CAP)], , drop = FALSE]
-        cmax <- stats::quantile(pk$intensity, input$contrast / 100, names = FALSE)
+        cmax <- quantile(pk$intensity, input$contrast / 100, names = FALSE)
         if (!is.finite(cmax) || cmax <= 0) cmax <- max(pk$intensity)
         # next-scan rt per file gives each centroid its rt width
         if (is.null(pk$sample_id)) pk$sample_id <- "f"
-        pk$rt1 <- stats::ave(pk$rt, pk$sample_id, FUN = function(r) {
+        pk$rt1 <- ave(pk$rt, pk$sample_id, FUN = function(r) {
           u <- sort(unique(r))
           gap <- if (length(u) > 1) diff(u)[length(u) - 1] else 1
           c(u[-1], u[length(u)] + gap)[match(r, u)]
@@ -128,7 +134,7 @@ mod_plot_map_server <- function(id, rv, included) {
             zaxis = list(title = "intensity")))
 
       } else {  # 3D points
-        thr <- stats::quantile(pk$intensity, input$thr / 100, names = FALSE)
+        thr <- quantile(pk$intensity, input$thr / 100, names = FALSE)
         pk <- pk[pk$intensity >= thr, , drop = FALSE]
         validate(need(nrow(pk) > 0, "Cutoff removed all points; lower it."))
         if (nrow(pk) > MAP_POINT_CAP)
@@ -159,13 +165,13 @@ mod_plot_map_server <- function(id, rv, included) {
       if (nrow(pk) > MAP_LINE_CAP)
         pk <- pk[order(-pk$intensity)[seq_len(MAP_LINE_CAP)], , drop = FALSE]
       pk$rt_disp <- rt_to_disp(pk$rt, unit)
-      cmax <- stats::quantile(pk$intensity, input$contrast / 100, names = FALSE)
-      ggplot2::ggplot(pk, ggplot2::aes(rt_disp, mz, color = pmin(intensity, cmax))) +
-        ggplot2::geom_point(size = input$psize * 0.4) +
-        ggplot2::scale_color_gradientn(colours = brewer_seq(rv$settings$seq_palette,
+      cmax <- quantile(pk$intensity, input$contrast / 100, names = FALSE)
+      ggplot(pk, aes(rt_disp, mz, color = pmin(intensity, cmax))) +
+        geom_point(size = input$psize * 0.4) +
+        scale_color_gradientn(colours = brewer_seq(rv$settings$seq_palette,
                                        invert = isTRUE(rv$settings$invert_scale))(9)) +
-        ggplot2::labs(x = rt_axis_label(unit), y = "m/z", color = "int") +
-        ggplot2::theme_bw()
+        labs(x = rt_axis_label(unit), y = "m/z", color = "int") +
+        theme_bw()
     })
     mod_export_server("export", export_gg, rv, "msmap")
   })

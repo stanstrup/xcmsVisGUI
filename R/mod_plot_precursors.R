@@ -2,6 +2,8 @@
 # Each point is a precursor selected for fragmentation. Click a point to show its
 # spectrum on the Spectrum tab.
 
+#' @importFrom plotly plotlyOutput
+#' @noRd
 mod_plot_precursors_ui <- function(id) {
   ns <- NS(id)
   card(
@@ -22,6 +24,9 @@ mod_plot_precursors_ui <- function(id) {
   )
 }
 
+#' @importFrom ggplot2 ggplot aes geom_point scale_color_manual labs theme_bw
+#' @importFrom plotly renderPlotly
+#' @noRd
 mod_plot_precursors_server <- function(id, rv, included) {
   moduleServer(id, function(input, output, session) {
 
@@ -52,21 +57,21 @@ mod_plot_precursors_server <- function(id, rv, included) {
                          df$precursorMZ, ifelse(is.na(df$scan), "?", df$scan),
                          df$rt_disp, unit, df$sample_name)
       cby <- input$color_by
-      p <- ggplot2::ggplot(df, ggplot2::aes(x = rt_disp, y = precursorMZ,
+      p <- ggplot(df, aes(x = rt_disp, y = precursorMZ,
                                             key = sample_id, text = .tip))
       if (identical(cby, "none")) {
-        p <- p + ggplot2::geom_point(
+        p <- p + geom_point(
           color = brewer_qual(1, rv$settings$qual_palette), alpha = 0.5, size = 1.2)
       } else {
         df$.color <- df[[cby]]
-        p <- ggplot2::ggplot(df, ggplot2::aes(x = rt_disp, y = precursorMZ,
+        p <- ggplot(df, aes(x = rt_disp, y = precursorMZ,
                                               color = .color, key = sample_id, text = .tip)) +
-          ggplot2::geom_point(alpha = 0.5, size = 1.2) +
-          ggplot2::scale_color_manual(
+          geom_point(alpha = 0.5, size = 1.2) +
+          scale_color_manual(
             values = brewer_named(unique(df$.color), rv$settings$qual_palette))
       }
-      p + ggplot2::labs(x = rt_axis_label(unit), y = "precursor m/z", color = NULL) +
-        ggplot2::theme_bw()
+      p + labs(x = rt_axis_label(unit), y = "precursor m/z", color = NULL) +
+        theme_bw()
     })
 
     keep_zoom <- zoom_keeper("prec")

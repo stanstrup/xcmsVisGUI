@@ -10,7 +10,7 @@ run_extract_checks <- function(path) {
   fdf <- tibble::tibble(id = "x", path = path, name = basename(path), sample_group = "g")
   meta <- fdf[, c("id", "name", "sample_group")]
   x <- apply_filters(build_msexp(fdf), empty_filter())
-  tic <- chrom_to_df(chromatogram(x, aggregationFun = "sum"), meta, "TIC")
+  tic <- chrom_to_df(xcms::chromatogram(x, aggregationFun = "sum"), meta, "TIC")
   pk <- extract_peaks(path, empty_filter())
   sp <- extract_spectrum(path, rt = mean(range(tic$rt)), scan = NA_integer_, f = empty_filter())
 

@@ -3,6 +3,9 @@
 # Stacked views compare the spectrum at the chosen rt across all included files.
 # A scan-list browser shows every scan's metadata.
 
+#' @importFrom DT DTOutput
+#' @importFrom plotly plotlyOutput
+#' @noRd
 mod_plot_spectrum_ui <- function(id) {
   ns <- NS(id)
   card(
@@ -32,6 +35,12 @@ mod_plot_spectrum_ui <- function(id) {
   )
 }
 
+#' @importFrom DT renderDT datatable
+#' @importFrom dplyr group_by mutate ungroup bind_rows
+#' @importFrom stats setNames
+#' @importFrom plotly event_data renderPlotly
+#' @importFrom ggplot2 ggplot aes geom_linerange geom_vline scale_color_manual labs theme_classic theme element_blank facet_wrap
+#' @noRd
 mod_plot_spectrum_server <- function(id, rv, included) {
   moduleServer(id, function(input, output, session) {
 
@@ -104,22 +113,22 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       col1 <- brewer_qual(1, rv$settings$qual_palette)
       if (identical(input$layout, "stacked")) {
         # normalise each file and offset vertically
-        df <- dplyr::group_by(df, sample_name)
-        df <- dplyr::mutate(df, intensity = intensity / max(intensity, na.rm = TRUE))
-        df <- dplyr::ungroup(df)
-        off <- stats::setNames(seq_along(unique(df$sample_name)) - 1, unique(df$sample_name))
+        df <- group_by(df, sample_name)
+        df <- mutate(df, intensity = intensity / max(intensity, na.rm = TRUE))
+        df <- ungroup(df)
+        off <- setNames(seq_along(unique(df$sample_name)) - 1, unique(df$sample_name))
         df$y0 <- off[df$sample_name] * 1.1
         df$y1 <- df$y0 + df$intensity
         df$.tip <- sprintf("%s\nm/z: %.4f", df$sample_name, df$mz)
-        p <- ggplot2::ggplot(df, ggplot2::aes(x = mz, ymin = y0, ymax = y1,
+        p <- ggplot(df, aes(x = mz, ymin = y0, ymax = y1,
                                               color = sample_name, text = .tip)) +
-          ggplot2::geom_linerange(linewidth = 0.4) +
-          ggplot2::scale_color_manual(
+          geom_linerange(linewidth = 0.4) +
+          scale_color_manual(
             values = brewer_named(unique(df$sample_name), rv$settings$qual_palette)) +
-          ggplot2::labs(x = "m/z", y = NULL, color = NULL) +
-          ggplot2::theme_classic() +
-          ggplot2::theme(axis.text.y = ggplot2::element_blank(),
-                         axis.ticks.y = ggplot2::element_blank())
+          labs(x = "m/z", y = NULL, color = NULL) +
+          theme_classic() +
+          theme(axis.text.y = element_blank(),
+                         axis.ticks.y = element_blank())
         return(p)
       }
       df$.tip <- sprintf("m/z: %.4f\nint: %.3g", df$mz, df$intensity)
@@ -137,15 +146,15 @@ mod_plot_spectrum_server <- function(id, rv, included) {
                 if (is.finite(pmz)) sprintf("  •  precursor m/z %.4f", pmz) else "")
       else sprintf("rt %.4g %s — %d files", rt_to_disp(df$rt[1], unit), unit,
                    length(unique(df$sample_name)))
-      p <- ggplot2::ggplot(df, ggplot2::aes(x = mz, ymin = 0, ymax = intensity, text = .tip)) +
-        ggplot2::geom_linerange(linewidth = 0.4, color = col1) +
-        ggplot2::labs(x = "m/z", y = "intensity", title = ttl) +
-        ggplot2::theme_classic()
+      p <- ggplot(df, aes(x = mz, ymin = 0, ymax = intensity, text = .tip)) +
+        geom_linerange(linewidth = 0.4, color = col1) +
+        labs(x = "m/z", y = "intensity", title = ttl) +
+        theme_classic()
       if (is.finite(pmz))
-        p <- p + ggplot2::geom_vline(xintercept = pmz, linetype = "dashed",
+        p <- p + geom_vline(xintercept = pmz, linetype = "dashed",
                                      color = "#d62728", linewidth = 0.5)
       if (identical(input$layout, "facet"))
-        p <- p + ggplot2::facet_wrap(~ sample_name, ncol = 1, scales = "free_y")
+        p <- p + facet_wrap(~ sample_name, ncol = 1, scales = "free_y")
       p
     })
 
@@ -157,7 +166,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     observeEvent(click(), {
       ev <- click(); req(ev, !is.null(ev$x))
       mz <- ev$x
-      rv$eic_targets <- dplyr::bind_rows(rv$eic_targets, new_eic_target(
+      rv$eic_targets <- bind_rows(rv$eic_targets, new_eic_target(
         mz, tol = rv$settings$default_tol, unit = rv$settings$default_tol_unit))
       showNotification(sprintf("Added m/z %.4f to the EIC list.", mz),
                        type = "message", duration = 2)
@@ -219,16 +228,16 @@ mod_plot_spectrum_server <- function(id, rv, included) {
           numericInput(ns("sl_pmz_min"), "precursor m/z ≥", sl$pmz_min),
           numericInput(ns("sl_pmz_max"), "precursor m/z ≤", sl$pmz_max),
           textInput(ns("sl_sid"), "spectrumId contains", value = sl$sid)),
-        DT::DTOutput(ns("scantable")),
+        DTOutput(ns("scantable")),
         footer = modalButton("Close")
       ))
     })
-    output$scantable <- DT::renderDT({
+    output$scantable <- renderDT({
       tab <- filtered_scans()
       disp <- tab[, c("scan", "rt_disp", "msLevel", "polarity", "precursorMZ",
                       "tic", "basePeakMZ", "spectrumId")]
       names(disp)[2] <- paste0("rt(", rv$settings$time_unit, ")")
-      DT::datatable(disp, rownames = FALSE, selection = "single",
+      datatable(disp, rownames = FALSE, selection = "single",
                     options = list(pageLength = 15, scrollX = TRUE))
     })
     observeEvent(input$scantable_rows_selected, {

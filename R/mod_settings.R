@@ -1,5 +1,7 @@
 # mod_settings — backend choice, palette, async pool, export defaults.
 
+#' @importFrom parallel detectCores
+#' @noRd
 mod_settings_ui <- function(id) {
   ns <- NS(id)
   layout_columns(
@@ -10,8 +12,8 @@ mod_settings_ui <- function(id) {
                "<code>BiocParallel::SerialParam()</code> registered — the default ",
                "<code>SnowParam</code> backend is ~100× slower (see BENCHMARK.md).")),
       sliderInput(ns("daemons"), "Parallel readers (mirai daemons)",
-                  min = 1, max = max(2L, parallel::detectCores()),
-                  value = max(1L, parallel::detectCores() - 1L), step = 1)
+                  min = 1, max = max(2L, detectCores()),
+                  value = max(1L, detectCores() - 1L), step = 1)
     ),
     card(
       card_header("Appearance & export"),
@@ -44,6 +46,8 @@ mod_settings_ui <- function(id) {
   )
 }
 
+#' @importFrom mirai everywhere
+#' @noRd
 mod_settings_server <- function(id, rv) {
   moduleServer(id, function(input, output, session) {
 
@@ -85,7 +89,7 @@ mod_settings_server <- function(id, rv) {
     observeEvent(daemon_n(), {
       req(daemon_n())
       rv$settings$daemons <- set_daemons(daemon_n())
-      mirai::everywhere(suppressPackageStartupMessages(library(mzR)))
+      everywhere(suppressPackageStartupMessages(library(mzR)))
     }, ignoreInit = TRUE)
 
     # Persist settings across restarts (debounced; ignoreInit so loading doesn't

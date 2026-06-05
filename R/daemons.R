@@ -3,24 +3,30 @@
 # spawning worker processes / setting global options belongs to run_app().
 
 # Default daemon count: one per core, leaving one free.
-.default_daemons <- function() max(1L, parallel::detectCores() - 1L)
+#' @importFrom parallel detectCores
+#' @noRd
+.default_daemons <- function() max(1L, detectCores() - 1L)
 
 #' (Re)size the mirai daemon pool used by the async file readers.
 #' @param n number of daemons (>= 1).
 #' @return the daemon count actually set.
+#' @importFrom mirai daemons
+#' @noRd
 set_daemons <- function(n = .default_daemons()) {
   n <- max(1L, as.integer(n))
-  mirai::daemons(0)        # reset any existing pool
-  mirai::daemons(n)
+  daemons(0)        # reset any existing pool
+  daemons(n)
   n
 }
 
 #' One-time runtime setup performed by run_app(): seed the daemon pool, ship mzR
 #' to the workers (they only read headers via mzR — fast, no BiocParallel), and
 #' allow large uploads. SerialParam is registered in .onLoad, not here.
+#' @importFrom mirai everywhere
+#' @noRd
 setup_runtime <- function() {
   set_daemons()
-  mirai::everywhere(suppressPackageStartupMessages(library(mzR)))
+  everywhere(suppressPackageStartupMessages(library(mzR)))
   options(shiny.maxRequestSize = 5 * 1024^3)
   invisible(TRUE)
 }

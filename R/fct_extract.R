@@ -64,11 +64,26 @@ chrom_to_df <- function(chr, meta, labels = NULL) {
   out
 }
 
+#' Cached per-path base Spectra object (MsBackendMzR, lazy). Single-file views
+#' (Spectrum, MS map, Precursors) slice/filter from this instead of re-running
+#' `Spectra(path, MsBackendMzR())` — a backend header read — on every rt/scan
+#' tweak. Filtering returns new subset objects, so the cached object is never
+#' mutated. Mirrors `.scan_cache`.
+.spectra_cache <- new.env(parent = emptyenv())
+get_spectra <- function(path) {
+  key <- normalizePath(path, winslash = "/", mustWork = FALSE)
+  hit <- get0(key, envir = .spectra_cache, inherits = FALSE)
+  if (!is.null(hit)) return(hit)
+  sp <- Spectra::Spectra(path, source = Spectra::MsBackendMzR())
+  assign(key, sp, envir = .spectra_cache)
+  sp
+}
+
 #' Extract a single spectrum at a retention time OR a scan (acquisition) number.
 #' The global filter `f` is applied (intensity/m/z/polarity/charge/spectrumId);
 #' ms_level and the rt/scan selection come from the Spectrum tab controls.
 extract_spectrum <- function(path, rt = NA_real_, scan = NA_integer_, f = list()) {
-  sp <- Spectra::Spectra(path, source = Spectra::MsBackendMzR())
+  sp <- get_spectra(path)
   ff <- f
   ff$rt_min <- NA_real_; ff$rt_max <- NA_real_     # selection drives rt, not filter
   sp <- apply_filters_spectra(sp, ff)              # ms_level comes from the filter
@@ -93,7 +108,7 @@ extract_spectrum <- function(path, rt = NA_real_, scan = NA_integer_, f = list()
 #' Extract all peaks (rt, m/z, intensity) from one file as a long tibble (MS map/3D).
 #' Applies the full global filter `f` (incl. intensity / spectrumId / charge).
 extract_peaks <- function(path, f = list()) {
-  sp <- Spectra::Spectra(path, source = Spectra::MsBackendMzR())
+  sp <- get_spectra(path)
   sp <- apply_filters_spectra(sp, f)
   if (!length(sp)) return(tibble::tibble(rt = numeric(), mz = numeric(), intensity = numeric()))
   rt <- Spectra::rtime(sp)
@@ -150,7 +165,7 @@ add_scan_numbers <- function(df, meta) {
 
 #' Precursor ions (rt, precursor m/z, scan) for MS>1 spectra in a file (DDA map).
 extract_precursors <- function(path) {
-  sp <- Spectra::Spectra(path, source = Spectra::MsBackendMzR())
+  sp <- get_spectra(path)
   ms <- Spectra::msLevel(sp); pmz <- Spectra::precursorMz(sp); rt <- Spectra::rtime(sp)
   scn <- tryCatch(Spectra::acquisitionNum(sp), error = function(e) rep(NA_integer_, length(sp)))
   idx <- which(ms > 1 & is.finite(pmz) & pmz > 0)

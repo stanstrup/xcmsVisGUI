@@ -15,6 +15,42 @@
   c(if (has_min) f$int_min else 0, if (has_max) f$int_max else Inf)
 }
 
+#' The global filter as a default list — the single source of truth for its
+#' shape. Used by make_rv() (initial state) and as the base make_filter() fills.
+#' ms_level defaults to 1 (MS1) at startup; everything else is unconstrained.
+empty_filter <- function() {
+  list(rt_min = NA_real_, rt_max = NA_real_,
+       mz_min = NA_real_, mz_max = NA_real_,
+       ms_level = 1L, polarity = "any",
+       int_min = NA_real_, int_max = NA_real_,
+       spectrum_id = "")
+}
+
+#' Build a filter list from the mod_filter UI inputs. rt inputs are in `unit`
+#' (display) and stored in seconds; blank/non-finite numerics become NA (no
+#' constraint); ms_level "all"/blank -> NA. Keeps the input->filter coercion in
+#' one place so adding a field touches the schema and the appliers only.
+make_filter <- function(inputs, unit) {
+  num <- function(v) if (is.null(v) || !is.finite(v)) NA_real_ else v
+  f <- empty_filter()
+  f$rt_min  <- rt_to_sec(num(inputs$rt_min), unit)
+  f$rt_max  <- rt_to_sec(num(inputs$rt_max), unit)
+  f$mz_min  <- num(inputs$mz_min);  f$mz_max  <- num(inputs$mz_max)
+  f$int_min <- num(inputs$int_min); f$int_max <- num(inputs$int_max)
+  f$ms_level <- if (is.null(inputs$ms_level) || identical(inputs$ms_level, "all"))
+                  NA_integer_ else as.integer(inputs$ms_level)
+  f$polarity <- if (!is.null(inputs$polarity)) inputs$polarity else "any"
+  f$spectrum_id <- inputs$spectrum_id %||% ""
+  f
+}
+
+#' Effective MS level for chromatogram extraction (TIC/BPC/EIC): the filter's
+#' ms_level when set, else 1 — chromatograms default to MS1. Keeps that default
+#' in one place instead of inline in each chromatogram view.
+chrom_ms_level <- function(f) {
+  if (!is.null(f$ms_level) && is.finite(f$ms_level)) as.integer(f$ms_level) else 1L
+}
+
 #' Apply the global filter `f` to an MsExperiment.
 apply_filters <- function(x, f) {
   if (!is.null(f$ms_level) && is.finite(f$ms_level))

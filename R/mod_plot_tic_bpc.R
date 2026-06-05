@@ -33,7 +33,7 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
     # (path set + filter + aggregation) so group/color changes never re-extract.
     chrom_df <- reactive({
       x <- dataset(); req(x)
-      ms <- if (is.finite(rv$filter$ms_level)) as.integer(rv$filter$ms_level) else 1L
+      ms <- chrom_ms_level(rv$filter)
       withProgress(message = "Extracting chromatograms…", value = 0.5, {
         chr <- chromatogram(x, aggregationFun = input$agg, msLevel = ms)
         add_scan_numbers(chrom_to_df(chr, meta(), labels = chrom_label()), meta())

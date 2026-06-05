@@ -66,19 +66,7 @@ mod_filter_server <- function(id, rv, included) {
     }) %>% debounce(600)
 
     observeEvent(filter_inputs(), {
-      fi <- filter_inputs()
-      unit <- rv$settings$time_unit
-      num <- function(v) if (is.null(v) || !is.finite(v)) NA_real_ else v
-      f <- rv$filter
-      f$rt_min <- rt_to_sec(num(fi$rt_min), unit)
-      f$rt_max <- rt_to_sec(num(fi$rt_max), unit)
-      f$mz_min <- num(fi$mz_min); f$mz_max <- num(fi$mz_max)
-      f$int_min <- num(fi$int_min); f$int_max <- num(fi$int_max)
-      f$ms_level <- if (is.null(fi$ms_level) || identical(fi$ms_level, "all"))
-                      NA_integer_ else as.integer(fi$ms_level)
-      f$polarity <- if (!is.null(fi$polarity)) fi$polarity else "any"
-      f$spectrum_id <- fi$spectrum_id %||% ""
-      rv$filter <- f
+      rv$filter <- make_filter(filter_inputs(), rv$settings$time_unit)
     }, ignoreNULL = FALSE)
 
     observeEvent(input$reset, {

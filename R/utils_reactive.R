@@ -37,14 +37,8 @@ make_rv <- function() {
     # Last plotly click that should drive the linked spectrum view.
     selection = NULL,        # list(plot, file_id, rt, mz)
 
-    # Global filter state (mod_filter).
-    filter = list(
-      rt_min = NA_real_, rt_max = NA_real_,
-      mz_min = NA_real_, mz_max = NA_real_,
-      ms_level = 1L, polarity = "any",
-      int_min = NA_real_, int_max = NA_real_,
-      spectrum_id = ""
-    ),
+    # Global filter state (mod_filter). Shape defined once in empty_filter().
+    filter = empty_filter(),
 
     # User settings (mod_settings).
     settings = list(

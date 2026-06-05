@@ -123,7 +123,7 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       rtr <- numeric()
       if (any(is.finite(rmin_s)) || any(is.finite(rmax_s)))
         rtr <- c(min(rmin_s, na.rm = TRUE), max(rmax_s, na.rm = TRUE))
-      ms <- if (is.finite(rv$filter$ms_level)) as.integer(rv$filter$ms_level) else 1L
+      ms <- chrom_ms_level(rv$filter)
       withProgress(message = "Extracting EICs…", value = 0.5, {
         chr <- if (length(rtr) == 2) chromatogram(x, mz = mzmat, rt = rtr, msLevel = ms)
                else chromatogram(x, mz = mzmat, msLevel = ms)

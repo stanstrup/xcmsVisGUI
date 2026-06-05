@@ -56,6 +56,16 @@ make_rv <- function() {
   )
 }
 
+#' Construct EIC target row(s) with the shared defaults (full rt range, enabled)
+#' matching the rv$eic_targets schema. `label` defaults to "m<mz>"; vectorised
+#' over `mz`. Single home for the target-row literal used by EIC add/paste and
+#' the spectrum click-to-add.
+new_eic_target <- function(mz, tol = 10, unit = "ppm",
+                           label = sprintf("m%.4f", mz)) {
+  tibble::tibble(label = label, mz = mz, tol = tol, unit = unit,
+                 rt_min = NA_real_, rt_max = NA_real_, enabled = TRUE)
+}
+
 #' Standard notification for files skipped by extract_over_files (one bad file in
 #' a multi-file plot is reported, not fatal). Pass as the `on_error` callback.
 notify_read_failures <- function(names) {

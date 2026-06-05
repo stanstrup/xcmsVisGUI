@@ -157,9 +157,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     observeEvent(click(), {
       ev <- click(); req(ev, !is.null(ev$x))
       mz <- ev$x
-      rv$eic_targets <- dplyr::bind_rows(rv$eic_targets, tibble::tibble(
-        label = sprintf("m%.4f", mz), mz = mz, tol = 10, unit = "ppm",
-        rt_min = NA_real_, rt_max = NA_real_, enabled = TRUE))
+      rv$eic_targets <- dplyr::bind_rows(rv$eic_targets, new_eic_target(mz))
       showNotification(sprintf("Added m/z %.4f to the EIC list.", mz),
                        type = "message", duration = 2)
     })

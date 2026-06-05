@@ -85,9 +85,8 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
 
     observeEvent(input$add, {
       n <- nrow(rv$eic_targets) + 1
-      rv$eic_targets <- dplyr::bind_rows(rv$eic_targets, tibble::tibble(
-        label = paste0("target", n), mz = NA_real_, tol = 10, unit = "ppm",
-        rt_min = NA_real_, rt_max = NA_real_, enabled = TRUE))
+      rv$eic_targets <- dplyr::bind_rows(rv$eic_targets,
+        new_eic_target(NA_real_, label = paste0("target", n)))
     })
     observeEvent(input$del, {
       sel <- input$targets_rows_selected
@@ -98,10 +97,8 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       vals <- suppressWarnings(as.numeric(trimws(strsplit(input$paste, "[,\n;]+")[[1]])))
       vals <- vals[is.finite(vals)]
       req(length(vals) > 0)
-      rv$eic_targets <- dplyr::bind_rows(rv$eic_targets, tibble::tibble(
-        label = sprintf("m%.4f", vals), mz = vals,
-        tol = input$paste_tol, unit = input$paste_unit,
-        rt_min = NA_real_, rt_max = NA_real_, enabled = TRUE))
+      rv$eic_targets <- dplyr::bind_rows(rv$eic_targets,
+        new_eic_target(vals, tol = input$paste_tol, unit = input$paste_unit))
       updateTextAreaInput(session, "paste", value = "")
     })
 

@@ -47,7 +47,7 @@ make_rv <- function() {
     # own reactive: changing the palette doesn't invalidate time-unit consumers
     # (a plain list slot would fan out every settings change to every reader).
     settings = reactiveValues(
-      time_unit    = "min",          # "min" | "sec" — display unit for rt
+      time_unit    = "min",          # "min" | "sec" \u2014 display unit for rt
       qual_palette = "Set1",
       seq_palette  = "viridis",
       invert_scale = TRUE,

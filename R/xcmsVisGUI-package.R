@@ -20,4 +20,11 @@
 #' @import bslib
 #' @importFrom magrittr %>%
 #' @importFrom rlang %||%
+#' @importFrom utils globalVariables
 "_PACKAGE"
+
+# Quiet R CMD check's "no visible binding" NOTE for the non-standard-evaluation
+# column names used by dplyr/ggplot2 aes() in the plot modules.
+globalVariables(c(
+  ".color", ".tip", "intensity", "mz", "mz_b", "precursorMZ", "rt_b", "rt_disp",
+  "sample_id", "sample_name", "target", "y0", "y1"))

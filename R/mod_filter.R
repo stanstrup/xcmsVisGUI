@@ -38,10 +38,10 @@ mod_filter_server <- function(id, rv, included) {
         return(helpText("Load and include files to enable filters."))
       unit <- rv$settings$time_unit
       rt_hint <- if (!is.null(r$rt))
-        sprintf("data: %.2f–%.2f %s", rt_to_disp(r$rt[1], unit),
+        sprintf("data: %.2f\u2013%.2f %s", rt_to_disp(r$rt[1], unit),
                 rt_to_disp(r$rt[2], unit), unit) else ""
       mz_hint <- if (!is.null(r$mz))
-        sprintf("data: %.4f–%.4f", r$mz[1], r$mz[2]) else ""
+        sprintf("data: %.4f\u2013%.4f", r$mz[1], r$mz[2]) else ""
       tagList(
         .minmax(ns, "rt", sprintf("Retention time (%s)", unit), rt_hint, 0.01),
         .minmax(ns, "mz", "m/z", mz_hint, 0.0001),

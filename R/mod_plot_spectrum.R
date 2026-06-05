@@ -25,7 +25,7 @@ mod_plot_spectrum_ui <- function(id) {
         numericInput(ns("rt"), "Retention time", value = NA, step = 0.1),
         conditionalPanel(
           sprintf("input['%s'] == 'single'", ns("layout")),
-          numericInput(ns("scan"), "…or scan (acquisition) number", value = NA, step = 1)),
+          numericInput(ns("scan"), "\u2026or scan (acquisition) number", value = NA, step = 1)),
         helpText("Single view uses the file you clicked (or the first included). ",
                  "Facet / Stacked compare all included files at the rt. MS level ",
                  "and intensity / spectrum-id filters come from the global filter.")
@@ -95,7 +95,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       validate(need(use_scan || is.finite(rt_disp),
                     "Enter a retention time (or scan number), or click a chromatogram."))
       rt_sec <- if (is.finite(rt_disp)) rt_to_sec(rt_disp, unit) else NA_real_
-      withProgress(message = "Reading spectrum…", value = 0.5, {
+      withProgress(message = "Reading spectrum\u2026", value = 0.5, {
         if (identical(input$layout, "single")) {
           f <- cur_row()
           d <- one_spectrum(f$path, rt_sec, input$scan); d$sample_name <- f$name; d
@@ -140,11 +140,11 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         if (length(pmz) != 1 || !is.finite(pmz) || pmz <= 0) pmz <- NA_real_
       }
       ttl <- if (identical(input$layout, "single"))
-        sprintf("%s — scan %s @ rt %.4g %s%s", df$sample_name[1],
+        sprintf("%s \u2014 scan %s @ rt %.4g %s%s", df$sample_name[1],
                 if (is.na(df$scan[1])) "?" else df$scan[1],
                 rt_to_disp(df$rt[1], unit), unit,
-                if (is.finite(pmz)) sprintf("  •  precursor m/z %.4f", pmz) else "")
-      else sprintf("rt %.4g %s — %d files", rt_to_disp(df$rt[1], unit), unit,
+                if (is.finite(pmz)) sprintf("  \u2022  precursor m/z %.4f", pmz) else "")
+      else sprintf("rt %.4g %s \u2014 %d files", rt_to_disp(df$rt[1], unit), unit,
                    length(unique(df$sample_name)))
       p <- ggplot(df, aes(x = mz, ymin = 0, ymax = intensity, text = .tip)) +
         geom_linerange(linewidth = 0.4, color = col1) +
@@ -212,21 +212,21 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       ms_choices <- c("all", sort(unique(scan_tab()$msLevel)))
       u <- rv$settings$time_unit
       showModal(modalDialog(
-        title = paste("Scans —", cur_row()$name), size = "xl", easyClose = TRUE,
+        title = paste("Scans \u2014", cur_row()$name), size = "xl", easyClose = TRUE,
         helpText("Type filters (blank = no limit); click a row to load that scan."),
         layout_columns(
           col_widths = c(2, 2, 2, 2, 2, 2),
-          numericInput(ns("sl_scan_min"), "scan ≥", sl$scan_min),
-          numericInput(ns("sl_scan_max"), "scan ≤", sl$scan_max),
-          numericInput(ns("sl_rt_min"), paste0("rt(", u, ") ≥"), sl$rt_min),
-          numericInput(ns("sl_rt_max"), paste0("rt(", u, ") ≤"), sl$rt_max),
+          numericInput(ns("sl_scan_min"), "scan \u2265", sl$scan_min),
+          numericInput(ns("sl_scan_max"), "scan \u2264", sl$scan_max),
+          numericInput(ns("sl_rt_min"), paste0("rt(", u, ") \u2265"), sl$rt_min),
+          numericInput(ns("sl_rt_max"), paste0("rt(", u, ") \u2264"), sl$rt_max),
           selectInput(ns("sl_ms"), "MS", choices = ms_choices, selected = sl$ms),
           selectInput(ns("sl_pol"), "Polarity", choices = c("any","pos","neg"),
                       selected = sl$pol)),
         layout_columns(
           col_widths = c(3, 3, 6),
-          numericInput(ns("sl_pmz_min"), "precursor m/z ≥", sl$pmz_min),
-          numericInput(ns("sl_pmz_max"), "precursor m/z ≤", sl$pmz_max),
+          numericInput(ns("sl_pmz_min"), "precursor m/z \u2265", sl$pmz_min),
+          numericInput(ns("sl_pmz_max"), "precursor m/z \u2264", sl$pmz_max),
           textInput(ns("sl_sid"), "spectrumId contains", value = sl$sid)),
         DTOutput(ns("scantable")),
         footer = modalButton("Close")

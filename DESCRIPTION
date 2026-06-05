@@ -33,10 +33,12 @@ Imports:
     grDevices,
     stats,
     tools,
+    utils,
     parallel
 Suggests:
     testthat (>= 3.0.0),
     withr,
+    svglite,
     msdata,
     faahKO
 biocViews:

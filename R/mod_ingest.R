@@ -17,20 +17,20 @@ mod_ingest_ui <- function(id) {
     div(class = "d-flex gap-2 mb-2",
         div(style = "flex:1;",
             textInput(ns("folder"), NULL, width = "100%",
-                      placeholder = "Paste a folder or file path…")),
+                      placeholder = "Paste a folder or file path\u2026")),
         actionButton(ns("add_folder"), "Add", class = "btn-primary"),
         actionButton(ns("clear"), NULL, icon = icon("trash"),
                      class = "btn-outline-secondary", title = "Clear all files")),
     div(class = "mb-2",
-        actionButton(ns("pick_dir"), "Choose folder…", icon = icon("folder-open"),
+        actionButton(ns("pick_dir"), "Choose folder\u2026", icon = icon("folder-open"),
                      class = "btn-outline-secondary btn-sm")),
     # 2) standard OS file browser (note: copies files to a temp dir)
     fileInput(ns("browse"), NULL, multiple = TRUE,
               accept = c(".mzML", ".mzXML", ".CDF", ".cdf"),
-              buttonLabel = "Browse files…", placeholder = "or the OS file browser"),
-    helpText("Paste a path or use ‘Choose folder…’ (native OS folder dialog, no copy) ",
-             "to load every MS file in a directory — best for many/large files. ",
-             "‘Browse files…’ is the OS file dialog but copies files to a temp folder."),
+              buttonLabel = "Browse files\u2026", placeholder = "or the OS file browser"),
+    helpText("Paste a path or use \u2018Choose folder\u2026\u2019 (native OS folder dialog, no copy) ",
+             "to load every MS file in a directory \u2014 best for many/large files. ",
+             "\u2018Browse files\u2026\u2019 is the OS file dialog but copies files to a temp folder."),
     div(class = "d-flex gap-2 mb-2",
         actionButton(ns("sel_all"),  "All",    class = "btn-sm btn-outline-secondary"),
         actionButton(ns("sel_none"), "None",   class = "btn-sm btn-outline-secondary"),
@@ -189,9 +189,9 @@ mod_ingest_server <- function(id, rv) {
         return(empty)
       }
       status_badge <- case_when(
-        f$status == "ready"   ~ "✅",
-        f$status == "reading" ~ "⏳",
-        TRUE                  ~ "❌"
+        f$status == "ready"   ~ "\u2705",
+        f$status == "reading" ~ "\u23f3",
+        TRUE                  ~ "\u274c"
       )
       check <- vapply(seq_len(nrow(f)), function(i) {
         as.character(tags$input(

@@ -26,7 +26,9 @@ set_daemons <- function(n = .default_daemons()) {
 #' @noRd
 setup_runtime <- function() {
   set_daemons()
-  everywhere(suppressPackageStartupMessages(library(mzR)))
+  # Preload mzR's namespace in each worker (read_ms_header uses mzR:: ); avoids
+  # the per-call load. requireNamespace, not library(), keeps R CMD check happy.
+  everywhere(suppressWarnings(requireNamespace("mzR", quietly = TRUE)))
   options(shiny.maxRequestSize = 5 * 1024^3)
   invisible(TRUE)
 }

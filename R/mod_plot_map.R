@@ -61,7 +61,7 @@ mod_plot_map_server <- function(id, rv, included) {
     peaks_all <- eventReactive(input$plot, {
       inc <- included()
       validate(need(nrow(inc) > 0, "Add and include at least one file."))
-      withProgress(message = "Reading peaks…", value = 0.3, {
+      withProgress(message = "Reading peaks\u2026", value = 0.3, {
         extract_over_files(inc, function(p) extract_peaks(p, rv$filter),
                            cols = "sample_id", scan = TRUE,
                            on_error = notify_read_failures)
@@ -71,7 +71,7 @@ mod_plot_map_server <- function(id, rv, included) {
     keep_zoom <- zoom_keeper("map")
     output$plot_out <- renderPlotly({
       if (is.null(input$plot) || input$plot == 0)
-        validate("Press ‘Plot’ to render the MS map for the included file(s).")
+        validate("Press \u2018Plot\u2019 to render the MS map for the included file(s).")
       pk <- peaks_all()
       validate(need(nrow(pk) > 0, "No peaks in the current filter range."))
       unit <- rv$settings$time_unit

@@ -14,5 +14,9 @@ launch-test.R
 Rplots.pdf
 *.tmp
 
+# R package build / check artifacts
+*.tar.gz
+*.Rcheck/
+
 # Claude Code harness
 .claude/

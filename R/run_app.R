@@ -3,6 +3,7 @@
 
 #' Build the app UI (bslib page_navbar with a shared Files+Filters sidebar and
 #' one nav panel per plot module).
+#' @noRd
 app_ui <- function() {
   page_navbar(
     title = "xcmsVisGUI",

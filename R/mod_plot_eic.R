@@ -22,16 +22,16 @@ mod_plot_eic_ui <- function(id) {
             actionButton(ns("add"), "Add row", class = "btn-sm btn-outline-primary"),
             actionButton(ns("del"), "Remove selected", class = "btn-sm btn-outline-secondary")),
         hr(),
-        helpText(strong("Paste m/z values"), " — these are ", strong("added"),
+        helpText(strong("Paste m/z values"), " \u2014 these are ", strong("added"),
                  " to the target list above."),
         textAreaInput(ns("paste"), NULL, rows = 3,
                       placeholder = "195.0877, 300.20\n335.10"),
         div(class = "d-flex gap-2",
-            numericInput(ns("paste_tol"), "± tol", value = 10, min = 0, width = "80px"),
+            numericInput(ns("paste_tol"), "\u00b1 tol", value = 10, min = 0, width = "80px"),
             selectInput(ns("paste_unit"), "unit", c("ppm", "Da"), width = "90px"),
             actionButton(ns("parse"), "Add to list", class = "btn-sm btn-outline-primary mt-4")),
-        helpText("tol is ± half-window: window = m/z ± m/z·ppm/1e6 (or ± Da). ",
-                 "So 10 ppm spans 20 ppm total — increase it if EICs look too narrow."),
+        helpText("tol is \u00b1 half-window: window = m/z \u00b1 m/z\u00b7ppm/1e6 (or \u00b1 Da). ",
+                 "So 10 ppm spans 20 ppm total \u2014 increase it if EICs look too narrow."),
         hr(),
         selectInput(ns("color_by"), "Color by",
                     c("File" = "sample_name", "Target" = "target",
@@ -65,7 +65,7 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
         onclick = sprintf(
           "Shiny.setInputValue('%s', {row: %d, checked: this.checked}, {priority:'event'})",
           ns("toggle"), i))), character(1))
-      disp <- data.frame(`✓` = check, label = tg$label, mz = tg$mz, tol = tg$tol,
+      disp <- data.frame(` ` = check, label = tg$label, mz = tg$mz, tol = tg$tol,
                          unit = tg$unit, rt_min = tg$rt_min, rt_max = tg$rt_max,
                          check.names = FALSE, stringsAsFactors = FALSE)
       datatable(
@@ -137,7 +137,7 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       if (any(is.finite(rmin_s)) || any(is.finite(rmax_s)))
         rtr <- c(min(rmin_s, na.rm = TRUE), max(rmax_s, na.rm = TRUE))
       ms <- chrom_ms_level(rv$filter)
-      withProgress(message = "Extracting EICs…", value = 0.5, {
+      withProgress(message = "Extracting EICs\u2026", value = 0.5, {
         chr <- if (length(rtr) == 2) xcms::chromatogram(x, mz = mzmat, rt = rtr, msLevel = ms)
                else xcms::chromatogram(x, mz = mzmat, msLevel = ms)
         df <- add_scan_numbers(chrom_to_df(chr, meta(), labels = tg$label), meta())

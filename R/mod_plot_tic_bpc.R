@@ -39,7 +39,7 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
     chrom_df <- reactive({
       x <- dataset(); req(x)
       ms <- chrom_ms_level(rv$filter)
-      withProgress(message = "Extracting chromatograms…", value = 0.5, {
+      withProgress(message = "Extracting chromatograms\u2026", value = 0.5, {
         chr <- xcms::chromatogram(x, aggregationFun = input$agg, msLevel = ms)
         add_scan_numbers(chrom_to_df(chr, meta(), labels = chrom_label()), meta())
       })
@@ -70,7 +70,7 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
         scale_color_manual(values = pal) +
         labs(x = rt_axis_label(unit), y = "intensity",
                       color = NULL,
-                      title = paste0(chrom_label(), " — ", length(unique(df$sample_id)),
+                      title = paste0(chrom_label(), " \u2014 ", length(unique(df$sample_id)),
                                      " file(s)")) +
         theme_bw()
     })

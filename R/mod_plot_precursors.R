@@ -42,7 +42,7 @@ mod_plot_precursors_server <- function(id, rv, included) {
       f2 <- ms2_files()
       validate(need(nrow(f2) > 0,
                     "No included file contains MS2 spectra (need DDA data)."))
-      withProgress(message = "Reading precursors…", value = 0.5, {
+      withProgress(message = "Reading precursors\u2026", value = 0.5, {
         extract_over_files(f2, extract_precursors,
                            cols = c("sample_id", "sample_name", "sample_group"),
                            on_error = notify_read_failures)

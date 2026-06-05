@@ -18,6 +18,7 @@
 #' The global filter as a default list — the single source of truth for its
 #' shape. Used by make_rv() (initial state) and as the base make_filter() fills.
 #' ms_level defaults to 1 (MS1) at startup; everything else is unconstrained.
+#' @noRd
 empty_filter <- function() {
   list(rt_min = NA_real_, rt_max = NA_real_,
        mz_min = NA_real_, mz_max = NA_real_,
@@ -30,6 +31,7 @@ empty_filter <- function() {
 #' (display) and stored in seconds; blank/non-finite numerics become NA (no
 #' constraint); ms_level "all"/blank -> NA. Keeps the input->filter coercion in
 #' one place so adding a field touches the schema and the appliers only.
+#' @noRd
 make_filter <- function(inputs, unit) {
   num <- function(v) if (is.null(v) || !is.finite(v)) NA_real_ else v
   f <- empty_filter()
@@ -47,11 +49,13 @@ make_filter <- function(inputs, unit) {
 #' Effective MS level for chromatogram extraction (TIC/BPC/EIC): the filter's
 #' ms_level when set, else 1 — chromatograms default to MS1. Keeps that default
 #' in one place instead of inline in each chromatogram view.
+#' @noRd
 chrom_ms_level <- function(f) {
   if (!is.null(f$ms_level) && is.finite(f$ms_level)) as.integer(f$ms_level) else 1L
 }
 
 #' Apply the global filter `f` to an MsExperiment.
+#' @noRd
 apply_filters <- function(x, f) {
   if (!is.null(f$ms_level) && is.finite(f$ms_level))
     x <- xcms::filterMsLevel(x, as.integer(f$ms_level))
@@ -72,6 +76,7 @@ apply_filters <- function(x, f) {
 }
 
 #' Apply the global filter `f` to a Spectra object.
+#' @noRd
 apply_filters_spectra <- function(sp, f) {
   if (!is.null(f$ms_level) && is.finite(f$ms_level))
     sp <- Spectra::filterMsLevel(sp, as.integer(f$ms_level))
@@ -98,6 +103,7 @@ apply_filters_spectra <- function(sp, f) {
 }
 
 #' Combined data ranges across the included files (for input hints).
+#' @noRd
 combined_ranges <- function(files_df) {
   rng <- function(lo, hi) {
     lo <- suppressWarnings(min(lo, na.rm = TRUE))

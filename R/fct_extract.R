@@ -8,6 +8,7 @@
 #' BiocParallel). Runs in a mirai worker. Spectra's read path is avoided here
 #' because even under SerialParam it is ~5 s/file (too slow for 100+ files).
 #' Returns list(summary=...) or list(error=...).
+#' @noRd
 read_ms_header <- function(path) {
   out <- tryCatch({
     x <- mzR::openMSfile(path)
@@ -37,6 +38,7 @@ read_ms_header <- function(path) {
 }
 
 #' Build an MsExperiment from included files, injecting our sample metadata.
+#' @noRd
 build_msexp <- function(files_df) {
   x <- MsExperiment::readMsExperiment(spectraFiles = files_df$path,
                                       BPPARAM = BiocParallel::SerialParam())
@@ -75,6 +77,7 @@ chrom_to_df <- function(chr, meta, labels = NULL) {
 #' `Spectra(path, MsBackendMzR())` — a backend header read — on every rt/scan
 #' tweak. Filtering returns new subset objects, so the cached object is never
 #' mutated. Mirrors `.scan_cache`.
+#' @noRd
 .spectra_cache <- new.env(parent = emptyenv())
 get_spectra <- function(path) {
   key <- normalizePath(path, winslash = "/", mustWork = FALSE)
@@ -158,6 +161,7 @@ bin_peaks <- function(df, rt_bin = 10, mz_bin = 1, aggfun = max) {
 }
 
 #' Cached per-file scan table (rt seconds, acquisition number, MS level) via mzR.
+#' @noRd
 .scan_cache <- new.env(parent = emptyenv())
 file_scan_table <- function(path) {
   key <- normalizePath(path, winslash = "/", mustWork = FALSE)
@@ -180,6 +184,7 @@ file_scan_table <- function(path) {
 #' Matched on rt rounded to 3 decimals: the Spectra/xcms rtime and the mzR header
 #' table agree to ms precision, so 3 decimals is a safe exact-match key. Single
 #' home for that contract (used by add_scan_numbers and extract_over_files).
+#' @noRd
 scan_for_rt <- function(rt, scan_table) {
   scan_table$scan[match(round(rt, 3), round(scan_table$rt, 3))]
 }
@@ -220,6 +225,7 @@ extract_over_files <- function(files_df, extractor, cols = "sample_id",
 #' clears the file list so cached reads don't accumulate across a long session.
 #' Path is the cache key; these raw files are effectively immutable, so there is
 #' deliberately no mtime check (see ARCHITECTURE_REVIEW.md open question).
+#' @noRd
 clear_ms_caches <- function() {
   rm(list = ls(.scan_cache, all.names = TRUE), envir = .scan_cache)
   rm(list = ls(.spectra_cache, all.names = TRUE), envir = .spectra_cache)
@@ -228,6 +234,7 @@ clear_ms_caches <- function() {
 
 #' Add a `scan` (acquisition number) column to a chromatogram tibble by matching
 #' retention time per file. `meta` must carry id + path columns.
+#' @noRd
 add_scan_numbers <- function(df, meta) {
   if (!nrow(df) || is.null(meta$path)) { df$scan <- NA_integer_; return(df) }
   df$scan <- NA_integer_

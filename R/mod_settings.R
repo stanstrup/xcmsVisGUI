@@ -9,8 +9,8 @@ mod_settings_ui <- function(id) {
     card(
       card_header("Data reading"),
       helpText(HTML("Files are read via <code>Spectra</code>/<code>xcms</code> with ",
-               "<code>BiocParallel::SerialParam()</code> registered — the default ",
-               "<code>SnowParam</code> backend is ~100× slower (see BENCHMARK.md).")),
+               "<code>BiocParallel::SerialParam()</code> registered \u2014 the default ",
+               "<code>SnowParam</code> backend is ~100\u00d7 slower (see BENCHMARK.md).")),
       sliderInput(ns("daemons"), "Parallel readers (mirai daemons)",
                   min = 1, max = max(2L, detectCores()),
                   value = max(1L, detectCores() - 1L), step = 1)
@@ -23,13 +23,13 @@ mod_settings_ui <- function(id) {
                   choices = QUAL_PALETTES),
       selectInput(ns("seq_palette"), "Sequential palette (maps, 3D)",
                   choices = SEQ_PALETTES),
-      checkboxInput(ns("invert_scale"), "Invert colour scale (light → dark)",
+      checkboxInput(ns("invert_scale"), "Invert colour scale (light \u2192 dark)",
                     value = TRUE),
       hr(),
-      helpText(strong("EIC defaults"), " — applied to new targets and the paste box."),
+      helpText(strong("EIC defaults"), " \u2014 applied to new targets and the paste box."),
       layout_columns(
         col_widths = c(6, 6),
-        numericInput(ns("default_tol"), "Default ± tolerance", value = 10, min = 0),
+        numericInput(ns("default_tol"), "Default \u00b1 tolerance", value = 10, min = 0),
         selectInput(ns("default_tol_unit"), "Unit", choices = c("ppm", "Da"))
       ),
       hr(),
@@ -89,7 +89,7 @@ mod_settings_server <- function(id, rv) {
     observeEvent(daemon_n(), {
       req(daemon_n())
       rv$settings$daemons <- set_daemons(daemon_n())
-      everywhere(suppressPackageStartupMessages(library(mzR)))
+      everywhere(suppressWarnings(requireNamespace("mzR", quietly = TRUE)))
     }, ignoreInit = TRUE)
 
     # Persist settings across restarts (debounced; ignoreInit so loading doesn't

@@ -134,7 +134,9 @@ zoom_keeper <- function(source) {
   z <- reactiveValues(x = NULL, y = NULL)
   # Only STORE ranges from user zoom/pan. We must NOT clear on autorange here:
   # a re-render emits an autorange relayout that would wipe the saved zoom.
-  observeEvent(event_data("plotly_relayout", source = source), {
+  # suppressWarnings on the trigger too: event_data emits a benign "source not
+  # registered" warning before the plot first renders.
+  observeEvent(suppressWarnings(event_data("plotly_relayout", source = source)), {
     e <- suppressWarnings(event_data("plotly_relayout", source = source))
     if (is.null(e)) return()
     if (!is.null(e[["xaxis.range[0]"]]))
@@ -143,7 +145,7 @@ zoom_keeper <- function(source) {
       z$y <- c(e[["yaxis.range[0]"]], e[["yaxis.range[1]"]])
   }, ignoreInit = TRUE)
   # A genuine reset is a double-click -> forget the zoom.
-  observeEvent(event_data("plotly_doubleclick", source = source), {
+  observeEvent(suppressWarnings(event_data("plotly_doubleclick", source = source)), {
     z$x <- NULL; z$y <- NULL
   }, ignoreInit = TRUE)
   function(p) {

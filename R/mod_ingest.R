@@ -74,7 +74,7 @@ mod_ingest_server <- function(id, rv) {
         id = paste0("f", as.integer(Sys.time()), "_",
                     seq.int(nrow(rv$files) + 1, length.out = length(paths))),
         path = paths, name = names, sample_group = "group1",
-        include = TRUE, status = "reading", n_spectra = NA_integer_,
+        include = FALSE, status = "reading", n_spectra = NA_integer_,
         rt_min = NA_real_, rt_max = NA_real_, mz_min = NA_real_, mz_max = NA_real_,
         ms_levels = NA_character_, polarities = NA_character_,
         charges = NA_character_, message = NA_character_)

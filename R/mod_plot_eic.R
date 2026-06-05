@@ -31,7 +31,7 @@ mod_plot_eic_ui <- function(id) {
                  "So 10 ppm spans 20 ppm total — increase it if EICs look too narrow."),
         hr(),
         selectInput(ns("color_by"), "Color by",
-                    c("Target" = "target", "File" = "sample_name",
+                    c("File" = "sample_name", "Target" = "target",
                       "Sample group" = "sample_group")),
         checkboxInput(ns("points"), "Show data points", value = FALSE),
         checkboxInput(ns("facet"), "Facet by file", value = FALSE),

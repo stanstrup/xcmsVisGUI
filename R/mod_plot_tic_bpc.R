@@ -15,7 +15,7 @@ mod_plot_tic_bpc_ui <- function(id) {
         radioButtons(ns("agg"), "Chromatogram",
                      c("TIC (sum)" = "sum", "BPC (max)" = "max")),
         selectInput(ns("color_by"), "Color by",
-                    c("Sample group" = "sample_group", "Sample" = "sample_name")),
+                    c("Sample" = "sample_name", "Sample group" = "sample_group")),
         checkboxInput(ns("points"), "Show data points", value = FALSE),
         helpText("Click a trace to show its spectrum on the Spectrum tab.")
       ),

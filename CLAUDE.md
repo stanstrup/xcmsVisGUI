@@ -14,7 +14,10 @@ Scope is **raw visualisation only** — no peak picking / grouping / alignment
 ## Run / test (Windows dev box)
 - R: `C:\Program Files\R\R-4.5.2\bin\Rscript.exe` (not on PATH — call by full path).
 - Launch: `Rscript run.R`, or headless `shiny::runApp(getwd(), port=7799, launch.browser=FALSE)`.
-- Smoke test on real data: `Rscript test-smoke.R` (faahKO CDF + msdata mzML).
+- Smoke test on real data: `Rscript test-smoke.R` (faahKO CDF + msdata mzML; asserts).
+- Unit/invariant tests: `Rscript tests/run-tests.R` (no testthat dep — a tiny
+  asserting runner; pure helpers + the apply_filters/apply_filters_spectra
+  equivalence invariant; real-data tests SKIP if msdata/faahKO absent; exits non-zero on failure).
 - `benchmarks/` holds throwaway timing/repro scripts; their `*.out` are git-ignored.
 - After editing, ALWAYS: parse-check every R file, then boot headless and confirm
   HTTP 200, before committing. Test plot/extraction logic on real data — never assume

@@ -8,7 +8,7 @@ flt <- list(ms_level = 1L, rt_min = NA_real_, rt_max = NA_real_,
 check <- function(path, label) {
   cat("\n== ", label, " ==\n", sep = "")
   h <- read_ms_header(path)
-  if (!is.null(h$error)) { cat("  header ERROR:", h$error, "\n"); return(invisible()) }
+  stopifnot("header read failed" = is.null(h$error))
   s <- h$summary
   cat(sprintf("  header: n=%d rt=%.0f-%.0f ms=%s\n",
               s$n_spectra, s$rt_min, s$rt_max, s$ms_levels))
@@ -20,6 +20,15 @@ check <- function(path, label) {
   sp  <- extract_spectrum(path, mean(range(tic$rt)), 1L)
   cat(sprintf("  TIC rows=%d  peaks=%d  spectrum peaks=%d\n",
               nrow(tic), nrow(pk), nrow(sp)))
+  # Assert (don't just eyeball): extraction returns data with the right columns.
+  stopifnot(
+    "header has spectra" = s$n_spectra > 0,
+    "TIC non-empty"      = nrow(tic) > 0,
+    "TIC columns"        = all(c("rt", "intensity", "sample_id") %in% names(tic)),
+    "peaks non-empty"    = nrow(pk) > 0,
+    "peaks columns"      = all(c("rt", "mz", "intensity") %in% names(pk)),
+    "spectrum non-empty" = nrow(sp) > 0,
+    "spectrum columns"   = all(c("mz", "intensity", "rt", "scan") %in% names(sp)))
 }
 
 cat("main bpparam:", class(BiocParallel::bpparam())[1], "(expect SerialParam)\n")

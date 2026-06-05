@@ -85,9 +85,16 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
 
     observeEvent(input$add, {
       n <- nrow(rv$eic_targets) + 1
-      rv$eic_targets <- dplyr::bind_rows(rv$eic_targets,
-        new_eic_target(NA_real_, label = paste0("target", n)))
+      rv$eic_targets <- dplyr::bind_rows(rv$eic_targets, new_eic_target(
+        NA_real_, tol = rv$settings$default_tol, unit = rv$settings$default_tol_unit,
+        label = paste0("target", n)))
     })
+
+    # Seed the paste tolerance/unit controls from the default-tolerance setting.
+    observeEvent(rv$settings$default_tol,
+                 updateNumericInput(session, "paste_tol", value = rv$settings$default_tol))
+    observeEvent(rv$settings$default_tol_unit,
+                 updateSelectInput(session, "paste_unit", selected = rv$settings$default_tol_unit))
     observeEvent(input$del, {
       sel <- input$targets_rows_selected
       if (length(sel)) rv$eic_targets <- rv$eic_targets[-sel, ]

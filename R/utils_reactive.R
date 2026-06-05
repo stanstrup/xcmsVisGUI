@@ -48,6 +48,8 @@ make_rv <- function() {
       qual_palette = "Set1",
       seq_palette  = "viridis",
       invert_scale = TRUE,
+      default_tol      = 10,         # default EIC tolerance for new targets
+      default_tol_unit = "ppm",      # "ppm" | "Da"
       daemons      = max(1L, parallel::detectCores() - 1L),
       export_format = "png",
       export_width  = 8,

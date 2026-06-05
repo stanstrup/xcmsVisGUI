@@ -24,6 +24,13 @@ mod_settings_ui <- function(id) {
       checkboxInput(ns("invert_scale"), "Invert colour scale (light → dark)",
                     value = TRUE),
       hr(),
+      helpText(strong("EIC defaults"), " — applied to new targets and the paste box."),
+      layout_columns(
+        col_widths = c(6, 6),
+        numericInput(ns("default_tol"), "Default ± tolerance", value = 10, min = 0),
+        selectInput(ns("default_tol_unit"), "Unit", choices = c("ppm", "Da"))
+      ),
+      hr(),
       selectInput(ns("export_format"), "Default export format",
                   choices = c("png", "svg", "pdf")),
       layout_columns(
@@ -47,6 +54,8 @@ mod_settings_server <- function(id, rv) {
     observeEvent(input$qual_palette,  rv$settings$qual_palette  <- input$qual_palette)
     observeEvent(input$seq_palette,   rv$settings$seq_palette   <- input$seq_palette)
     observeEvent(input$invert_scale,  rv$settings$invert_scale  <- input$invert_scale)
+    observeEvent(input$default_tol,      rv$settings$default_tol      <- input$default_tol)
+    observeEvent(input$default_tol_unit, rv$settings$default_tol_unit <- input$default_tol_unit)
     observeEvent(input$export_format, rv$settings$export_format <- input$export_format)
     observeEvent(input$export_width,  rv$settings$export_width  <- input$export_width)
     observeEvent(input$export_height, rv$settings$export_height <- input$export_height)

@@ -12,7 +12,12 @@ mod_plot_map_ui <- function(id) {
   ns <- NS(id)
   card(
     full_screen = TRUE,
-    card_header("MS map", div(class = "float-end", mod_export_ui(ns("export")))),
+    # Export is 2D-only (the on-screen 2D map has a ggplot equivalent; the 3D
+    # views are plotly-native and can't be saved as a static ggplot), so hide the
+    # button outside "2D map" rather than silently export a mismatched plot.
+    card_header("MS map", div(class = "float-end",
+      conditionalPanel(sprintf("input['%s'] == 'map'", ns("mode")),
+                       mod_export_ui(ns("export"))))),
     layout_sidebar(
       sidebar = sidebar(
         width = 260, position = "right", open = "open",

@@ -40,18 +40,18 @@ mod_settings_ui <- function(id) {
 mod_settings_server <- function(id, rv) {
   moduleServer(id, function(input, output, session) {
 
-    # Push every control into rv$settings so other modules react to changes.
-    observe({
-      rv$settings$time_unit     <- input$time_unit
-      rv$settings$qual_palette  <- input$qual_palette
-      rv$settings$seq_palette   <- input$seq_palette
-      rv$settings$invert_scale  <- input$invert_scale
-      rv$settings$export_format <- input$export_format
-      rv$settings$export_width  <- input$export_width
-      rv$settings$export_height <- input$export_height
-      rv$settings$export_units  <- input$export_units
-      rv$settings$export_dpi    <- input$export_dpi
-    })
+    # Push each control into its own rv$settings field. Per-field observers (not
+    # one observe over all inputs) so changing one setting writes only that field
+    # and invalidates only its consumers (rv$settings is a nested reactiveValues).
+    observeEvent(input$time_unit,     rv$settings$time_unit     <- input$time_unit)
+    observeEvent(input$qual_palette,  rv$settings$qual_palette  <- input$qual_palette)
+    observeEvent(input$seq_palette,   rv$settings$seq_palette   <- input$seq_palette)
+    observeEvent(input$invert_scale,  rv$settings$invert_scale  <- input$invert_scale)
+    observeEvent(input$export_format, rv$settings$export_format <- input$export_format)
+    observeEvent(input$export_width,  rv$settings$export_width  <- input$export_width)
+    observeEvent(input$export_height, rv$settings$export_height <- input$export_height)
+    observeEvent(input$export_units,  rv$settings$export_units  <- input$export_units)
+    observeEvent(input$export_dpi,    rv$settings$export_dpi    <- input$export_dpi)
 
     # Resize the mirai pool when the user changes the daemon count (debounced).
     daemon_n <- reactive(input$daemons) %>% debounce(800)

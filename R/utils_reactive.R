@@ -40,8 +40,10 @@ make_rv <- function() {
     # Global filter state (mod_filter). Shape defined once in empty_filter().
     filter = empty_filter(),
 
-    # User settings (mod_settings).
-    settings = list(
+    # User settings (mod_settings). A NESTED reactiveValues so each field is its
+    # own reactive: changing the palette doesn't invalidate time-unit consumers
+    # (a plain list slot would fan out every settings change to every reader).
+    settings = reactiveValues(
       time_unit    = "min",          # "min" | "sec" — display unit for rt
       qual_palette = "Set1",
       seq_palette  = "viridis",

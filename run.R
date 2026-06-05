@@ -1,7 +1,10 @@
 # run.R — convenience launcher.
 #
-# On a fresh machine:  Rscript run.R
-# renv auto-activates via .Rprofile; global.R restores the library from
-# renv.lock on first boot, then the app starts.
+#   Rscript run.R
+#
+# renv auto-activates via .Rprofile. Loads the package from source (no install
+# needed for dev) and starts the app. For an installed package use instead:
+#   xcmsVisGUI::run_app(launch.browser = TRUE)
 
-shiny::runApp(".", launch.browser = TRUE)
+pkgload::load_all(".", quiet = TRUE)
+run_app(launch.browser = TRUE)

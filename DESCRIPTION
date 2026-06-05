@@ -13,32 +13,38 @@ Encoding: UTF-8
 Imports:
     shiny,
     bslib,
-    mirai,
-    promises,
-    shinyFiles,
-    shinyWidgets,
-    shinyjs,
     plotly,
     DT,
-    htmlwidgets,
+    mirai,
     RColorBrewer,
+    viridisLite,
+    ggplot2,
     magrittr,
     dplyr,
     tibble,
-    tidyr,
     purrr,
     rlang,
-    stringr,
-    fs,
+    jsonlite,
     Spectra,
     MsExperiment,
     xcms,
-    MsCoreUtils,
-    xcmsVis
+    BiocParallel,
+    mzR,
+    xcmsVis,
+    grDevices,
+    stats,
+    utils,
+    tools,
+    parallel
 Suggests:
+    testthat (>= 3.0.0),
+    withr,
     MsDataHub,
     msdata,
     faahKO
 Remotes:
     github::stanstrup/xcmsVis
 biocViews:
+Config/testthat/edition: 3
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 8.0.0

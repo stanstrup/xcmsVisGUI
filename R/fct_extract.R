@@ -127,7 +127,10 @@ extract_peaks <- function(path, f = list()) {
   sp <- apply_filters_spectra(sp, f)
   if (!length(sp)) return(tibble::tibble(rt = numeric(), mz = numeric(), intensity = numeric()))
   rt <- Spectra::rtime(sp)
-  pd <- Spectra::peaksData(sp)
+  # peaksData() is an S4 SimpleList; coerce to a base list so do.call(rbind, ...)
+  # and vapply work without relying on BiocGenerics::rbind being attached
+  # (it isn't, inside the package namespace).
+  pd <- as.list(Spectra::peaksData(sp))
   lens <- vapply(pd, nrow, integer(1))
   mat <- do.call(rbind, pd)
   if (is.null(mat)) return(tibble::tibble(rt = numeric(), mz = numeric(), intensity = numeric()))

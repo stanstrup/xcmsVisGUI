@@ -13,14 +13,18 @@ Scope is **raw visualisation only** — no peak picking / grouping / alignment
 
 ## Run / test (Windows dev box)
 - R: `C:\Program Files\R\R-4.5.2\bin\Rscript.exe` (not on PATH — call by full path).
-- Launch: `Rscript run.R`, or headless `shiny::runApp(getwd(), port=7799, launch.browser=FALSE)`.
-- Smoke test on real data: `Rscript test-smoke.R` (faahKO CDF + msdata mzML; asserts).
-- Unit/invariant tests: `Rscript tests/run-tests.R` (no testthat dep — a tiny
-  asserting runner; pure helpers + the apply_filters/apply_filters_spectra
-  equivalence invariant; real-data tests SKIP if msdata/faahKO absent; exits non-zero on failure).
+- **This is now an R package.** `R/` is package code (loaded via the namespace, not
+  Shiny-auto-sourced); the app is the exported `run_app()`. Launch headless:
+  `Rscript -e "pkgload::load_all('.'); run_app(port=7799, launch.browser=FALSE)"`
+  (or `Rscript run.R`, which load_all's + launches). Installed: `xcmsVisGUI::run_app()`.
+- Tests (testthat, edition 3): `Rscript -e "testthat::test_local('.')"` (dev, load_all)
+  or `R CMD check`. Real-data tests (filter-equivalence + extraction smoke) SKIP when
+  msdata/faahKO are absent. `tests/testthat/` holds them.
+- After changing imports/roxygen run `Rscript -e "roxygen2::roxygenise()"` to regenerate
+  NAMESPACE + `man/`.
 - `benchmarks/` holds throwaway timing/repro scripts; their `*.out` are git-ignored.
-- After editing, ALWAYS: parse-check every R file, then boot headless and confirm
-  HTTP 200, before committing. Test plot/extraction logic on real data — never assume
+- After editing, ALWAYS: parse-check every R file (or `load_all`), then boot headless and
+  confirm HTTP 200, before committing. Test plot/extraction logic on real data — never assume
   a plot works without running real MS data (faahKO, msdata, or the user's urine files
   at `../Mcourse_new/data/2023/incognito_urine_A_vs_C_pos`).
 
@@ -29,10 +33,13 @@ Benchmarked: `Spectra(MsBackendMzR())` / `xcms::chromatogram()` took **80–150 
 on real mzML. Root cause = **BiocParallel**: `MsBackendMzR::backendInitialize` reads
 headers via `bplapply(files, ..., BPPARAM = bpparam())`, and the Windows default is
 `SnowParam(6)` — it spawns a socket cluster (each worker reloading the Bioc stack) per
-call. Fix: **`register(SerialParam())`** → 0.2–1.6 s. Done in `global.R` (main process).
+call. Fix: **`register(SerialParam())`** → 0.2–1.6 s. Done in **`.onLoad` (`R/zzz.R`)**
+so every read path (the app AND the test suite) gets it.
 
 Consequences baked into the architecture:
-- `global.R` calls `BiocParallel::register(SerialParam())`. **Do not remove it.**
+- `.onLoad` (`R/zzz.R`) calls `BiocParallel::register(SerialParam())`. **Do not remove it.**
+  (`run_app()` adds the mirai daemon pool + large-upload option; daemons are NOT spawned
+  on package load.)
 - File-list **header summaries** are read with **raw mzR** (`read_ms_header`, ~0.1 s) in
   mirai workers — even SerialParam Spectra reads are ~5 s/file, too slow for 100+ files.
   Workers only `library(mzR)` (no BiocParallel).
@@ -44,13 +51,15 @@ Consequences baked into the architecture:
   fixes the SnowParam default upstream, the SerialParam workaround can be dropped.
 
 ## Architecture / data flow
-- `app.R`: bslib `page_navbar`; a sidebar with Files (`mod_ingest`) + Filters
-  (`mod_filter`); nav panels = plot modules. Server builds `included` (ticked + ready
-  files), `meta` (id/name/path/group), `data_key` (paths + filter), a cached
-  `raw_msexp` (`build_msexp`, keyed on path set) and `dataset` (= `apply_filters(raw)`).
-- **`global.R` is NOT auto-sourced** for app.R-style apps in this Shiny version — `app.R`
-  sources it explicitly at the top. `R/*.R` ARE auto-sourced. Don't remove the
-  `source("global.R")` line.
+- `R/run_app.R`: `app_ui()` builds the bslib `page_navbar` (sidebar with Files
+  (`mod_ingest`) + Filters (`mod_filter`); nav panels = plot modules); `app_server()`
+  builds `included` (ticked + ready files), `meta` (id/name/path/group), `data_key`
+  (paths + filter), a cached `raw_msexp` (`build_msexp`, keyed on path set) and `dataset`
+  (= `apply_filters(raw)`). `run_app()` does runtime setup + `shinyApp` + `runApp`.
+- **Package layout (not an app-dir):** what was `global.R` is split into `R/zzz.R`
+  (`.onLoad` → SerialParam), `R/constants.R` (constants + rt helpers), `R/daemons.R`
+  (`set_daemons`/`setup_runtime`). `R/xcmsVisGUI-package.R` holds the roxygen import
+  declarations; NAMESPACE/`man/` are roxygen-generated — don't hand-edit.
 - Central reactive state: `make_rv()` in `R/utils_reactive.R` (rv$files, rv$eic_targets,
   rv$selection, rv$filter, rv$settings). One `rv` passed to every module.
 - Modules (`R/mod_*.R`): one per plot + ingest/filter/settings/export. Plot modules

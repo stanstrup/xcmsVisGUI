@@ -18,10 +18,13 @@ read_ms_header <- function(path) {
     chg <- if ("precursorCharge" %in% colnames(h))
       sort(unique(h$precursorCharge[is.finite(h$precursorCharge) & h$precursorCharge != 0]))
       else integer(0)
+    # all-NA retention times (a CDF edge) make min/max return Inf/-Inf, which would
+    # leak into the filter range hint — keep non-finite as NA.
+    finite_or_na <- function(v) if (is.finite(v)) v else NA_real_
     list(summary = list(
       n_spectra  = nrow(h),
-      rt_min     = suppressWarnings(min(h$retentionTime, na.rm = TRUE)),
-      rt_max     = suppressWarnings(max(h$retentionTime, na.rm = TRUE)),
+      rt_min     = finite_or_na(suppressWarnings(min(h$retentionTime, na.rm = TRUE))),
+      rt_max     = finite_or_na(suppressWarnings(max(h$retentionTime, na.rm = TRUE))),
       mz_min     = if (length(mzs)) min(mzs) else NA_real_,
       mz_max     = if (length(mzs)) max(mzs) else NA_real_,
       ms_levels  = paste(sort(unique(h$msLevel)), collapse = ", "),

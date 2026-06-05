@@ -31,15 +31,11 @@ make_rv <- function() {
       unit   = character(),  # "ppm" | "Da"
       rt_min = numeric(),
       rt_max = numeric(),
-      color  = character(),
       enabled = logical()
     ),
 
     # Last plotly click that should drive the linked spectrum view.
     selection = NULL,        # list(plot, file_id, rt, mz)
-
-    # Shared "active file" for the single-file views (Spectrum, MS map).
-    active_file = NULL,      # a file id
 
     # Global filter state (mod_filter).
     filter = list(
@@ -47,12 +43,11 @@ make_rv <- function() {
       mz_min = NA_real_, mz_max = NA_real_,
       ms_level = 1L, polarity = "any",
       int_min = NA_real_, int_max = NA_real_,
-      charge = NA_integer_, spectrum_id = ""
+      spectrum_id = ""
     ),
 
     # User settings (mod_settings).
     settings = list(
-      backend      = "MsBackendMzR",
       time_unit    = "min",          # "min" | "sec" — display unit for rt
       qual_palette = "Set1",
       seq_palette  = "viridis",
@@ -94,22 +89,4 @@ zoom_keeper <- function(source) {
     if (!is.null(zy)) p <- plotly::layout(p, yaxis = list(range = zy, autorange = FALSE))
     p
   }
-}
-
-#' Convenience: ids of files currently included for plotting.
-included_file_ids <- function(rv) {
-  f <- rv$files
-  if (nrow(f) == 0) return(character())
-  f$id[f$include & f$status == "ready"]
-}
-
-#' Construct a Spectra backend object from a settings string.
-make_backend <- function(backend = "MsBackendMzR") {
-  switch(
-    backend,
-    MsBackendMzR    = Spectra::MsBackendMzR(),
-    MsBackendMemory = Spectra::MsBackendMemory(),
-    MsBackendSql    = Spectra::MsBackendMzR(),  # Sql needs a db handle; read via MzR then setBackend downstream
-    Spectra::MsBackendMzR()
-  )
 }

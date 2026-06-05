@@ -1,10 +1,12 @@
 # mod_ingest — file selection + asynchronous reading.
 #
-# Files are picked server-side with shinyFiles (no upload; multi-GB safe on a
-# local desktop). Each file is read in a mirai worker via an ExtendedTask, so
-# the UI stays responsive and rows flip from "reading" to "ready" one by one.
-# A queue feeds the single-file reader; concurrency can be added later by
-# widening the pool of in-flight readers.
+# Files are added by typing a folder/file path or via the native OS folder
+# dialog (utils::choose.dir) — both load in place, no copy (multi-GB safe on a
+# local desktop). A native fileInput "Browse files…" is also offered, but it
+# copies to a temp dir (documented trade-off). Each file is read in a mirai
+# worker via an ExtendedTask, so the UI stays responsive and rows flip from
+# "reading" to "ready" one by one. A queue feeds the single-file reader;
+# concurrency can be added later by widening the pool of in-flight readers.
 
 mod_ingest_ui <- function(id) {
   ns <- NS(id)

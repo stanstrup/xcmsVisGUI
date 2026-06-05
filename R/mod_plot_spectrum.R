@@ -197,6 +197,9 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       if (isTRUE(is.finite(sl$pmz_max))) keep <- keep & tab$precursorMZ <= sl$pmz_max
       if (!is.null(sl$sid) && nzchar(sl$sid))
         keep <- keep & grepl(sl$sid, tab$spectrumId, fixed = TRUE)
+      # NA fields (e.g. MS1 precursor m/z, unset polarity) make a clause NA, which
+      # would materialize all-NA phantom rows in the DT — drop those rows.
+      keep[is.na(keep)] <- FALSE
       tab[keep, , drop = FALSE]
     })
     observeEvent(input$scanlist, {

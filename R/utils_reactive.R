@@ -56,6 +56,14 @@ make_rv <- function() {
   )
 }
 
+#' Standard notification for files skipped by extract_over_files (one bad file in
+#' a multi-file plot is reported, not fatal). Pass as the `on_error` callback.
+notify_read_failures <- function(names) {
+  shiny::showNotification(
+    paste0("Skipped unreadable file(s): ", paste(names, collapse = ", ")),
+    type = "warning", duration = 6)
+}
+
 #' Register the click/relayout/doubleclick events on a plotly object. Used by
 #' every interactive plot so clicks and zoom-persistence reach the server.
 register_plotly_events <- function(p) {

@@ -163,6 +163,43 @@ file_scan_table <- function(path) {
   tab
 }
 
+#' Acquisition number(s) for retention time(s) by matching a file's scan table.
+#' Matched on rt rounded to 3 decimals: the Spectra/xcms rtime and the mzR header
+#' table agree to ms precision, so 3 decimals is a safe exact-match key. Single
+#' home for that contract (used by add_scan_numbers and extract_over_files).
+scan_for_rt <- function(rt, scan_table) {
+  scan_table$scan[match(round(rt, 3), round(scan_table$rt, 3))]
+}
+
+#' Run a per-file `extractor(path)` over the included files, attach the requested
+#' sample metadata, optionally join scan numbers by rt, and bind into one tibble.
+#' The extractor is wrapped with purrr::possibly so an unreadable file is SKIPPED
+#' (its name passed to `on_error`) rather than aborting the whole multi-file plot.
+#' Keeps the Shiny layer out: the caller supplies `on_error` for any notification.
+#' @param files_df included files (needs id, path, name, sample_group)
+#' @param extractor function(path) -> tibble with an `rt` column
+#' @param cols metadata to attach: any of sample_id / sample_name / sample_group
+#' @param scan join acquisition numbers by rt (MS map)
+#' @param on_error function(failed_names) called once if any file failed
+extract_over_files <- function(files_df, extractor, cols = "sample_id",
+                               scan = FALSE, on_error = NULL) {
+  safe <- purrr::possibly(extractor, otherwise = NULL)
+  pieces <- lapply(seq_len(nrow(files_df)), function(i) {
+    d <- safe(files_df$path[i])
+    if (is.null(d)) return(NULL)              # read failed -> skip this file
+    if (nrow(d)) {
+      if ("sample_id"    %in% cols) d$sample_id    <- files_df$id[i]
+      if ("sample_name"  %in% cols) d$sample_name  <- files_df$name[i]
+      if ("sample_group" %in% cols) d$sample_group <- files_df$sample_group[i]
+      if (scan) d$scan <- scan_for_rt(d$rt, file_scan_table(files_df$path[i]))
+    }
+    d
+  })
+  failed <- vapply(pieces, is.null, logical(1))
+  if (any(failed) && !is.null(on_error)) on_error(files_df$name[failed])
+  dplyr::bind_rows(pieces)                     # bind_rows drops NULLs
+}
+
 #' Add a `scan` (acquisition number) column to a chromatogram tibble by matching
 #' retention time per file. `meta` must carry id + path columns.
 add_scan_numbers <- function(df, meta) {
@@ -173,7 +210,7 @@ add_scan_numbers <- function(df, meta) {
     if (!length(p) || is.na(p)) next
     st <- file_scan_table(p)
     idx <- df$sample_id == fid
-    df$scan[idx] <- st$scan[match(round(df$rt[idx], 3), round(st$rt, 3))]
+    df$scan[idx] <- scan_for_rt(df$rt[idx], st)
   }
   df
 }

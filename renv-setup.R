@@ -13,7 +13,7 @@ cran_pkgs <- c(
   "shiny", "bslib", "mirai", "promises",
   "plotly", "DT", "htmlwidgets",
   "RColorBrewer",
-  "dplyr", "tibble", "magrittr", "rlang"
+  "dplyr", "tibble", "magrittr", "purrr", "rlang"
 )
 
 # Bioconductor packages: the RforMassSpectrometry stack + real test data.

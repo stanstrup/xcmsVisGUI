@@ -92,11 +92,8 @@ mod_plot_spectrum_server <- function(id, rv, included) {
           d <- one_spectrum(f$path, rt_sec, input$scan); d$sample_name <- f$name; d
         } else {
           inc <- included(); validate(need(nrow(inc) > 0, "Include at least one file."))
-          dplyr::bind_rows(lapply(seq_len(nrow(inc)), function(i) {
-            d <- one_spectrum(inc$path[i], rt_sec, NA_integer_)
-            if (nrow(d)) d$sample_name <- inc$name[i]
-            d
-          }))
+          extract_over_files(inc, function(p) one_spectrum(p, rt_sec, NA_integer_),
+                             cols = "sample_name", on_error = notify_read_failures)
         }
       })
     })

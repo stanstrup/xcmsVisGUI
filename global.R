@@ -26,6 +26,7 @@ library(RColorBrewer)
 library(magrittr)
 library(dplyr)
 library(tibble)
+library(purrr)
 library(rlang)
 
 # The RforMassSpectrometry stack. xcms pulls in Spectra/MsExperiment.

@@ -38,14 +38,9 @@ mod_plot_precursors_server <- function(id, rv, included) {
       validate(need(nrow(f2) > 0,
                     "No included file contains MS2 spectra (need DDA data)."))
       withProgress(message = "Reading precursors…", value = 0.5, {
-        dplyr::bind_rows(lapply(seq_len(nrow(f2)), function(i) {
-          d <- extract_precursors(f2$path[i])
-          if (nrow(d)) {
-            d$sample_id <- f2$id[i]; d$sample_name <- f2$name[i]
-            d$sample_group <- f2$sample_group[i]
-          }
-          d
-        }))
+        extract_over_files(f2, extract_precursors,
+                           cols = c("sample_id", "sample_name", "sample_group"),
+                           on_error = notify_read_failures)
       })
     })
 

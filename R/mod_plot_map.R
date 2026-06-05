@@ -51,16 +51,9 @@ mod_plot_map_server <- function(id, rv, included) {
       inc <- included()
       validate(need(nrow(inc) > 0, "Add and include at least one file."))
       withProgress(message = "Reading peaks…", value = 0.3, {
-        pieces <- lapply(seq_len(nrow(inc)), function(i) {
-          d <- extract_peaks(inc$path[i], rv$filter)
-          if (nrow(d)) {
-            d$sample_id <- inc$id[i]
-            st <- file_scan_table(inc$path[i])
-            d$scan <- st$scan[match(round(d$rt, 3), round(st$rt, 3))]
-          }
-          d
-        })
-        dplyr::bind_rows(pieces)
+        extract_over_files(inc, function(p) extract_peaks(p, rv$filter),
+                           cols = "sample_id", scan = TRUE,
+                           on_error = notify_read_failures)
       })
     })
 

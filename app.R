@@ -25,9 +25,7 @@ ui <- page_navbar(
   nav_panel(
     "Settings", icon = icon("gear"),
     mod_settings_ui("settings")
-  ),
-
-  header = useShinyjs()
+  )
 )
 
 server <- function(input, output, session) {

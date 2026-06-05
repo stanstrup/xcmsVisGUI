@@ -11,10 +11,9 @@ options(
 # CRAN packages: app framework, async, UI, plotting, data wrangling.
 cran_pkgs <- c(
   "shiny", "bslib", "mirai", "promises",
-  "shinyFiles", "shinyWidgets", "shinyjs",
   "plotly", "DT", "htmlwidgets",
   "RColorBrewer",
-  "dplyr", "tibble", "tidyr", "purrr", "magrittr", "rlang", "fs", "stringr"
+  "dplyr", "tibble", "magrittr", "rlang"
 )
 
 # Bioconductor packages: the RforMassSpectrometry stack + real test data.

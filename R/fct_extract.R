@@ -87,25 +87,37 @@ get_spectra <- function(path) {
 #' ms_level and the rt/scan selection come from the Spectrum tab controls.
 extract_spectrum <- function(path, rt = NA_real_, scan = NA_integer_, f = list()) {
   sp <- get_spectra(path)
+  empty <- tibble::tibble(mz = numeric(), intensity = numeric(), rt = numeric(),
+                          scan = integer())
+  one_to_df <- function(one) {
+    if (!length(one)) return(empty)
+    mzv <- Spectra::mz(one)[[1]]; iv <- Spectra::intensity(one)[[1]]
+    if (!length(mzv)) return(empty)
+    a <- tryCatch(Spectra::acquisitionNum(one), error = function(e) NA_integer_)
+    tibble::tibble(mz = mzv, intensity = iv, rt = Spectra::rtime(one)[1], scan = a[1])
+  }
+  if (!is.null(scan) && is.finite(scan)) {
+    # An explicit acquisition-number pick must resolve against the FULL file: the
+    # selection filters (ms level, polarity, rt, spectrum id) would otherwise hide
+    # the chosen scan (e.g. picking an MS2 scan while the global filter is MS1).
+    # Match the nearest acquisition number — NOT a positional index — so the right
+    # scan loads regardless of how acquisition numbers are numbered. Only the
+    # peak-level intensity / m/z filters still apply to the chosen spectrum.
+    anum <- tryCatch(Spectra::acquisitionNum(sp), error = function(e) NULL)
+    if (is.null(anum) || !length(anum)) return(empty)
+    idx <- which.min(abs(anum - as.integer(scan)))
+    pf <- f
+    pf$ms_level <- NA_integer_; pf$rt_min <- NA_real_; pf$rt_max <- NA_real_
+    pf$polarity <- "any"; pf$spectrum_id <- ""
+    return(one_to_df(apply_filters_spectra(sp[idx], pf)))
+  }
+  # rt-based selection: the global filter chooses which spectrum (ms level etc.).
   ff <- f
   ff$rt_min <- NA_real_; ff$rt_max <- NA_real_     # selection drives rt, not filter
   sp <- apply_filters_spectra(sp, ff)              # ms_level comes from the filter
-  n <- length(sp)
-  empty <- tibble::tibble(mz = numeric(), intensity = numeric(), rt = numeric(),
-                          scan = integer())
-  if (!n) return(empty)
+  if (!length(sp)) return(empty)
   rts <- Spectra::rtime(sp)
-  if (!is.null(scan) && is.finite(scan)) {
-    anum <- tryCatch(Spectra::acquisitionNum(sp), error = function(e) NULL)
-    idx <- if (!is.null(anum) && any(anum == scan, na.rm = TRUE)) which(anum == scan)[1]
-           else min(max(as.integer(scan), 1L), n)
-  } else {
-    idx <- which.min(abs(rts - rt))
-  }
-  anum <- tryCatch(Spectra::acquisitionNum(sp), error = function(e) rep(NA_integer_, n))
-  one <- sp[idx]
-  tibble::tibble(mz = Spectra::mz(one)[[1]], intensity = Spectra::intensity(one)[[1]],
-                 rt = rts[idx], scan = anum[idx])
+  one_to_df(sp[which.min(abs(rts - rt))])
 }
 
 #' Extract all peaks (rt, m/z, intensity) from one file as a long tibble (MS map/3D).

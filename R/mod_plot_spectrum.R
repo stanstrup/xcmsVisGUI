@@ -58,13 +58,18 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       }
     })
 
-    # Snap an out-of-range scan back into the input box.
+    # Snap an out-of-range scan back into the input box. The box holds an
+    # ACQUISITION number, not a 1..n position — clamp to the file's actual
+    # acquisition-number range (these can start well above 1 and be non-contiguous).
     observeEvent(input$scan, {
-      n <- cur_row()$n_spectra
-      if (is.finite(input$scan) && is.finite(n) && input$scan > n)
-        updateNumericInput(session, "scan", value = n)
-      if (is.finite(input$scan) && input$scan < 1)
-        updateNumericInput(session, "scan", value = 1)
+      if (!isTRUE(is.finite(input$scan))) return()
+      scans <- file_scan_table(cur_row()$path)$scan
+      scans <- scans[is.finite(scans)]
+      if (!length(scans)) return()
+      if (input$scan < min(scans))
+        updateNumericInput(session, "scan", value = min(scans))
+      else if (input$scan > max(scans))
+        updateNumericInput(session, "scan", value = max(scans))
     })
 
     one_spectrum <- function(path, rt_sec, scan) {

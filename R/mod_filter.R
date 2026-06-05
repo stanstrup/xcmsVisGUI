@@ -86,6 +86,8 @@ mod_filter_server <- function(id, rv, included) {
         updateNumericInput(session, k, value = NA)
       updateTextInput(session, "spectrum_id", value = "")
       updateSelectInput(session, "polarity", selected = "any")
+      updateSelectInput(session, "ms_level",
+        selected = if ("1" %in% ranges()$ms_levels) "1" else "all")
     })
   })
 }

@@ -200,6 +200,16 @@ extract_over_files <- function(files_df, extractor, cols = "sample_id",
   dplyr::bind_rows(pieces)                     # bind_rows drops NULLs
 }
 
+#' Empty the per-file caches (.scan_cache + .spectra_cache). Called when the user
+#' clears the file list so cached reads don't accumulate across a long session.
+#' Path is the cache key; these raw files are effectively immutable, so there is
+#' deliberately no mtime check (see ARCHITECTURE_REVIEW.md open question).
+clear_ms_caches <- function() {
+  rm(list = ls(.scan_cache, all.names = TRUE), envir = .scan_cache)
+  rm(list = ls(.spectra_cache, all.names = TRUE), envir = .spectra_cache)
+  invisible(NULL)
+}
+
 #' Add a `scan` (acquisition number) column to a chromatogram tibble by matching
 #' retention time per file. `meta` must carry id + path columns.
 add_scan_numbers <- function(df, meta) {

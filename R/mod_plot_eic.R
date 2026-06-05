@@ -172,18 +172,8 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
     })
 
     keep_zoom <- zoom_keeper("eic")
-    output$plot <- renderPlotly({
-      ggplotly(plot_gg(), source = "eic", tooltip = "text", dynamicTicks = TRUE) %>%
-        keep_zoom() %>%
-        event_register("plotly_click") %>% event_register("plotly_relayout") %>% event_register("plotly_doubleclick")
-    })
-
-    click <- reactive(suppressWarnings(event_data("plotly_click", source = "eic")))
-    observeEvent(click(), {
-      ev <- click(); req(ev)
-      rv$selection <- list(plot = "eic", file_id = ev$key,
-                           rt = rt_to_sec(ev$x, rv$settings$time_unit), mz = NA_real_)
-    })
+    output$plot <- renderPlotly(finalize_plotly(plot_gg(), "eic", keep_zoom))
+    wire_selection("eic", "eic", rv)
 
     mod_export_server("export", plot_gg, rv, "eic")
   })

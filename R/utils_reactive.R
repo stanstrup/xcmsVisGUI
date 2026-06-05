@@ -62,6 +62,40 @@ make_rv <- function() {
   )
 }
 
+#' Register the click/relayout/doubleclick events on a plotly object. Used by
+#' every interactive plot so clicks and zoom-persistence reach the server.
+register_plotly_events <- function(p) {
+  p %>%
+    plotly::event_register("plotly_click") %>%
+    plotly::event_register("plotly_relayout") %>%
+    plotly::event_register("plotly_doubleclick")
+}
+
+#' Convert a ggplot to plotly and finalize it for an interactive plot module:
+#' tooltip from the `text` aes, dynamic ticks, zoom persistence, and event
+#' registration. `keep_zoom` is the function returned by `zoom_keeper(source)`.
+#' Collapses the identical render tail repeated in every ggplot-based plot module.
+finalize_plotly <- function(gg, source, keep_zoom) {
+  plotly::ggplotly(gg, source = source, tooltip = "text", dynamicTicks = TRUE) %>%
+    keep_zoom() %>%
+    register_plotly_events()
+}
+
+#' Wire a plotly click on `source` to `rv$selection` (drives the linked Spectrum
+#' view). `file_id` comes from the click `key` aesthetic; `mz_from(ev)` yields the
+#' m/z (default NA). Call ONCE inside a moduleServer. `suppressWarnings` hides the
+#' benign "source not registered" notice emitted before the first render.
+wire_selection <- function(source, plot, rv, mz_from = function(ev) NA_real_) {
+  click <- shiny::reactive(suppressWarnings(
+    plotly::event_data("plotly_click", source = source)))
+  shiny::observeEvent(click(), {
+    ev <- click(); shiny::req(ev)
+    rv$selection <- list(plot = plot, file_id = ev$key,
+                         rt = rt_to_sec(ev$x, rv$settings$time_unit),
+                         mz = mz_from(ev))
+  })
+}
+
 #' Persist 2D zoom across re-renders. Call ONCE inside a moduleServer with the
 #' plot's plotly `source`; it returns a function to pipe a plotly object through.
 #' The stored range is read with isolate() so a user zoom does NOT re-trigger the

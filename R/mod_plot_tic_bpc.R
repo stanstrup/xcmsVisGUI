@@ -71,20 +71,9 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
     })
 
     keep_zoom <- zoom_keeper("tic")
-    output$plot <- renderPlotly({
-      ggplotly(plot_gg(), source = "tic", tooltip = "text", dynamicTicks = TRUE) %>%
-        keep_zoom() %>%
-        event_register("plotly_click") %>% event_register("plotly_relayout") %>% event_register("plotly_doubleclick")
-    })
-
-    # Click -> selection that drives the Spectrum tab. suppressWarnings hides the
-    # benign "source not registered" notice emitted before the plot first renders.
-    click <- reactive(suppressWarnings(event_data("plotly_click", source = "tic")))
-    observeEvent(click(), {
-      ev <- click(); req(ev)
-      rv$selection <- list(plot = "tic", file_id = ev$key,
-                           rt = rt_to_sec(ev$x, rv$settings$time_unit), mz = NA_real_)
-    })
+    output$plot <- renderPlotly(finalize_plotly(plot_gg(), "tic", keep_zoom))
+    # Click -> selection that drives the Spectrum tab.
+    wire_selection("tic", "tic", rv)
 
     mod_export_server("export", plot_gg, rv, reactive(tolower(chrom_label())))
   })

@@ -75,18 +75,8 @@ mod_plot_precursors_server <- function(id, rv, included) {
     })
 
     keep_zoom <- zoom_keeper("prec")
-    output$plot <- renderPlotly({
-      ggplotly(plot_gg(), source = "prec", tooltip = "text", dynamicTicks = TRUE) %>%
-        keep_zoom() %>%
-        event_register("plotly_click") %>% event_register("plotly_relayout") %>% event_register("plotly_doubleclick")
-    })
-
-    click <- reactive(suppressWarnings(event_data("plotly_click", source = "prec")))
-    observeEvent(click(), {
-      ev <- click(); req(ev)
-      rv$selection <- list(plot = "prec", file_id = ev$key,
-                           rt = rt_to_sec(ev$x, rv$settings$time_unit), mz = ev$y)
-    })
+    output$plot <- renderPlotly(finalize_plotly(plot_gg(), "prec", keep_zoom))
+    wire_selection("prec", "prec", rv, mz_from = function(ev) ev$y)
 
     mod_export_server("export", plot_gg, rv, "precursors")
   })

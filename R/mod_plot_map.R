@@ -111,7 +111,7 @@ mod_plot_map_server <- function(id, rv, included) {
                        hoverinfo = "skip", showlegend = FALSE)
         p %>% layout(xaxis = list(title = rt_axis_label(unit)), yaxis = list(title = "m/z")) %>%
           keep_zoom() %>%
-          event_register("plotly_click") %>% event_register("plotly_relayout") %>% event_register("plotly_doubleclick")
+          register_plotly_events()
 
       } else if (input$mode == "surface") {
         b <- bin_peaks(pk, rt_bin = input$rt_bin, mz_bin = input$mz_bin, aggfun = max)

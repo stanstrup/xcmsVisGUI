@@ -138,7 +138,7 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
         df$rmin <- NULL; df$rmax <- NULL
       }
       df
-    }) %>% bindCache(data_key(), enabled_targets())
+    }) %>% bindCache(data_key(), enabled_targets(), rv$settings$time_unit)
 
     plot_gg <- reactive({
       df <- eic_df(); req(nrow(df) > 0)

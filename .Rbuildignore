@@ -18,3 +18,5 @@
 ^pkgdown$
 ^data-raw$
 ^vignettes/articles$
+^Dockerfile$
+^\.dockerignore$

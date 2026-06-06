@@ -2,8 +2,9 @@
 
 Read this before changing anything. It captures the non-obvious decisions, the
 performance traps, and the conventions this codebase follows. Also read `PLAN.md`
-(original design), `BENCHMARK.md` / `SPECTRA_ISSUE.md` (the perf investigation),
-and `USER_GUIDE.md` (user-facing behaviour).
+(original design), `BENCHMARK.md` (the perf investigation), `ARCHITECTURE_REVIEW.md`
+(current architecture), and the pkgdown usage guide (`vignettes/articles/usage.Rmd`,
+user-facing behaviour).
 
 ## What this is
 A **local desktop Shiny app** for interactively visualising **raw** LC-MS data

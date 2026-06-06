@@ -5,8 +5,8 @@ A local Shiny desktop app (packaged as an R package) for interactively visualisi
 `xcms`). Plots are ggplot2 rendered through plotly for interactivity (click, zoom,
 hover); static export is via ggsave.
 
-See [`PLAN.md`](PLAN.md) for the original design and [`ARCHITECTURE_REVIEW.md`](ARCHITECTURE_REVIEW.md)
-for the current architecture.
+See [`ARCHITECTURE_REVIEW.md`](ARCHITECTURE_REVIEW.md) for the design, architecture,
+and decision log (it also folds in the original implementation plan).
 
 ## Status
 
@@ -15,7 +15,11 @@ unit, default EIC tolerance, export defaults — persisted across restarts), glo
 filters (rt / m/z / MS level / polarity / intensity / spectrum-id), and all raw-data
 plot views — TIC/BPC, multi-EIC, click-to-spectrum (+ scan-list browser), 2D MS map,
 3D (points/surface), and DDA precursor ions. Scope is **raw visualisation only** — no
-peak picking / grouping / alignment (deferred; `PLAN.md` §16).
+peak picking / grouping / alignment (deferred; see `ARCHITECTURE_REVIEW.md`).
+
+Extraction results are cached to disk (qs2), so re-opening the app with the same files +
+filter is instant. Figures export as png/svg/pdf or as the raw ggplot object (rds) for
+later tweaking in R.
 
 ## Running
 
@@ -82,11 +86,12 @@ R/
   mod_plot_spectrum.R  # spectrum at a clicked rt / picked scan + scan-list browser
   mod_plot_map.R       # 2D MS map + 3D points/surface (plotly-native)
   mod_plot_precursors.R# DDA precursor-ion map
-  mod_export.R         # reusable png/svg/pdf export modal
+  mod_export.R         # reusable png/svg/pdf/rds export modal
   fct_extract.R        # data extraction (summaries, chromatograms, peaks, spectra)
   fct_filters.R        # compose filter state into Spectra/xcms calls
-  fct_export.R         # ggsave-based export
+  fct_export.R         # ggsave-based export (+ rds = the ggplot object itself)
   fct_palettes.R       # ColorBrewer / viridis helpers
+  fct_cache.R          # layered mem+disk (qs2) cache backing bindCache, persistent across restarts
   fct_settings_store.R # persist settings to the per-user config dir
   utils_reactive.R     # central reactive state (rv) + plotly/zoom helpers
 tests/testthat/        # unit + real-data tests

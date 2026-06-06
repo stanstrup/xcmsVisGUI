@@ -1,8 +1,16 @@
 # Architecture review — xcmsVisGUI
 
-Date: 2026-06-05. Method: two independent reviewers analysed the full codebase
-(`app.R`, `global.R`, all `R/*.R`, `test-smoke.R`, `PLAN.md`, `CLAUDE.md`), then
-debated to consensus:
+Date: 2026-06-05 (file refs updated 2026-06-06 for the package conversion).
+Method: two independent reviewers analysed the full codebase (then `app.R`,
+`global.R`, all `R/*.R`, `test-smoke.R`, `PLAN.md`, `CLAUDE.md`), then debated to
+consensus:
+
+> **Note:** this review predates the R-package conversion. Where it says `app.R`
+> read `R/run_app.R`; `global.R` is now split into `R/zzz.R` (the `.onLoad`
+> SerialParam fix), `R/constants.R`, and `R/daemons.R`; `test-smoke.R` /
+> `tests/run-tests.R` are now `tests/testthat/`. See the **Decision log** at the
+> bottom for everything done *after* this review (package, cache, export,
+> pkgdown, Docker, CI, persistent settings, xcmsVis).
 
 - **Agent P** — pragmatic maintainer, bias toward low-risk incremental change.
 - **Agent S** — structural/design-first, willing to argue for deeper refactors.
@@ -57,10 +65,11 @@ into plot modules is two lines reading `rv$filter$ms_level`.
 ## What is already good — do not touch
 
 - **Centralised performance contract.** `register(SerialParam())` once in
-  `global.R`; mirai workers only `library(mzR)`; heavy Spectra/xcms work in the
-  main process. This is the whole performance story — off-limits.
+  `R/zzz.R` (`.onLoad`); mirai workers only `requireNamespace("mzR")`; heavy
+  Spectra/xcms work in the main process. This is the whole performance story —
+  off-limits.
 - **Clean reactive graph** in the composition root: `included()` → `data_key()`
-  → `raw_msexp()` (cached) → `dataset()` → modules (`app.R`).
+  → `raw_msexp()` (cached) → `dataset()` → modules (`R/run_app.R`).
 - **Cache discipline**: `data_key()` keyed only on path-set + filter; `bindCache`
   on heavy reactives excludes cosmetic inputs.
 - **Edge discipline**: seconds internally, conversion only at display/input
@@ -110,10 +119,10 @@ Each item: **effort** (S/M/L) · **risk** (low/med/high) · **definition of done
    spectrum_id), the spectra surviving `apply_filters` **equal** those surviving
    `apply_filters_spectra` on a real msdata file. Folds in the old
    `benchmarks/filter-test.R`. Makes the lock-step (issue 2) safe.
-   *Done:* `tests/test-filters.R`. **Note:** implemented in a dependency-free
-   runner (`tests/run-tests.R`), **not** `tests/testthat/` — testthat isn't in
-   the renv library and the app is sourced, not installed. (See future_work:
-   "make it into an R package" would move this to testthat.)
+   *Done:* `tests/testthat/test-filters.R`. **Update (2026-06-06):** the original
+   dependency-free `tests/run-tests.R` runner has since been folded into
+   `tests/testthat/` as part of the package conversion — testthat (edition 3) is
+   now the suite, run via `testthat::test_local(".")` / `R CMD check`.
 
 3. ✅ **Single filter schema + `make_filter()` constructor** — S/M · low-med.
    *DoD:* `make_rv()` and `mod_filter` build the filter from one definition
@@ -185,7 +194,8 @@ Each item: **effort** (S/M/L) · **risk** (low/med/high) · **definition of done
   documented dogmas. Off-limits.
 - **Async-ifying heavy reads, a state-management framework, a DT-checkbox
   abstraction, a swappable-backend layer** — out of scope / speculative.
-- **Peak picking / grouping / alignment** — deferred by design (`PLAN.md` §16).
+- **Peak picking / grouping / alignment** — deferred by design (see
+  **Deferred: preprocessing** below).
 
 ---
 
@@ -209,6 +219,139 @@ overwritten — **no mtime key.** Clear-only (item 11) shipped; mtime declined.
 ## Suggested execution order
 
 ✅ **Done** — all of Tier 1 and Tier 2 were implemented in this order across
-separate parse-checked, test- and smoke-verified commits on `main`. Remaining
-ideas (R package, CI, Docker, persistent settings, default tol setting,
-CommonMZ/CAMERA, xcms objects, persistent cache) are tracked in `future_work.md`.
+separate parse-checked, test- and smoke-verified commits on `main`. The
+post-review work (R package, CI, Docker, persistent settings, default tol
+setting, persistent cache, rds export) is now also done — see the Decision log
+below. Remaining ideas (CommonMZ/CAMERA, xcms objects, peak picking) live in
+`future_work.md` and the **Deferred: preprocessing** section below.
+
+---
+
+## Decision log (work done after the review above)
+
+Everything here landed on `main` after the Tier-1/Tier-2 roadmap, each as its
+own parse-checked + `R CMD check`-clean commit. Recorded so these decisions
+don't get re-litigated.
+
+### Packaging & infrastructure
+- **Converted the sourced app into an installable R package.** `app.R` + the
+  side-effecting tail of `global.R` → exported `run_app()` in `R/run_app.R`;
+  `global.R` split into `R/zzz.R` (`.onLoad` → `register(SerialParam())`),
+  `R/constants.R`, `R/daemons.R`. Imports declared per-function via roxygen;
+  NAMESPACE/`man/` are generated. The MS S4 stack (Spectra/MsExperiment/xcms/
+  BiocParallel/mzR) is called via `::` to dodge overlapping-generic conflicts.
+- **Test suite → testthat (edition 3)** in `tests/testthat/`; `R CMD check`
+  passes Status: OK. Real-data tests skip when `msdata`/`faahKO` are absent.
+- **CI** — GitHub Actions `R-CMD-check.yaml` (full suite incl. real data) +
+  `pkgdown.yaml`; renv autoloader disabled in CI.
+- **pkgdown site** with a screenshot-driven usage guide
+  (`vignettes/articles/usage.Rmd`, chromote-captured figures via
+  `data-raw/capture-screenshots.R`). Replaced the hand-written `USER_GUIDE.md`.
+- **Docker** wrapper (Bioconductor base) for server deployment.
+
+### Persistence
+- **Settings persist across restarts** — allow-listed fields written as JSON to
+  the per-user config dir (`tools::R_user_dir("xcmsVisGUI","config")`,
+  `R/fct_settings_store.R`). Chosen over an in-package file so a normal install
+  is writable. Added a **default EIC tolerance** setting (value + ppm/Da).
+- **Persistent extraction cache** (`R/fct_cache.R`) — heavy `bindCache` results
+  (TIC/BPC + EIC tibbles) go into a **layered memory + disk** cache: memory is
+  the fast in-session primary, disk is the persistent backing so re-opening the
+  app with the same files + filter is instant. The disk layer is a custom
+  cachem-compatible store serialising with **qs2 at `compress_level = 0`**
+  (benchmarked: gzip RDS 1.5–4 s vs qs2 L0 0.1–0.4 s at this app's 0.5–1.5M-row
+  result sizes, similar file size). LRU eviction past ~2 GB / 30 days. The raw
+  `MsExperiment` stays in a **session (memory) cache only** — not worth
+  disk-serialising an S4 object with a file-backed backend. `clear_ms_caches()`
+  ("Clear all") also resets the disk cache. **No mtime keying** (files aren't
+  overwritten in practice — confirmed with the user).
+
+### Export
+- **`rds` export** added alongside png/svg/pdf — saves the ggplot object itself
+  (`save_gg()` rds branch), so a figure can be reopened and re-tweaked in R.
+
+### xcmsVis — evaluated and declined (for now)
+Re-examined whether to delegate plotting to **xcmsVis** (`gplot*` → ggplot,
+amendable post-hoc with `+ aes()/geom_/scale_`). **Declined for the current
+raw-only scope.** Reasons:
+1. **Loadability** — in this R install, *accessing any exported symbol*
+   segfaults (reproducible, exit 139; likely a lazy-load/Rcpp-ABI issue after
+   Rcpp 1.1.0→1.1.1). `library(xcmsVis)` loads but the first symbol touch
+   crashes — so it isn't even callable here right now.
+2. **Input type** — its methods dispatch on `XChromatograms` / `XcmsExperiment`
+   / `MChromatograms` (xcms/MSnbase result objects). We deliberately extract to
+   plain tibbles (cached, computed under SerialParam); feeding xcmsVis means
+   keeping xcms objects live, which fights the qs2 tibble cache.
+3. **Post-hoc `+` is additive only** — it can't rewire mappings already baked
+   into existing layers. The GUI needs exactly such changes: the `key` aesthetic
+   on the line geom for plotly click-nav, the seconds→display-unit transform,
+   and ColorBrewer (xcmsVis uses viridis/topo/gradientn). None retrofit via `+`.
+4. **ggplotly round-trip** isn't guaranteed (custom `geom_polygon` fills;
+   feature views compose with **patchwork**, which `ggplotly()` can't convert).
+5. **Scope** — most `gplot*` functions are peak/feature plots, the territory we
+   defer (see **Deferred: preprocessing** below).
+
+**Revisit when:** peak picking lands — we'd then have `XcmsExperiment`
+objects, the segfault is presumably fixed, and `gplotChromPeaks` /
+`gplotFeatureGroups` could back dedicated peak views (adding our own `key` layer
+on top is workable on fresh plots). Tracked in `future_work.md`.
+
+---
+
+## Original design (from the former PLAN.md)
+
+The implementation plan is folded in here so there's one design doc. The
+as-built app diverges from it in two big ways (both covered above): plotting is
+**not** delegated to xcmsVis (we build ggplots ourselves), and it's an R package
+rather than a sourced `app.R`/`global.R` app dir. Everything else below held up.
+
+**Locked decisions** (still in force):
+
+| Decision | Choice |
+|---|---|
+| Deployment | **Local desktop**, single user |
+| Scope | **Raw visualisation only** — no peak picking / grouping / alignment (deferred, below) |
+| Async engine | **`ExtendedTask` + `mirai`** |
+| Colours | **ColorBrewer / viridis** throughout |
+| Testing | **Always test on real data** (`msdata` / `faahKO`) |
+
+**Tech stack:** Shiny + `bslib` (`page_navbar`); Shiny modules (one per plot +
+ingest/filter/settings); `Spectra`/`MsExperiment`/`xcms` with the on-disk mzR
+backend; `DT` for the editable EIC target table; `ggsave` for vector export
+(the ggplot is the export source of truth, plotly is the on-screen widget only).
+
+**Plot catalog** (the five raw-capable views that shipped): TIC/BPC overlay
+(`chromatogram(aggregationFun="sum"/"max")`), multi-m/z EIC (target table →
+mz-range matrix), click-driven Spectrum (nearest scan + scan-list browser),
+2D MS map + 3D points/surface (plotly-native), and DDA Precursor ions.
+
+**Design points worth keeping in mind** (resolved during the build):
+- mirai workers return **extracted data** (tibbles), not live on-disk `Spectra`
+  handles — handles don't cross process boundaries cleanly.
+- `gplot(XcmsExperiment)` on raw data was avoided entirely (we extract TIC / MS
+  map directly), sidestepping its "requires detected peaks" coupling.
+- The Spectra **backend** question (`MsBackendMzR` vs Memory/Sql/Hdf5) was
+  settled by the perf investigation: on-disk mzR under `SerialParam`, with header
+  summaries read via raw mzR in workers. See CLAUDE.md "THE performance story"
+  (the standalone benchmark write-up was filed as an upstream Bioconductor issue
+  and removed from the repo).
+
+---
+
+## Deferred: preprocessing (do NOT build now)
+
+Out of current scope by design — recorded here (formerly PLAN.md §16) as the
+brief for a future `mod_preprocess`. References elsewhere to "the deferred
+preprocessing scope" point here.
+
+- **Pipeline:** `findChromPeaks` (CentWave / MatchedFilter params UI) →
+  `groupChromPeaks` (PeakDensity) → `adjustRtime` (Obiwarp / PeakGroups) →
+  `groupFeatures`. Run async (ExtendedTask + mirai); keep the processed
+  `XcmsExperiment` alongside the raw data.
+- **Unlocks the peak/feature plots** — `gplotChromPeaks`, `gplotChromPeakImage`,
+  `ghighlightChromPeaks` (peak overlay on EICs), `gplotChromPeakDensity` (param
+  tuning), `gplotFeatureGroups`, `gplotAdjustedRtime` (alignment QC). This is the
+  natural moment to **reconsider xcmsVis** (see the Decision log): we'd then have
+  `XcmsExperiment` objects, which is exactly what its `gplot*` methods want.
+- `gplotChromPeakDensity` is ideal for interactive `bw` / `minFraction` tuning.
+- Also deferred: importing an already-processed `XcmsExperiment` / `.rds`.

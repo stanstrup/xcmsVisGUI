@@ -132,8 +132,12 @@ wire_selection <- function(source, plot, rv, mz_from = function(ev) NA_real_) {
 #' @noRd
 zoom_keeper <- function(source) {
   z <- reactiveValues(x = NULL, y = NULL)
-  # Only STORE ranges from user zoom/pan. We must NOT clear on autorange here:
-  # a re-render emits an autorange relayout that would wipe the saved zoom.
+  # Track zoom PER AXIS: a reported range pins that axis; a reported autorange
+  # CLEARS it. Clearing per-axis (never both at once) is what keeps this safe.
+  # A data re-render autoranges only the axes we did NOT pin, so its autorange
+  # echo can't wipe a pinned axis — while a genuine x-only zoom (which autoranges
+  # y) correctly drops the now-stale y range, instead of leaving it to be
+  # re-applied on the next re-render (which snapped the view back — the bug).
   # suppressWarnings on the trigger too: event_data emits a benign "source not
   # registered" warning before the plot first renders.
   observeEvent(suppressWarnings(event_data("plotly_relayout", source = source)), {
@@ -141,8 +145,10 @@ zoom_keeper <- function(source) {
     if (is.null(e)) return()
     if (!is.null(e[["xaxis.range[0]"]]))
       z$x <- c(e[["xaxis.range[0]"]], e[["xaxis.range[1]"]])
+    else if (isTRUE(e[["xaxis.autorange"]])) z$x <- NULL
     if (!is.null(e[["yaxis.range[0]"]]))
       z$y <- c(e[["yaxis.range[0]"]], e[["yaxis.range[1]"]])
+    else if (isTRUE(e[["yaxis.autorange"]])) z$y <- NULL
   }, ignoreInit = TRUE)
   # A genuine reset is a double-click -> forget the zoom.
   observeEvent(suppressWarnings(event_data("plotly_doubleclick", source = source)), {

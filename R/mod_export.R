@@ -21,7 +21,7 @@ mod_export_server <- function(id, plot_gg, rv, basename = "plot") {
       s <- rv$settings
       showModal(modalDialog(
         title = "Save plot", size = "m", easyClose = TRUE,
-        selectInput(ns("format"), "Format", c("png", "svg", "pdf"),
+        selectInput(ns("format"), "Format", c("png", "svg", "pdf", "rds"),
                     selected = s$export_format),
         layout_columns(
           col_widths = c(4, 4, 4),

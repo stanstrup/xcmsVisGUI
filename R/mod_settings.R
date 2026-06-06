@@ -34,7 +34,7 @@ mod_settings_ui <- function(id) {
       ),
       hr(),
       selectInput(ns("export_format"), "Default export format",
-                  choices = c("png", "svg", "pdf")),
+                  choices = c("png", "svg", "pdf", "rds")),
       layout_columns(
         col_widths = c(4, 4, 4),
         numericInput(ns("export_width"),  "Width",  value = 8, min = 1),

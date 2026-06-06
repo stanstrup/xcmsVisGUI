@@ -1,5 +1,6 @@
 # Plot export. The ggplot is the source of truth, so static exports are crisp
-# vectors (svg/pdf) or high-DPI raster (png) regardless of the on-screen plotly.
+# vectors (svg/pdf) or high-DPI raster (png) regardless of the on-screen plotly,
+# and "rds" saves the ggplot object itself for further editing/replotting in R.
 
 #' Save a ggplot to file using the user's export settings.
 #' @param gg a ggplot object
@@ -10,6 +11,8 @@
 #' @noRd
 save_gg <- function(gg, file, settings) {
   fmt <- settings$export_format %||% "png"
+  # "rds": save the ggplot object itself (readRDS() it to tweak/replot in R).
+  if (identical(fmt, "rds")) { saveRDS(gg, file); return(invisible(file)) }
   args <- list(
     filename = file, plot = gg,
     width = settings$export_width %||% 8,

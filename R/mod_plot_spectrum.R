@@ -53,26 +53,35 @@ mod_plot_spectrum_ui <- function(id) {
                              width = "90px"),
                 selectInput(ns("ann_unit"), "unit", c("ppm", "Da"), width = "90px")),
             numericInput(ns("ann_min_int"), "Min intensity (% of base peak)",
-                         value = 1, min = 0, max = 100, step = 0.5),
+                         value = 0, min = 0, max = 100, step = 0.5),
             numericInput(ns("ann_top_n"), "Annotate only top N peaks (blank = all)",
                          value = NA, min = 1, step = 1),
+            # Projection options (manual + auto): isotopes, fragments, max charge.
             conditionalPanel(
               sprintf("input['%s'] != 'diff'", ns("ann_mode")),
+              div(class = "d-flex gap-2",
+                  numericInput(ns("ann_niso"), "Max isotope M+n", value = 3, min = 0,
+                               max = 6, step = 1, width = "120px"),
+                  numericInput(ns("ann_max_z"), "Max charge", value = 1, min = 1,
+                               max = 5, step = 1, width = "110px")),
+              checkboxInput(ns("ann_frag"), "In-source fragments", value = TRUE),
+              checkboxInput(ns("ann_ghost"), "Show expected-but-absent", value = FALSE)),
+            # Manual-only: the anchor ion. Auto mode drives the anchor from findMAIN.
+            conditionalPanel(
+              sprintf("input['%s'] == 'manual'", ns("ann_mode")),
               div(class = "d-flex gap-2",
                   numericInput(ns("anchor_mz"), "Anchor m/z", value = NA,
                                step = 0.0001),
                   selectInput(ns("ann_adduct"), "is a", choices = NULL,
                               width = "130px")),
               radioButtons(ns("click_action"), "Click on a peak", inline = TRUE,
-                           c("→ EIC list" = "eic", "→ set anchor" = "anchor")),
-              numericInput(ns("ann_niso"), "Max isotope (M+n; 0 = off)",
-                           value = 2, min = 0, max = 6, step = 1),
-              checkboxInput(ns("ann_frag"), "In-source fragments", value = TRUE),
-              checkboxInput(ns("ann_ghost"), "Show expected-but-absent", value = FALSE)),
+                           c("→ EIC list" = "eic", "→ set anchor" = "anchor"))),
             conditionalPanel(
               sprintf("input['%s'] == 'auto'", ns("ann_mode")),
               actionButton(ns("suggest"), "Suggest molecular ion",
                            class = "btn-sm btn-outline-primary mb-2"),
+              helpText("findMAIN ranks molecular-ion hypotheses; the top one is ",
+                       "annotated — click another row to switch."),
               DTOutput(ns("ranked"))),
             conditionalPanel(
               sprintf("input['%s'] == 'diff'", ns("ann_mode")),
@@ -200,25 +209,25 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       v <- input$ann_top_n
       if (is.null(v) || !is.finite(v) || v < 1) NA_integer_ else as.integer(v)
     })
-    # The peaks eligible for annotation: above the intensity floor, then capped to
-    # the top-N most intense. Both are clutter/noise controls shared by all modes.
+    # Peaks above the intensity floor (the noise filter). The top-N cap is applied
+    # later to the ANNOTATED peaks, not here — the user wants the N strongest hits,
+    # not annotation restricted to the N strongest peaks of the whole spectrum.
     ann_peaks <- function(df) {
-      df <- df[is.finite(df$intensity) &
-                 df$intensity >= ann_floor() * max(df$intensity, na.rm = TRUE), ,
-               drop = FALSE]
-      n <- ann_top()
-      if (!is.na(n) && nrow(df) > n)
-        df <- df[order(-df$intensity), , drop = FALSE][seq_len(n), , drop = FALSE]
-      df
+      df[is.finite(df$intensity) &
+           df$intensity >= ann_floor() * max(df$intensity, na.rm = TRUE), , drop = FALSE]
     }
 
-    # findMAIN ranked hypotheses (auto mode); a row click fills the anchor.
+    # findMAIN ranked hypotheses (auto mode). The selected row (default the top,
+    # best-scoring one) becomes the anchor — no manual anchor entry in auto mode.
     ranked <- eventReactive(input$suggest, {
       df <- ann_peaks(spec_df()); validate(need(nrow(df) > 0, "No spectrum."))
       ppm <- if (identical(input$ann_unit, "ppm")) input$ann_tol else 5
       withProgress(message = "Ranking molecular-ion hypotheses…", value = 0.5,
                    rank_anchors(df, mode = input$ann_pol, ppm = ppm, rel_floor = 0))
     })
+    auto_pick <- reactiveVal(1L)
+    observeEvent(ranked(), auto_pick(1L))                       # reset on a new run
+    observeEvent(input$ranked_rows_selected, auto_pick(input$ranked_rows_selected))
     output$ranked <- renderDT({
       r <- ranked(); validate(need(nrow(r) > 0, "No hypothesis found."))
       disp <- data.frame(adduct = r$adducthyp, `neutral mass` = round(r$neutral_mass, 4),
@@ -227,31 +236,38 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       datatable(disp, rownames = FALSE, selection = "single",
                 options = list(dom = "t", paging = FALSE, ordering = FALSE))
     })
-    observeEvent(input$ranked_rows_selected, {
-      i <- input$ranked_rows_selected; r <- ranked(); req(nrow(r) >= i)
-      updateNumericInput(session, "anchor_mz", value = round(r$adductmz[i], 4))
-      updateSelectInput(session, "ann_adduct", selected = r$adducthyp[i])
-    })
 
     # The annotation result for the current single spectrum (anchor or diff mode).
-    # Only the eligible peaks (intensity floor + top-N cap) are matched.
     ann_result <- reactive({
       req(isTRUE(input$annotate), identical(input$layout, "single"))
       df <- ann_peaks(spec_df()); req(nrow(df) > 0)
       if (identical(input$ann_mode, "diff")) {
-        # diff is O(n^2): when no explicit cap is set, still bound it at 30.
+        # diff is O(n^2) over the candidate peaks, so it must cap its INPUT by
+        # intensity (top-N, or 30 when blank) — there's no per-result cap here.
         cap <- if (is.na(ann_top())) 30L else ann_top()
         return(list(mode = "diff",
                     edges = difference_network(df, input$ann_tol, input$ann_unit,
                                                top_n = cap, rel_floor = 0)))
       }
-      req(is.finite(input$anchor_mz), isTRUE(input$ann_adduct %in% quasi_adducts(input$ann_pol)))
+      # anchor ion: typed (manual) or the picked findMAIN hypothesis (auto)
+      if (identical(input$ann_mode, "auto")) {
+        r <- ranked(); req(nrow(r) > 0)               # silent until Suggest is run
+        pick <- min(auto_pick(), nrow(r))
+        anchor <- r$adductmz[pick]; adduct <- r$adducthyp[pick]
+      } else {
+        req(is.finite(input$anchor_mz),
+            isTRUE(input$ann_adduct %in% quasi_adducts(input$ann_pol)))
+        anchor <- input$anchor_mz; adduct <- input$ann_adduct
+      }
       niso <- suppressWarnings(as.integer(input$ann_niso))
       if (is.na(niso) || niso < 0) niso <- 0L
-      a <- annotate_anchor(df, input$anchor_mz, input$ann_adduct, input$ann_pol,
-                           tol = input$ann_tol, unit = input$ann_unit,
-                           isotopes = niso, losses = isTRUE(input$ann_frag))
-      list(mode = "anchor", M = a$M, table = a$table, ghost = isTRUE(input$ann_ghost))
+      maxz <- suppressWarnings(as.integer(input$ann_max_z))
+      if (is.na(maxz) || maxz < 1) maxz <- Inf
+      a <- annotate_anchor(df, anchor, adduct, input$ann_pol,
+                           tol = input$ann_tol, unit = input$ann_unit, isotopes = niso,
+                           fragments = isTRUE(input$ann_frag), max_charge = maxz)
+      list(mode = "anchor", M = a$M, table = cap_matched(a$table, ann_top()),
+           ghost = isTRUE(input$ann_ghost))
     })
 
     plot_gg <- reactive({
@@ -311,7 +327,12 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     })
 
     keep_zoom <- zoom_keeper("spec")
-    output$plot <- renderPlotly(finalize_plotly(plot_gg(), "spec", keep_zoom))
+    output$plot <- renderPlotly({
+      p <- finalize_plotly(plot_gg(), "spec", keep_zoom)
+      # ggplotly drops geom_text `angle`, so rotate the label traces here.
+      if (isTRUE(input$annotate)) p <- text_traces_vertical(p)
+      p
+    })
 
     # Click a peak -> set the annotation anchor, or add its m/z to the EIC list.
     click <- reactive(suppressWarnings(event_data("plotly_click", source = "spec")))
@@ -472,4 +493,28 @@ collapse_hits <- function(hit) {
            label = paste(unique(g$label), collapse = "; "),
            type = g$type[1], ppm_err = g$ppm_err[1])
   }))
+}
+
+#' Keep only the N most intense ANNOTATED peaks (top-N applies to hits, not to the
+#' input spectrum). Unmatched rows (ghost candidates) are always retained; ties
+#' broken by intensity. `n = NA` keeps everything.
+#' @noRd
+cap_matched <- function(tab, n) {
+  if (is.na(n)) return(tab)
+  m <- tab[tab$matched, , drop = FALSE]
+  if (nrow(m) == 0) return(tab)
+  keep <- utils::head(unique(m$mz_obs[order(-m$intensity)]), n)   # top-N distinct peaks
+  tab[!tab$matched | tab$mz_obs %in% keep, , drop = FALSE]
+}
+
+#' Set vertical text on a converted plotly object's text-mode traces. ggplotly
+#' does not carry geom_text `angle` through, so the annotation labels render
+#' horizontally unless we set `textangle` on the traces here (-90 reads upward).
+#' @noRd
+text_traces_vertical <- function(p) {
+  for (i in seq_along(p$x$data)) {
+    m <- p$x$data[[i]]$mode
+    if (!is.null(m) && grepl("text", m)) p$x$data[[i]]$textangle <- -90
+  }
+  p
 }

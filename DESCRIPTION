@@ -34,6 +34,8 @@ Imports:
     xcms,
     BiocParallel,
     mzR,
+    commonMZ,
+    InterpretMSSpectrum,
     grDevices,
     stats,
     tools,
@@ -45,6 +47,8 @@ Suggests:
     svglite,
     msdata,
     faahKO
+Remotes:
+    stanstrup/commonMZ
 biocViews:
 Config/testthat/edition: 3
 Config/Needs/website: pkgdown

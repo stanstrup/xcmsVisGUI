@@ -11,6 +11,12 @@ VIRIDIS_PALETTES <- c("viridis", "magma", "plasma", "inferno", "cividis",
                       "mako", "rocket", "turbo")
 SEQ_PALETTES  <- c(VIRIDIS_PALETTES, "YlOrRd", "YlGnBu", "Blues", "Spectral")
 
+# Mass spacing between the M+1 and M (13C - 12C) isotopologues, used to project
+# isotope peaks in spectrum annotation. Divided by the charge for the observed
+# m/z spacing. (Adduct mass offsets themselves come from commonMZ::MZ_CAMERA,
+# whose massdiff already folds in the proton/electron mass.)
+ISOTOPE_SPACING <- 1.0033548
+
 # --- Retention-time unit helpers ------------------------------------------
 # Data is always handled internally in SECONDS (xcms/Spectra native). These
 # convert to/from the user-facing display unit (minutes by default).

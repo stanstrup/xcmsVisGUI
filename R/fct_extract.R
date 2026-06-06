@@ -1,8 +1,9 @@
 # Data extraction on Spectra / MsExperiment / xcms.
 #
-# IMPORTANT: all reads run under BiocParallel SerialParam (registered in global.R
-# and in the mirai workers). The default SnowParam backend makes MsBackendMzR
-# initialization ~100x slower on Windows — see BENCHMARK.md / SPECTRA_ISSUE.md.
+# IMPORTANT: all reads run under BiocParallel SerialParam (registered in R/zzz.R
+# .onLoad and in the mirai workers). The default SnowParam backend makes
+# MsBackendMzR initialization ~100x slower on Windows — see CLAUDE.md
+# "THE performance story".
 
 #' Fast file header summary for the file list, via mzR only (~0.1 s/file, no
 #' BiocParallel). Runs in a mirai worker. Spectra's read path is avoided here

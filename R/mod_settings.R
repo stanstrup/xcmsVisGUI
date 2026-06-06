@@ -10,7 +10,7 @@ mod_settings_ui <- function(id) {
       card_header("Data reading"),
       helpText(HTML("Files are read via <code>Spectra</code>/<code>xcms</code> with ",
                "<code>BiocParallel::SerialParam()</code> registered \u2014 the default ",
-               "<code>SnowParam</code> backend is ~100\u00d7 slower (see BENCHMARK.md).")),
+               "<code>SnowParam</code> backend is ~100\u00d7 slower.")),
       sliderInput(ns("daemons"), "Parallel readers (mirai daemons)",
                   min = 1, max = max(2L, detectCores()),
                   value = max(1L, detectCores() - 1L), step = 1)

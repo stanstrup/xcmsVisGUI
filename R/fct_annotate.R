@@ -165,8 +165,14 @@ annotate_anchor <- function(spec_df, anchor_mz, adduct = NULL, mode = c("pos", "
   if (!nrow(rule)) stop("Unknown adduct: ", adduct)
   M <- neutral_mass(anchor_mz, rule)
   expected <- project_ions(M, mode, fragments = fragments, max_charge = max_charge)
-  tab <- match_spectrum(spec_df, expected, tol, unit)
-  if (isotopes >= 1) tab <- add_detected_isotopes(tab, spec_df, isotopes, tol, unit)
+  # Match adducts/fragments against the DEISOTOPED, centroided spectrum so an
+  # isotope peak can never be labelled as an adduct or fragment (isotope wins);
+  # its satellites are then labelled separately from the full spectrum.
+  cp <- centroid_peaks(spec_df, rel_floor = 0)
+  zmax <- if (is.finite(max_charge)) max(1L, as.integer(max_charge)) else 2L
+  pool <- deisotope(cp, tol, unit, max_charge = zmax)
+  tab <- match_spectrum(pool, expected, tol, unit)
+  if (isotopes >= 1) tab <- add_detected_isotopes(tab, cp, isotopes, tol, unit)
   list(M = M, adduct = adduct, table = tab)
 }
 
@@ -252,35 +258,43 @@ difference_network <- function(spec_df, tol = 10, unit = "ppm", top_n = 30L,
   do.call(rbind, rows)
 }
 
-#' Detect isotopologue groups in a spectrum with MetaboCoreUtils (the
-#' RforMassSpectrometry isotope model: 13C/34S/37Cl substitutions with expected
-#' intensity-ratio bounds, charge-aware — the machinery `Spectra::deisotopeSpectra`
-#' uses). Returns a list of integer vectors of ORIGINAL `spec_df` row indices, each
-#' an isotope envelope ordered by m/z (first = monoisotopic). The detector needs
-#' m/z-sorted input, so we sort and map indices back. Single isotope primitive used
-#' by both deisotoping (drop satellites) and annotation (label satellites).
+#' Flag isotope SATELLITES in a centroid list — the single isotope definition
+#' shared by deisotoping and annotation. A peak is a satellite when another peak
+#' sits ~k * (13C spacing / z) BELOW it (k = 1..max_k, z = 1..max_charge) within
+#' the combined peak-accuracy window AND is at least as intense (the monoisotope is
+#' the tallest for small molecules). Checking the lower steps cascades to strip a
+#' whole envelope to its monoisotope. Position+intensity based and governed by the
+#' user's tolerance — deliberately NOT MetaboCoreUtils::isotopologues, whose
+#' theoretical-spacing grouping is too strict for real MS2 (isotope centroids tens
+#' of ppm off ideal). Returns a logical vector over `cp` rows.
 #' @noRd
-iso_groups <- function(spec_df, tol = 10, unit = "ppm", charge = 1L) {
-  if (nrow(spec_df) < 2) return(list())
-  o <- order(spec_df$mz)
-  x <- cbind(mz = spec_df$mz[o], intensity = spec_df$intensity[o])
-  ppm <- if (identical(unit, "ppm")) tol else 0
-  tolerance <- if (identical(unit, "ppm")) 0 else tol
-  grps <- tryCatch(
-    MetaboCoreUtils::isotopologues(x, ppm = ppm, tolerance = tolerance, charge = charge),
-    error = function(e) list())
-  lapply(grps, function(g) o[g])      # original indices, still ascending in m/z
+isotope_satellites <- function(cp, tol = 10, unit = "ppm", max_charge = 2L,
+                               max_k = 2L) {
+  n <- nrow(cp)
+  if (n < 2) return(rep(FALSE, n))
+  o <- order(cp$mz); mz <- cp$mz[o]; it <- cp$intensity[o]
+  sat <- logical(n)
+  span <- max_k * ISOTOPE_SPACING + 0.05         # widest look-behind window
+  for (a in seq_len(n)) {
+    lo <- findInterval(mz[a] - span, mz) + 1L     # candidate parents are just below
+    if (lo > a - 1L) next
+    for (b in lo:(a - 1L)) {
+      if (it[b] < it[a]) next                     # parent must be >= intensity
+      d <- mz[a] - mz[b]
+      win <- tol_to_da(mz[a], tol, unit) + tol_to_da(mz[b], tol, unit)
+      for (z in seq_len(max_charge)) for (k in seq_len(max_k))
+        if (abs(d - k * ISOTOPE_SPACING / z) <= win) { sat[o[a]] <- TRUE; break }
+      if (sat[o[a]]) break
+    }
+  }
+  sat
 }
 
-#' Reduce a centroid list to monoisotopic peaks: drop every non-first member of a
-#' detected isotopologue group (tried for charge 1 and 2). Ungrouped peaks remain.
+#' Reduce a centroid list to monoisotopic peaks by dropping isotope satellites.
 #' @noRd
-deisotope <- function(cp, tol = 10, unit = "ppm", charges = 1:2) {
+deisotope <- function(cp, tol = 10, unit = "ppm", max_charge = 2L) {
   if (nrow(cp) < 2) return(cp)
-  drop <- integer(0)
-  for (z in charges)
-    drop <- union(drop, unlist(lapply(iso_groups(cp, tol, unit, z), function(g) g[-1])))
-  cp[setdiff(seq_len(nrow(cp)), drop), , drop = FALSE]
+  cp[!isotope_satellites(cp, tol, unit, max_charge), , drop = FALSE]
 }
 
 #' Label the isotopes of each matched adduct/fragment by DETECTION anchored to the
@@ -293,11 +307,9 @@ deisotope <- function(cp, tol = 10, unit = "ppm", charges = 1:2) {
 #' tolerance governs how far off the spacing may be.
 #' @importFrom tibble tibble
 #' @noRd
-add_detected_isotopes <- function(tab, spec_df, n = 2L, tol = 10, unit = "ppm") {
+add_detected_isotopes <- function(tab, cp, n = 2L, tol = 10, unit = "ppm") {
   hits <- tab[tab$matched & tab$type %in% c("adduct", "fragment"), , drop = FALSE]
-  if (!nrow(hits)) return(tab)
-  cp <- centroid_peaks(spec_df, rel_floor = 0)
-  if (!nrow(cp)) return(tab)
+  if (!nrow(hits) || !nrow(cp)) return(tab)
   extra <- list()
   for (i in seq_len(nrow(hits))) {
     z <- abs(hits$charge[i]); if (!is.finite(z) || z < 1) z <- 1

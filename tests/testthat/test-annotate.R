@@ -71,7 +71,6 @@ test_that("adduct_rules + project_ions + match round-trip on a planted spectrum"
 
 test_that("annotate_anchor labels DETECTED isotopes of a matched adduct", {
   skip_if_not_installed("commonMZ")
-  skip_if_not_installed("MetaboCoreUtils")
   rules <- adduct_rules("pos")
   mzH <- adduct_mz(300.1, rules[rules$name == "[M+H]+", , drop = FALSE])[1]
   # plausible 13C envelope for ~300 Da (M+1 ~23 %, M+2 ~3 %)

@@ -30,7 +30,6 @@ Imports:
     qs2,
     jsonlite,
     Spectra,
-    MetaboCoreUtils,
     MsExperiment,
     xcms,
     BiocParallel,

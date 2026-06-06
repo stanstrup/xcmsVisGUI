@@ -93,6 +93,19 @@ test_that("difference_network finds a water-loss edge", {
   expect_match(hit$origin, "H2O", fixed = TRUE)
 })
 
+test_that("difference_network window is the peak accuracy, not ppm of the delta", {
+  skip_if_not_installed("commonMZ")
+  # A real water-loss ladder at m/z ~425: each rung is 18.0106 but the measured
+  # peaks carry ~5 ppm error, so the observed delta is off by ~0.003 Da — far more
+  # than ppm-of-18 (0.00018 Da). All three rungs must still be annotated.
+  mz <- c(416.3099, 434.3229, 452.3308, 470.3417)
+  spec <- tibble::tibble(mz = mz, intensity = c(3556, 4043, 928, 729))
+  net <- difference_network(spec, tol = 10, unit = "ppm", top_n = 30)
+  rungs <- net[abs(net$delta - 18.0106) < 0.012, ]
+  expect_gte(nrow(rungs), 3)                       # 416-434, 434-452, 452-470
+  expect_true(all(grepl("H2O", rungs$origin, fixed = TRUE)))
+})
+
 test_that("rank_anchors suggests the right molecular ion via findMAIN", {
   skip_if_not_installed("commonMZ")
   skip_if_not_installed("InterpretMSSpectrum")

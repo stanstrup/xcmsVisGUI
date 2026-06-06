@@ -231,7 +231,10 @@ difference_network <- function(spec_df, tol = 10, unit = "ppm", top_n = 30L,
   for (i in seq_len(nrow(cp) - 1L)) for (j in (i + 1L):nrow(cp)) {
     lo <- min(cp$mz[i], cp$mz[j]); hi <- max(cp$mz[i], cp$mz[j])
     delta <- hi - lo
-    win <- tol_to_da(delta, tol, unit)
+    # The window is the instrument accuracy at BOTH peaks (errors add), NOT ppm of
+    # the tiny difference: a 10 ppm peak pair at m/z 425 leaves ~0.008 Da slack on
+    # an 18 Da loss, but ppm-of-18 would be 0.0002 Da and miss the whole ladder.
+    win <- tol_to_da(lo, tol, unit) + tol_to_da(hi, tol, unit)
     m <- which(abs(af$mz_diff - delta) <= win)
     if (length(m)) {
       k <- k + 1L

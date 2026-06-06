@@ -54,6 +54,8 @@ mod_plot_spectrum_ui <- function(id) {
                 selectInput(ns("ann_unit"), "unit", c("ppm", "Da"), width = "90px")),
             numericInput(ns("ann_min_int"), "Min intensity (% of base peak)",
                          value = 1, min = 0, max = 100, step = 0.5),
+            numericInput(ns("ann_top_n"), "Annotate only top N peaks (blank = all)",
+                         value = NA, min = 1, step = 1),
             conditionalPanel(
               sprintf("input['%s'] != 'diff'", ns("ann_mode")),
               div(class = "d-flex gap-2",
@@ -193,14 +195,29 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       v <- input$ann_min_int
       if (is.null(v) || !is.finite(v) || v < 0) 0 else v / 100
     })
+    # Optional cap on how many peaks to annotate (NA = all).
+    ann_top <- reactive({
+      v <- input$ann_top_n
+      if (is.null(v) || !is.finite(v) || v < 1) NA_integer_ else as.integer(v)
+    })
+    # The peaks eligible for annotation: above the intensity floor, then capped to
+    # the top-N most intense. Both are clutter/noise controls shared by all modes.
+    ann_peaks <- function(df) {
+      df <- df[is.finite(df$intensity) &
+                 df$intensity >= ann_floor() * max(df$intensity, na.rm = TRUE), ,
+               drop = FALSE]
+      n <- ann_top()
+      if (!is.na(n) && nrow(df) > n)
+        df <- df[order(-df$intensity), , drop = FALSE][seq_len(n), , drop = FALSE]
+      df
+    }
 
     # findMAIN ranked hypotheses (auto mode); a row click fills the anchor.
     ranked <- eventReactive(input$suggest, {
-      df <- spec_df(); validate(need(nrow(df) > 0, "No spectrum."))
+      df <- ann_peaks(spec_df()); validate(need(nrow(df) > 0, "No spectrum."))
       ppm <- if (identical(input$ann_unit, "ppm")) input$ann_tol else 5
       withProgress(message = "Ranking molecular-ion hypotheses…", value = 0.5,
-                   rank_anchors(df, mode = input$ann_pol, ppm = ppm,
-                                rel_floor = ann_floor()))
+                   rank_anchors(df, mode = input$ann_pol, ppm = ppm, rel_floor = 0))
     })
     output$ranked <- renderDT({
       r <- ranked(); validate(need(nrow(r) > 0, "No hypothesis found."))
@@ -217,18 +234,17 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     })
 
     # The annotation result for the current single spectrum (anchor or diff mode).
-    # Peaks below the intensity floor are dropped first, so noise can't be matched.
+    # Only the eligible peaks (intensity floor + top-N cap) are matched.
     ann_result <- reactive({
       req(isTRUE(input$annotate), identical(input$layout, "single"))
-      df <- spec_df(); req(nrow(df) > 0)
-      df <- df[is.finite(df$intensity) &
-                 df$intensity >= ann_floor() * max(df$intensity, na.rm = TRUE), ,
-               drop = FALSE]
-      req(nrow(df) > 0)
-      if (identical(input$ann_mode, "diff"))
+      df <- ann_peaks(spec_df()); req(nrow(df) > 0)
+      if (identical(input$ann_mode, "diff")) {
+        # diff is O(n^2): when no explicit cap is set, still bound it at 30.
+        cap <- if (is.na(ann_top())) 30L else ann_top()
         return(list(mode = "diff",
                     edges = difference_network(df, input$ann_tol, input$ann_unit,
-                                               rel_floor = 0)))
+                                               top_n = cap, rel_floor = 0)))
+      }
       req(is.finite(input$anchor_mz), isTRUE(input$ann_adduct %in% quasi_adducts(input$ann_pol)))
       niso <- suppressWarnings(as.integer(input$ann_niso))
       if (is.na(niso) || niso < 0) niso <- 0L

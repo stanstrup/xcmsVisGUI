@@ -115,7 +115,8 @@ package; the ion mode defaults to the file's polarity. There are three modes:
   drop noise pairs.
 
 The **± tol** is the match window (ppm or Da); **Min intensity** drops peaks below
-that fraction of the base peak before matching, so noise can't be annotated.
+that fraction of the base peak before matching, and **Annotate only top N peaks**
+caps annotation to the N most intense — both keep noise from being labelled.
 Labels are written vertically and multiple hits on one peak are joined with "; ".
 **In-source fragments** and **Show expected-but-absent** (faint ghost ticks at
 projected but unobserved positions) are toggle-able. Annotations are part of the

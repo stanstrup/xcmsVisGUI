@@ -27,6 +27,7 @@ Imports:
     purrr,
     rlang,
     cachem,
+    qs2,
     jsonlite,
     Spectra,
     MsExperiment,

@@ -88,30 +88,32 @@ adduct_mz <- function(M, rules) {
 
 # --- ion projection ----------------------------------------------------------
 
-#' Project every ion we expect to see for a neutral mass M: all adducts, the
-#' M+1..M+k isotopes of the quasi-molecular adducts, and in-source neutral losses
-#' from the principal ion (commonMZ::adducts_fragments mass differences subtracted
-#' from the principal-ion m/z). Returns tibble(label, type, mz, charge) where
-#' `type` is "adduct" | "isotope" | "fragment". Pure dictionary maths — matching
-#' against an actual spectrum is match_spectrum().
+#' Project every ion we expect to see for a neutral mass M from a SINGLE
+#' dictionary — commonMZ::MZ_CAMERA. That table already carries both true adducts
+#' (`[M+H]+`, `[M+Na]+`, `[2M+H]+`, …) and in-source fragments (`[M+H-H2O]+`,
+#' `[M+H-CO2]+`, …); we classify each row by name so a fragment isn't also
+#' re-projected from a second source (which produced duplicate labels for the same
+#' ion). Adds M+1..M+k isotopes of the quasi-molecular adducts. Returns
+#' tibble(label, type, mz, charge) with `type` "adduct" | "isotope" | "fragment".
 #' @param M neutral monoisotopic mass.
 #' @param mode "pos" / "neg".
-#' @param principal adduct name whose ion the neutral losses hang off
-#'   (default: the first quasi adduct, i.e. `[M+H]+` / `[M-H]-`).
 #' @param isotopes number of isotope peaks (M+1..) to project per quasi adduct.
-#' @param losses include in-source neutral-loss fragments.
-#' @param max_loss largest neutral loss (Da) to consider.
+#' @param fragments include the in-source-fragment rows.
+#' @param max_charge keep only ions with |charge| <= this.
 #' @importFrom tibble tibble
 #' @noRd
-project_ions <- function(M, mode = c("pos", "neg"), principal = NULL,
-                         isotopes = 1L, losses = TRUE, max_loss = 250) {
+project_ions <- function(M, mode = c("pos", "neg"), isotopes = 1L,
+                         fragments = TRUE, max_charge = Inf) {
   mode <- match.arg(mode)
   rules <- adduct_rules(mode)
-  out <- tibble(label = rules$name, type = "adduct",
+  rules <- rules[abs(rules$charge) <= max_charge, , drop = FALSE]
+  kind <- ifelse(is_fragment_name(rules$name), "fragment", "adduct")
+  if (!isTRUE(fragments)) { rules <- rules[kind == "adduct", ]; kind <- kind[kind == "adduct"] }
+  out <- tibble(label = rules$name, type = kind,
                 mz = adduct_mz(M, rules), charge = rules$charge)
 
   if (isotopes >= 1) {
-    q <- rules[rules$quasi == 1, , drop = FALSE]
+    q <- rules[rules$quasi == 1 & kind == "adduct", , drop = FALSE]
     qmz <- adduct_mz(M, q)
     iso <- lapply(seq_len(isotopes), function(k) {
       tibble(label = sprintf("%s [+%d]", q$name, k), type = "isotope",
@@ -119,22 +121,19 @@ project_ions <- function(M, mode = c("pos", "neg"), principal = NULL,
     })
     out <- rbind_tibbles(out, iso)
   }
-
-  if (isTRUE(losses)) {
-    pr <- if (is.null(principal)) quasi_adducts(mode)[1] else principal
-    prule <- rules[rules$name == pr, , drop = FALSE]
-    if (nrow(prule)) {
-      base_mz <- adduct_mz(M, prule)[1]
-      af <- commonMZ::adducts_fragments
-      d <- af[is.finite(af$mz_diff) & af$mz_diff > 0 & af$mz_diff <= max_loss, ]
-      frag_mz <- base_mz - d$mz_diff
-      ok <- frag_mz > 0
-      out <- rbind_tibbles(out, list(tibble(
-        label = sprintf("%s -%.3f (%s)", pr, d$mz_diff[ok], short_origin(d$origin[ok])),
-        type = "fragment", mz = frag_mz[ok], charge = prule$charge[1])))
-    }
-  }
   out[is.finite(out$mz), , drop = FALSE]
+}
+
+#' Is a commonMZ adduct name an in-source FRAGMENT (a neutral loss) rather than a
+#' plain adduct? Strip the trailing charge first (so `[M+Cl]-` / `[M-H]-` aren't
+#' read as losses), then flag a fragment when the bracket has either a loss after
+#' a charge carrier (`[M+H-H2O]+`) or two subtractions (`[M-H-H2O]-`). A single
+#' subtraction (`[M-H]-`, `[M-2H]2-`) is just deprotonation — an adduct.
+#' @noRd
+is_fragment_name <- function(name) {
+  inner <- sub("\\][0-9]*[+-]+$", "", name)        # drop "]2+" / "]-" etc.
+  n_minus <- nchar(gsub("[^-]", "", inner))
+  grepl("\\+[^]]*-", inner) | n_minus >= 2
 }
 
 #' Match projected ions against the observed spectrum: for each expected m/z take
@@ -169,15 +168,16 @@ match_spectrum <- function(spec_df, expected, tol = 10, unit = "ppm") {
 #' Returns list(M = neutral mass, adduct, table = match_spectrum(...)).
 #' @noRd
 annotate_anchor <- function(spec_df, anchor_mz, adduct = NULL, mode = c("pos", "neg"),
-                            tol = 10, unit = "ppm", isotopes = 1L, losses = TRUE) {
+                            tol = 10, unit = "ppm", isotopes = 1L, fragments = TRUE,
+                            max_charge = Inf) {
   mode <- match.arg(mode)
   rules <- adduct_rules(mode)
   if (is.null(adduct)) adduct <- quasi_adducts(mode)[1]
   rule <- rules[rules$name == adduct, , drop = FALSE]
   if (!nrow(rule)) stop("Unknown adduct: ", adduct)
   M <- neutral_mass(anchor_mz, rule)
-  expected <- project_ions(M, mode, principal = adduct, isotopes = isotopes,
-                           losses = losses)
+  expected <- project_ions(M, mode, isotopes = isotopes, fragments = fragments,
+                           max_charge = max_charge)
   list(M = M, adduct = adduct,
        table = match_spectrum(spec_df, expected, tol, unit))
 }
@@ -262,11 +262,3 @@ rbind_tibbles <- function(x, pieces) {
 #' downstream. The only non-ASCII content is Latin-1, so this conversion is exact.
 #' @noRd
 clean_text <- function(x) iconv(x, from = "latin1", to = "UTF-8")
-
-#' First clause of a commonMZ origin string (before the first comma) — the
-#' fragment description, dropping the long explanatory tail, for compact labels.
-#' @noRd
-short_origin <- function(x) {
-  x <- clean_text(x)
-  trimws(vapply(strsplit(x, ",", fixed = TRUE), `[`, character(1), 1))
-}

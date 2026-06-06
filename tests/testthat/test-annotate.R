@@ -60,7 +60,7 @@ test_that("adduct_rules + project_ions + match round-trip on a planted spectrum"
   spec <- tibble::tibble(mz = c(mzH, mzNa, iso1, frag),
                          intensity = c(1000, 400, 150, 250))
 
-  exp_tab <- project_ions(M, "pos", isotopes = 1L, losses = TRUE)
+  exp_tab <- project_ions(M, "pos", isotopes = 1L, fragments = TRUE)
   expect_true(all(c("adduct", "isotope", "fragment") %in% exp_tab$type))
 
   res <- match_spectrum(spec, exp_tab, tol = 10, unit = "ppm")
@@ -69,6 +69,36 @@ test_that("adduct_rules + project_ions + match round-trip on a planted spectrum"
   expect_true(is_match("[M+Na]+"))
   expect_true(is_match("[M+H]+ [+1]"))           # isotope label format
   expect_true(any(res$type == "fragment" & res$matched))
+})
+
+test_that("is_fragment_name separates in-source losses from adducts", {
+  expect_true(is_fragment_name("[M+H-H2O]+"))
+  expect_true(is_fragment_name("[M+H-CO2]+"))
+  expect_false(is_fragment_name("[M+H]+"))
+  expect_false(is_fragment_name("[M+Na]+"))
+  expect_false(is_fragment_name("[2M+H]+"))
+  expect_false(is_fragment_name("[M-H]-"))      # deprotonation, not a loss
+  expect_false(is_fragment_name("[M+Cl]-"))     # trailing charge sign, not a loss
+})
+
+test_that("project_ions sources fragments only from the CAMERA dictionary", {
+  skip_if_not_installed("commonMZ")
+  tab <- project_ions(300.1, "pos", isotopes = 0L, fragments = TRUE)
+  frags <- tab[tab$type == "fragment", ]
+  expect_gt(nrow(frags), 0)
+  expect_true("[M+H-H2O]+" %in% frags$label)            # water loss is a fragment
+  expect_true(all(grepl("^\\[", frags$label)))          # CAMERA bracket names only
+  # the old second source labelled losses relative to the principal ion, e.g.
+  # "[M+H]+ -18.011 (...)"; those must be gone (no space-dash-number form).
+  expect_false(any(grepl("\\]\\+? -[0-9]", frags$label)))
+})
+
+test_that("project_ions max_charge filters multiply-charged ions", {
+  skip_if_not_installed("commonMZ")
+  t1 <- project_ions(300.1, "pos", isotopes = 0L, fragments = FALSE, max_charge = 1)
+  expect_true(all(abs(t1$charge) <= 1))
+  t2 <- project_ions(300.1, "pos", isotopes = 0L, fragments = FALSE, max_charge = 3)
+  expect_true(max(abs(t2$charge)) > 1)
 })
 
 test_that("annotate_anchor recovers the neutral mass from a chosen adduct", {

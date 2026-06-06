@@ -27,4 +27,6 @@
 # column names used by dplyr/ggplot2 aes() in the plot modules.
 globalVariables(c(
   ".color", ".tip", "intensity", "mz", "mz_b", "precursorMZ", "rt_b", "rt_disp",
-  "sample_id", "sample_name", "target", "y0", "y1"))
+  "sample_id", "sample_name", "target", "y0", "y1",
+  # spectrum annotation overlay (R/mod_plot_spectrum.R annotate_layers)
+  "mz_obs", "type", "label", "mz_lo", "mz_hi", "delta", "xmid", "y"))

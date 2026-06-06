@@ -17,6 +17,12 @@ SEQ_PALETTES  <- c(VIRIDIS_PALETTES, "YlOrRd", "YlGnBu", "Blues", "Spectral")
 # whose massdiff already folds in the proton/electron mass.)
 ISOTOPE_SPACING <- 1.0033548
 
+# Extra absolute slack (Da) when judging whether a peak m/z DIFFERENCE is an
+# isotope spacing. Real MS2 isotope centroids drift tens of ppm off the
+# theoretical spacing — more than the tight adduct match window — so the
+# difference-network isotope skip widens by this to avoid mislabelling them.
+ISO_SLACK <- 0.02
+
 # --- Retention-time unit helpers ------------------------------------------
 # Data is always handled internally in SECONDS (xcms/Spectra native). These
 # convert to/from the user-facing display unit (minutes by default).

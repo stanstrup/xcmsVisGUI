@@ -88,27 +88,23 @@ adduct_mz <- function(M, rules) {
 
 # --- ion projection ----------------------------------------------------------
 
-#' Project the adduct and in-source-fragment ions for a neutral mass M from a
-#' SINGLE dictionary — commonMZ::MZ_CAMERA. That table carries both true adducts
-#' (`[M+H]+`, `[M+Na]+`, `[2M+H]+`, …) and in-source fragments (`[M+H-H2O]+`,
-#' `[M+H-CO2]+`, …); each row is classified by mass (is_fragment_rule). Isotopes
-#' are NOT projected here — they are DETECTED from the spectrum after matching
-#' (see add_detected_isotopes), the same isotopologue machinery deisotoping uses.
-#' Returns tibble(label, type, mz, charge) with `type` "adduct" | "fragment".
+#' Project the ADDUCT ions for a neutral mass M from commonMZ::MZ_CAMERA. The
+#' CAMERA table also carries in-source fragments (`[M+H-H2O]+`, `[M+H-CO2]+`, …);
+#' those are excluded here (classified by mass via is_fragment_rule) — in-source
+#' losses are the difference-network's job, not the anchor/auto overlay. Isotopes
+#' are not projected either; they are DETECTED after matching (add_detected_isotopes).
+#' Returns tibble(label, type = "adduct", mz, charge).
 #' @param M neutral monoisotopic mass.
 #' @param mode "pos" / "neg".
-#' @param fragments include the in-source-fragment rows.
 #' @param max_charge keep only ions with |charge| <= this.
 #' @importFrom tibble tibble
 #' @noRd
-project_ions <- function(M, mode = c("pos", "neg"), fragments = TRUE,
-                         max_charge = Inf) {
+project_ions <- function(M, mode = c("pos", "neg"), max_charge = Inf) {
   mode <- match.arg(mode)
   rules <- adduct_rules(mode)
-  rules <- rules[abs(rules$charge) <= max_charge, , drop = FALSE]
-  kind <- ifelse(is_fragment_rule(rules$massdiff, rules$charge), "fragment", "adduct")
-  if (!isTRUE(fragments)) { rules <- rules[kind == "adduct", ]; kind <- kind[kind == "adduct"] }
-  out <- tibble(label = rules$name, type = kind,
+  rules <- rules[abs(rules$charge) <= max_charge &
+                   !is_fragment_rule(rules$massdiff, rules$charge), , drop = FALSE]
+  out <- tibble(label = rules$name, type = "adduct",
                 mz = adduct_mz(M, rules), charge = rules$charge)
   out[is.finite(out$mz), , drop = FALSE]
 }
@@ -156,18 +152,17 @@ match_spectrum <- function(spec_df, expected, tol = 10, unit = "ppm") {
 #' `isotopes` members). Returns list(M = neutral mass, adduct, table).
 #' @noRd
 annotate_anchor <- function(spec_df, anchor_mz, adduct = NULL, mode = c("pos", "neg"),
-                            tol = 10, unit = "ppm", isotopes = 1L, fragments = TRUE,
-                            max_charge = Inf) {
+                            tol = 10, unit = "ppm", isotopes = 1L, max_charge = Inf) {
   mode <- match.arg(mode)
   rules <- adduct_rules(mode)
   if (is.null(adduct)) adduct <- quasi_adducts(mode)[1]
   rule <- rules[rules$name == adduct, , drop = FALSE]
   if (!nrow(rule)) stop("Unknown adduct: ", adduct)
   M <- neutral_mass(anchor_mz, rule)
-  expected <- project_ions(M, mode, fragments = fragments, max_charge = max_charge)
-  # Match adducts/fragments against the DEISOTOPED, centroided spectrum so an
-  # isotope peak can never be labelled as an adduct or fragment (isotope wins);
-  # its satellites are then labelled separately from the full spectrum.
+  expected <- project_ions(M, mode, max_charge = max_charge)
+  # Match adducts against the DEISOTOPED, centroided spectrum so an isotope peak
+  # can never be labelled as an adduct (isotope wins); its satellites are then
+  # labelled separately from the full spectrum.
   cp <- centroid_peaks(spec_df, rel_floor = 0)
   zmax <- if (is.finite(max_charge)) max(1L, as.integer(max_charge)) else 2L
   pool <- deisotope(cp, tol, unit, max_charge = zmax)
@@ -201,10 +196,15 @@ rank_anchors <- function(spec_df, mode = c("pos", "neg"), ppm = 5,
   spec <- cbind(mz = cp$mz, int = cp$intensity)
   ionmode <- if (mode == "pos") "positive" else "negative"
   # findMAIN is chatty (per-hypothesis scoring warnings) — quiet it for the app.
+  # Hypotheses are real adducts only — NOT in-source fragments like [M+H-H2O]+.
+  # Allowing a fragment as the main-ion hypothesis let findMAIN call the base peak
+  # a water loss (neutral mass off by +H2O) and produced confusing annotations.
+  r <- adduct_rules(mode)
+  hyp <- r$name[r$quasi == 1 & !is_fragment_rule(r$massdiff, r$charge)]
   res <- tryCatch(
     suppressWarnings(suppressMessages(
       InterpretMSSpectrum::findMAIN(spec, ionmode = ionmode,
-                                    adducthyp = quasi_adducts(mode), ppm = ppm))),
+                                    adducthyp = hyp, ppm = ppm))),
     error = function(e) NULL)
   if (is.null(res)) return(empty)
   s <- tryCatch(as.data.frame(summary(res)), error = function(e) NULL)
@@ -240,10 +240,14 @@ difference_network <- function(spec_df, tol = 10, unit = "ppm", top_n = 30L,
     # the tiny difference: a 10 ppm peak pair at m/z 425 leaves ~0.008 Da slack on
     # an 18 Da loss, but ppm-of-18 would be 0.0002 Da and miss the whole ladder.
     win <- tol_to_da(lo, tol, unit) + tol_to_da(hi, tol, unit)
-    if (ignore_isotopes) {                  # also skip any isotope-spaced delta:
-      ik <- round(delta / ISOTOPE_SPACING)  # deisotoping misses pairs where the
-      if (ik >= 1 && ik <= 3 &&             # satellite is the taller/noise peak.
-          abs(delta - ik * ISOTOPE_SPACING) <= win) next
+    if (ignore_isotopes) {
+      # Skip any near-isotope-spaced delta (k = 1..3). Real isotope centroids in
+      # MS2 can be tens of ppm off the theoretical spacing, so this uses a GENEROUS
+      # window (the adduct ppm window plus an absolute isotope slack) — wider than
+      # the adduct match window — so imprecise/noise isotope pairs don't slip
+      # through and get mislabelled (e.g. a 2.03 spacing tagged as "+/- 2H").
+      ik <- round(delta / ISOTOPE_SPACING)
+      if (ik >= 1 && ik <= 3 && abs(delta - ik * ISOTOPE_SPACING) <= win + ISO_SLACK) next
     }
     m <- which(abs(af$mz_diff - delta) <= win)
     if (length(m)) {
@@ -308,7 +312,7 @@ deisotope <- function(cp, tol = 10, unit = "ppm", max_charge = 2L) {
 #' @importFrom tibble tibble
 #' @noRd
 add_detected_isotopes <- function(tab, cp, n = 2L, tol = 10, unit = "ppm") {
-  hits <- tab[tab$matched & tab$type %in% c("adduct", "fragment"), , drop = FALSE]
+  hits <- tab[tab$matched & tab$type == "adduct", , drop = FALSE]
   if (!nrow(hits) || !nrow(cp)) return(tab)
   extra <- list()
   for (i in seq_len(nrow(hits))) {
@@ -322,7 +326,7 @@ add_detected_isotopes <- function(tab, cp, n = 2L, tol = 10, unit = "ppm") {
       j <- cand[which.min(abs(cp$mz[cand] - em))]
       if (cp$intensity[j] > 1.5 * mono_int) next     # not a plausible satellite
       extra[[length(extra) + 1L]] <- tibble(
-        label = sprintf("%s [+%d]", hits$label[i], k), type = "isotope",
+        label = sprintf("[+%d]", k), type = "isotope",
         mz = em, charge = hits$charge[i], mz_obs = cp$mz[j],
         intensity = cp$intensity[j], ppm_err = (cp$mz[j] - em) / em * 1e6,
         matched = TRUE)

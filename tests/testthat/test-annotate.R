@@ -55,21 +55,19 @@ test_that("adduct_rules + project_ions + match round-trip on a planted spectrum"
   rules <- adduct_rules("pos")
   pick <- function(nm) adduct_mz(M, rules[rules$name == nm, , drop = FALSE])[1]
   mzH  <- pick("[M+H]+"); mzNa <- pick("[M+Na]+")
-  frag <- mzH - 18.01057                         # in-source water loss
-  spec <- tibble::tibble(mz = c(mzH, mzNa, frag), intensity = c(1000, 400, 250))
+  spec <- tibble::tibble(mz = c(mzH, mzNa), intensity = c(1000, 400))
 
-  exp_tab <- project_ions(M, "pos", fragments = TRUE)
-  expect_true(all(c("adduct", "fragment") %in% exp_tab$type))
-  expect_false("isotope" %in% exp_tab$type)      # isotopes are detected, not projected
+  exp_tab <- project_ions(M, "pos")
+  expect_true(all(exp_tab$type == "adduct"))         # adducts only
+  expect_false("[M+H-H2O]+" %in% exp_tab$label)      # in-source fragments excluded
 
   res <- match_spectrum(spec, exp_tab, tol = 10, unit = "ppm")
   is_match <- function(nm) isTRUE(res$matched[match(nm, res$label)])
   expect_true(is_match("[M+H]+"))
   expect_true(is_match("[M+Na]+"))
-  expect_true(any(res$type == "fragment" & res$matched))
 })
 
-test_that("annotate_anchor labels DETECTED isotopes of a matched adduct", {
+test_that("annotate_anchor labels DETECTED isotopes as [+k]", {
   skip_if_not_installed("commonMZ")
   rules <- adduct_rules("pos")
   mzH <- adduct_mz(300.1, rules[rules$name == "[M+H]+", , drop = FALSE])[1]
@@ -77,10 +75,10 @@ test_that("annotate_anchor labels DETECTED isotopes of a matched adduct", {
   spec <- tibble::tibble(mz = c(mzH, mzH + ISOTOPE_SPACING, mzH + 2 * ISOTOPE_SPACING),
                          intensity = c(1000, 230, 27))
   ann <- annotate_anchor(spec, mzH, "[M+H]+", "pos", tol = 10, unit = "ppm",
-                         isotopes = 2, fragments = FALSE)
+                         isotopes = 2)
   iso <- ann$table$label[ann$table$type == "isotope" & ann$table$matched]
-  expect_true("[M+H]+ [+1]" %in% iso)
-  expect_true("[M+H]+ [+2]" %in% iso)
+  expect_true("[+1]" %in% iso)
+  expect_true("[+2]" %in% iso)
 })
 
 test_that("is_fragment_rule separates in-source losses from adducts by mass", {
@@ -95,23 +93,20 @@ test_that("is_fragment_rule separates in-source losses from adducts by mass", {
   expect_false(is_fragment_rule(-2 * p, -2))        # [M-2H]2-: deprotonation
 })
 
-test_that("project_ions sources fragments only from the CAMERA dictionary", {
+test_that("project_ions returns adducts only (no in-source fragments)", {
   skip_if_not_installed("commonMZ")
-  tab <- project_ions(300.1, "pos", fragments = TRUE)
-  frags <- tab[tab$type == "fragment", ]
-  expect_gt(nrow(frags), 0)
-  expect_true("[M+H-H2O]+" %in% frags$label)            # water loss is a fragment
-  expect_true(all(grepl("^\\[", frags$label)))          # CAMERA bracket names only
-  # the old second source labelled losses relative to the principal ion, e.g.
-  # "[M+H]+ -18.011 (...)"; those must be gone (no space-dash-number form).
-  expect_false(any(grepl("\\]\\+? -[0-9]", frags$label)))
+  tab <- project_ions(300.1, "pos")
+  expect_gt(nrow(tab), 0)
+  expect_true(all(tab$type == "adduct"))
+  expect_true("[M+H]+" %in% tab$label)
+  expect_false("[M+H-H2O]+" %in% tab$label)       # fragments excluded
 })
 
 test_that("project_ions max_charge filters multiply-charged ions", {
   skip_if_not_installed("commonMZ")
-  t1 <- project_ions(300.1, "pos", fragments = FALSE, max_charge = 1)
+  t1 <- project_ions(300.1, "pos", max_charge = 1)
   expect_true(all(abs(t1$charge) <= 1))
-  t2 <- project_ions(300.1, "pos", fragments = FALSE, max_charge = 3)
+  t2 <- project_ions(300.1, "pos", max_charge = 3)
   expect_true(max(abs(t2$charge)) > 1)
 })
 

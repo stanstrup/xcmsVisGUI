@@ -66,7 +66,6 @@ mod_plot_spectrum_ui <- function(id) {
                                max = 6, step = 1, width = "120px"),
                   numericInput(ns("ann_max_z"), "Max charge", value = 1, min = 1,
                                max = 5, step = 1, width = "110px")),
-              checkboxInput(ns("ann_frag"), "In-source fragments", value = TRUE),
               checkboxInput(ns("ann_ghost"), "Show expected-but-absent", value = FALSE)),
             # Manual-only: the anchor ion. Auto mode drives the anchor from findMAIN.
             conditionalPanel(
@@ -265,7 +264,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       if (is.na(maxz) || maxz < 1) maxz <- Inf
       a <- annotate_anchor(df, anchor, adduct, input$ann_pol,
                            tol = input$ann_tol, unit = input$ann_unit, isotopes = niso,
-                           fragments = isTRUE(input$ann_frag), max_charge = maxz)
+                           max_charge = maxz)
       list(mode = "anchor", M = a$M, table = cap_matched(a$table, ann_top()),
            ghost = isTRUE(input$ann_ghost))
     })

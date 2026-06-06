@@ -43,6 +43,8 @@ mod_plot_spectrum_ui <- function(id) {
                         value = FALSE),
           conditionalPanel(
             single(sprintf("input['%s'] == true", ns("annotate"))),
+            radioButtons(ns("click_action"), "Click on a peak", inline = TRUE,
+                         c("→ EIC list" = "eic", "→ set anchor" = "anchor")),
             selectInput(ns("ann_mode"), "Mode",
                         c("Manual anchor" = "manual", "Auto-suggest (findMAIN)" = "auto",
                           "Difference network" = "diff")),
@@ -73,9 +75,7 @@ mod_plot_spectrum_ui <- function(id) {
                   numericInput(ns("anchor_mz"), "Anchor m/z", value = NA,
                                step = 0.0001),
                   selectInput(ns("ann_adduct"), "is a", choices = NULL,
-                              width = "130px")),
-              radioButtons(ns("click_action"), "Click on a peak", inline = TRUE,
-                           c("→ EIC list" = "eic", "→ set anchor" = "anchor"))),
+                              width = "130px"))),
             conditionalPanel(
               sprintf("input['%s'] == 'auto'", ns("ann_mode")),
               actionButton(ns("suggest"), "Suggest molecular ion",
@@ -508,14 +508,34 @@ cap_matched <- function(tab, n) {
   tab[!tab$matched | tab$mz_obs %in% keep, , drop = FALSE]
 }
 
-#' Set vertical text on a converted plotly object's text-mode traces. ggplotly
-#' does not carry geom_text `angle` through, so the annotation labels render
-#' horizontally unless we set `textangle` on the traces here (-90 reads upward).
+#' Render the annotation labels vertically. ggplotly turns geom_text into scatter
+#' text traces, and this plotly.js (2.25) ignores `textangle` on those — but it
+#' does honour it on LAYOUT ANNOTATIONS. So convert each text trace's labels into
+#' layout annotations (rotated -90, reading upward, anchored above the peak) and
+#' drop the now-redundant text trace. Operate on a built object so trace `mode`,
+#' `x`/`y`/`text` and `textfont` are populated.
 #' @noRd
 text_traces_vertical <- function(p) {
-  for (i in seq_along(p$x$data)) {
-    m <- p$x$data[[i]]$mode
-    if (!is.null(m) && grepl("text", m)) p$x$data[[i]]$textangle <- -90
+  d <- p$x$data
+  if (is.null(d)) return(p)
+  anns <- p$x$layout$annotations
+  if (is.null(anns)) anns <- list()
+  keep <- rep(TRUE, length(d))
+  for (i in seq_along(d)) {
+    tr <- d[[i]]
+    if (is.null(tr$mode) || !grepl("text", tr$mode)) next
+    keep[i] <- FALSE
+    txt <- tr$text; xs <- tr$x; ys <- tr$y
+    col <- tr$textfont$color %||% "black"
+    for (j in seq_along(txt)) {
+      if (is.na(txt[j]) || !nzchar(txt[j])) next
+      anns[[length(anns) + 1L]] <- list(
+        x = xs[j], y = ys[j], text = txt[j], textangle = -90,
+        showarrow = FALSE, xanchor = "center", yanchor = "bottom",
+        font = list(size = 10, color = if (length(col) > 1) col[j] else col))
+    }
   }
+  p$x$data <- d[keep]
+  p$x$layout$annotations <- anns
   p
 }

@@ -107,7 +107,7 @@ project_ions <- function(M, mode = c("pos", "neg"), isotopes = 1L,
   mode <- match.arg(mode)
   rules <- adduct_rules(mode)
   rules <- rules[abs(rules$charge) <= max_charge, , drop = FALSE]
-  kind <- ifelse(is_fragment_name(rules$name), "fragment", "adduct")
+  kind <- ifelse(is_fragment_rule(rules$massdiff, rules$charge), "fragment", "adduct")
   if (!isTRUE(fragments)) { rules <- rules[kind == "adduct", ]; kind <- kind[kind == "adduct"] }
   out <- tibble(label = rules$name, type = kind,
                 mz = adduct_mz(M, rules), charge = rules$charge)
@@ -124,16 +124,14 @@ project_ions <- function(M, mode = c("pos", "neg"), isotopes = 1L,
   out[is.finite(out$mz), , drop = FALSE]
 }
 
-#' Is a commonMZ adduct name an in-source FRAGMENT (a neutral loss) rather than a
-#' plain adduct? Strip the trailing charge first (so `[M+Cl]-` / `[M-H]-` aren't
-#' read as losses), then flag a fragment when the bracket has either a loss after
-#' a charge carrier (`[M+H-H2O]+`) or two subtractions (`[M-H-H2O]-`). A single
-#' subtraction (`[M-H]-`, `[M-2H]2-`) is just deprotonation — an adduct.
+#' Classify a CAMERA rule as an in-source FRAGMENT by MASS, not by name: a
+#' fragment removes neutral mass from M (massdiff < 0). The only adducts with a
+#' negative offset are pure (de)protonations (`[M-H]-`, `[M-2H]2-`), whose massdiff
+#' is exactly -|charge|*proton — exclude those. Everything that adds mass (any
+#' protonation, Na/K/NH4/Cl/formate adduct, multimer) is an adduct.
 #' @noRd
-is_fragment_name <- function(name) {
-  inner <- sub("\\][0-9]*[+-]+$", "", name)        # drop "]2+" / "]-" etc.
-  n_minus <- nchar(gsub("[^-]", "", inner))
-  grepl("\\+[^]]*-", inner) | n_minus >= 2
+is_fragment_rule <- function(massdiff, charge, proton = 1.007276) {
+  (massdiff < 0) & (abs(massdiff + abs(charge) * proton) > 0.01)
 }
 
 #' Match projected ions against the observed spectrum: for each expected m/z take
@@ -187,16 +185,23 @@ annotate_anchor <- function(spec_df, anchor_mz, adduct = NULL, mode = c("pos", "
 #' adducts, and returns the ranked hypotheses as a tibble (best first). Robust to
 #' failure/empty input — returns a 0-row tibble. The app uses the top row's
 #' (adductmz, adducthyp) as the anchor for annotate_anchor().
+#'
+#' findMAIN's scoring degrades when fed thousands of noise peaks (random
+#' coincidences "explain" spurious masses), so we always reduce to the `max_peaks`
+#' most intense centroids first — independent of the intensity floor, which the
+#' user may have set to 0 for the other modes.
 #' @importFrom tibble as_tibble tibble
 #' @noRd
 rank_anchors <- function(spec_df, mode = c("pos", "neg"), ppm = 5,
-                         top_n = 5L, rel_floor = 0.01) {
+                         top_n = 5L, rel_floor = 0.01, max_peaks = 200L) {
   mode <- match.arg(mode)
   empty <- tibble(adductmz = numeric(), adducthyp = character(),
                   neutral_mass = numeric(), adducts_explained = integer(),
                   total_score = numeric())
   cp <- centroid_peaks(spec_df, rel_floor = rel_floor)
   if (nrow(cp) < 1) return(empty)
+  if (nrow(cp) > max_peaks)
+    cp <- cp[order(-cp$intensity), , drop = FALSE][seq_len(max_peaks), , drop = FALSE]
   spec <- cbind(mz = cp$mz, int = cp$intensity)
   ionmode <- if (mode == "pos") "positive" else "negative"
   # findMAIN is chatty (per-hypothesis scoring warnings) — quiet it for the app.
@@ -212,13 +217,15 @@ rank_anchors <- function(spec_df, mode = c("pos", "neg"), ppm = 5,
 }
 
 #' Difference network (mode 3): annotate peak PAIRS whose m/z difference matches a
-#' commonMZ adducts_fragments entry. No anchor needed; the noisy mode (off by
-#' default in the UI). Returns tibble(mz_lo, mz_hi, delta, origin, int_lo, int_hi),
-#' one row per matched edge among the `top_n` most intense peaks.
+#' commonMZ adducts_fragments entry. No anchor needed. Returns tibble(mz_lo, mz_hi,
+#' delta, origin, int_lo, int_hi), one row per matched edge among the `top_n` most
+#' intense peaks. Isotope-spaced pairs (delta ~= k * 13C spacing, k = 1..3) are
+#' skipped by default — those are isotopes, not adduct/fragment relationships, and
+#' would otherwise be mislabelled (e.g. an M+2 spacing matching "+/- 2H").
 #' @importFrom tibble tibble
 #' @noRd
 difference_network <- function(spec_df, tol = 10, unit = "ppm", top_n = 30L,
-                               rel_floor = 0.01) {
+                               rel_floor = 0.01, ignore_isotopes = TRUE) {
   empty <- tibble(mz_lo = numeric(), mz_hi = numeric(), delta = numeric(),
                   origin = character(), int_lo = numeric(), int_hi = numeric())
   cp <- centroid_peaks(spec_df, rel_floor = rel_floor)
@@ -235,6 +242,10 @@ difference_network <- function(spec_df, tol = 10, unit = "ppm", top_n = 30L,
     # the tiny difference: a 10 ppm peak pair at m/z 425 leaves ~0.008 Da slack on
     # an 18 Da loss, but ppm-of-18 would be 0.0002 Da and miss the whole ladder.
     win <- tol_to_da(lo, tol, unit) + tol_to_da(hi, tol, unit)
+    if (ignore_isotopes) {                       # skip M+1 / M+2 / M+3 spacings
+      ik <- round(delta / ISOTOPE_SPACING)
+      if (ik >= 1 && ik <= 3 && abs(delta - ik * ISOTOPE_SPACING) <= win) next
+    }
     m <- which(abs(af$mz_diff - delta) <= win)
     if (length(m)) {
       k <- k + 1L

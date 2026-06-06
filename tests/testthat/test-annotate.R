@@ -71,14 +71,16 @@ test_that("adduct_rules + project_ions + match round-trip on a planted spectrum"
   expect_true(any(res$type == "fragment" & res$matched))
 })
 
-test_that("is_fragment_name separates in-source losses from adducts", {
-  expect_true(is_fragment_name("[M+H-H2O]+"))
-  expect_true(is_fragment_name("[M+H-CO2]+"))
-  expect_false(is_fragment_name("[M+H]+"))
-  expect_false(is_fragment_name("[M+Na]+"))
-  expect_false(is_fragment_name("[2M+H]+"))
-  expect_false(is_fragment_name("[M-H]-"))      # deprotonation, not a loss
-  expect_false(is_fragment_name("[M+Cl]-"))     # trailing charge sign, not a loss
+test_that("is_fragment_rule separates in-source losses from adducts by mass", {
+  p <- 1.007276
+  expect_true(is_fragment_rule(p - 18.010565, 1))   # [M+H-H2O]+ : net loss
+  expect_true(is_fragment_rule(p - 43.989830, 1))   # [M+H-CO2]+ : net loss
+  expect_true(is_fragment_rule(-p - 18.010565, -1)) # [M-H-H2O]- : net loss
+  expect_false(is_fragment_rule(p, 1))              # [M+H]+  : adds mass
+  expect_false(is_fragment_rule(22.989, 1))         # [M+Na]+ : adds mass
+  expect_false(is_fragment_rule(34.969, -1))        # [M+Cl]- : adds mass
+  expect_false(is_fragment_rule(-p, -1))            # [M-H]-  : deprotonation
+  expect_false(is_fragment_rule(-2 * p, -2))        # [M-2H]2-: deprotonation
 })
 
 test_that("project_ions sources fragments only from the CAMERA dictionary", {
@@ -134,6 +136,16 @@ test_that("difference_network window is the peak accuracy, not ppm of the delta"
   rungs <- net[abs(net$delta - 18.0106) < 0.012, ]
   expect_gte(nrow(rungs), 3)                       # 416-434, 434-452, 452-470
   expect_true(all(grepl("H2O", rungs$origin, fixed = TRUE)))
+})
+
+test_that("difference_network ignores isotope-spaced pairs", {
+  skip_if_not_installed("commonMZ")
+  # 2.0067 apart = M+2 (13C) spacing; must NOT be annotated (e.g. as +/- 2H)
+  spec <- tibble::tibble(mz = c(400.0, 402.0067), intensity = c(1000, 200))
+  expect_equal(nrow(difference_network(spec, tol = 20, unit = "ppm")), 0)
+  # without the guard, that spacing does match a table entry
+  expect_gte(nrow(difference_network(spec, tol = 20, unit = "ppm",
+                                     ignore_isotopes = FALSE)), 1)
 })
 
 test_that("rank_anchors suggests the right molecular ion via findMAIN", {

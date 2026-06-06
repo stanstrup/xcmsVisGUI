@@ -24,6 +24,15 @@ source explicit and dispatch unambiguous — the "unresolvable conflict" case.
 \verb{\%>\%} (magrittr) and \verb{\%||\%} (rlang) are imported here once as operators.
 }
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://stanstrup.github.io/xcmsVisGUI}
+  \item \url{https://github.com/stanstrup/xcmsVisGUI}
+  \item Report bugs at \url{https://github.com/stanstrup/xcmsVisGUI/issues}
+}
+
+}
 \author{
 \strong{Maintainer}: Jan Stanstrup \email{stanstrup@gmail.com}
 

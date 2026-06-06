@@ -79,6 +79,7 @@ Consequences baked into the architecture:
 | `R/fct_export.R` | `save_gg` (png/svg/pdf via ggsave; **rds** = save the ggplot object itself) |
 | `R/fct_cache.R` | `cache_disk_qs2` (qs2 disk store), `app_cache` (layered mem+disk), `clear_disk_cache` |
 | `R/fct_settings_store.R` | `load_settings`/`save_settings` — persist allow-listed settings as JSON to the per-user config dir |
+| `R/fct_annotate.R` | spectrum annotation engine (pure): `adduct_rules`/`quasi_adducts` (commonMZ dict), `neutral_mass`/`adduct_mz`/`project_ions`, `match_spectrum`, `annotate_anchor` (manual), `rank_anchors` (findMAIN auto), `difference_network`, `centroid_peaks`. Overlaid by `mod_plot_spectrum`'s `annotate_layers` |
 | `R/utils_reactive.R` | `make_rv`, `zoom_keeper`, helpers |
 
 ## Conventions / dogmas

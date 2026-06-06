@@ -221,9 +221,10 @@ overwritten — **no mtime key.** Clear-only (item 11) shipped; mtime declined.
 ✅ **Done** — all of Tier 1 and Tier 2 were implemented in this order across
 separate parse-checked, test- and smoke-verified commits on `main`. The
 post-review work (R package, CI, Docker, persistent settings, default tol
-setting, persistent cache, rds export) is now also done — see the Decision log
-below. Remaining ideas (CommonMZ/CAMERA, xcms objects, peak picking) live in
-`future_work.md` and the **Deferred: preprocessing** section below.
+setting, persistent cache, rds export, spectrum annotation) is now also done —
+see the Decision log below. Remaining ideas (xcms objects, peak picking,
+CAMERA-style cross-sample grouping) live in `future_work.md` and the
+**Deferred: preprocessing** section below.
 
 ---
 
@@ -269,6 +270,29 @@ don't get re-litigated.
 ### Export
 - **`rds` export** added alongside png/svg/pdf — saves the ggplot object itself
   (`save_gg()` rds branch), so a figure can be reopened and re-tweaked in R.
+
+### Spectrum annotation (adducts / isotopes / in-source fragments)
+Single-spectrum annotation overlaid on the Spectrum view (`R/fct_annotate.R` +
+`mod_plot_spectrum`). **commonMZ** (GitHub-only, hence the `Remotes:` field) is the
+adduct/fragment **dictionary**; **InterpretMSSpectrum::findMAIN** is the auto
+**ranker** — both hard Imports. Three modes share one dictionary so manual and auto
+annotate identically:
+- **Manual anchor** — user designates a peak as a known ion; we invert to the
+  neutral mass (`m/z = (nmol·M + massdiff)/|charge|`, massdiff from
+  `commonMZ::MZ_CAMERA`) and project all adducts + M+1 isotopes + in-source neutral
+  losses (`commonMZ::adducts_fragments`), matching within the shared ppm/Da tol.
+- **Auto-suggest** — `findMAIN` (constrained to commonMZ's quasi-molecular adducts)
+  ranks (M, main-adduct) hypotheses; the chosen row fills the anchor.
+- **Difference network** — peak pairs whose Δm/z matches a dictionary entry.
+
+Why **not** CAMERA / cliqueMS / RAMClustR: those need a multi-sample feature matrix
+(coelution/correlation across detected peaks) — incompatible with this app's
+raw-only, one-spectrum-at-a-time model, and prone to false hits on noisy raw scans.
+The anchor-first design puts the molecular-ion decision with the user. The engine is
+pure (no Shiny) and unit-tested on synthetic + real (`msdata`) spectra. Click
+disambiguation: a *Click → EIC list | → set anchor* toggle reuses the existing
+spectrum-click plumbing. Annotation tolerance reuses the persisted default-tolerance
+setting (no new persisted fields). Re-encodes commonMZ's Latin-1 origin text to UTF-8.
 
 ### xcmsVis — evaluated and declined (for now)
 Re-examined whether to delegate plotting to **xcmsVis** (`gplot*` → ggplot,

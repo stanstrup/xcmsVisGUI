@@ -74,6 +74,9 @@ mod_plot_map_server <- function(id, rv, included) {
         validate("Press \u2018Plot\u2019 to render the MS map for the included file(s).")
       pk <- peaks_all()
       validate(need(nrow(pk) > 0, "No peaks in the current filter range."))
+      # Building the plotly traces is slow for large maps; show feedback so the
+      # gap between "Reading peaks" finishing and the plot appearing isn't silent.
+      withProgress(message = "Rendering map...", value = 0.5, {
       unit <- rv$settings$time_unit
       pk$rt_disp <- rt_to_disp(pk$rt, unit)
       inv <- isTRUE(rv$settings$invert_scale)
@@ -147,6 +150,7 @@ mod_plot_map_server <- function(id, rv, included) {
             yaxis = list(title = "m/z", range = range(pk$mz)),
             zaxis = list(title = "intensity")))
       }
+      })  # withProgress
     })
 
     # Click a 2D-map point -> spectrum at that rt (first included file).

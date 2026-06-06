@@ -30,5 +30,7 @@ setup_runtime <- function() {
   # the per-call load. requireNamespace, not library(), keeps R CMD check happy.
   everywhere(suppressWarnings(requireNamespace("mzR", quietly = TRUE)))
   options(shiny.maxRequestSize = 5 * 1024^3)
+  # Persist bindCache() results to disk so extractions survive app restarts.
+  shinyOptions(cache = app_cache())
   invisible(TRUE)
 }

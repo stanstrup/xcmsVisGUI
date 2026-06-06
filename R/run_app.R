@@ -54,12 +54,15 @@ app_server <- function(input, output, session) {
   data_key <- reactive(list(paths = sort(included()$path), filter = rv$filter))
 
   # Raw MsExperiment cached on the path set (built under SerialParam, so fast);
-  # the global filter is applied lazily on top.
+  # the global filter is applied lazily on top. Kept in the in-memory SESSION
+  # cache — the MsExperiment is an S4 object with a file-backed backend, not
+  # worth disk-serialising (unlike the tibble results from chrom_df / eic_df,
+  # which use the default app-level disk cache set in setup_runtime()).
   raw_msexp <- reactive({
     inc <- included()
     validate(need(nrow(inc) > 0, "Add files and tick at least one to include."))
     build_msexp(inc)
-  }) %>% bindCache(sort(included()$path))
+  }) %>% bindCache(sort(included()$path), cache = "session")
 
   dataset <- reactive({
     x <- raw_msexp()           # force here so validate() surfaces cleanly

@@ -26,6 +26,7 @@ Imports:
     tibble,
     purrr,
     rlang,
+    cachem,
     jsonlite,
     Spectra,
     MsExperiment,

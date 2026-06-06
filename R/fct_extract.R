@@ -229,6 +229,7 @@ extract_over_files <- function(files_df, extractor, cols = "sample_id",
 clear_ms_caches <- function() {
   rm(list = ls(.scan_cache, all.names = TRUE), envir = .scan_cache)
   rm(list = ls(.spectra_cache, all.names = TRUE), envir = .spectra_cache)
+  clear_disk_cache()   # also wipe the persistent bindCache results
   invisible(NULL)
 }
 

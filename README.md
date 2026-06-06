@@ -29,6 +29,18 @@ Rscript run.R                       # = pkgload::load_all() + run_app(launch.bro
 xcmsVisGUI::run_app()
 ```
 
+## Deploy with Docker
+
+A `Dockerfile` (based on the Bioconductor image) runs the app as a server:
+
+```sh
+docker build -t xcmsvisgui .
+docker run --rm -p 3838:3838 -v /path/to/ms-data:/data xcmsvisgui
+```
+
+Open <http://localhost:3838> and paste `/data` (your mounted files) into the Files
+box. Mount a volume at `/root/.config/R` to persist settings across restarts.
+
 ## Tests
 
 ```r

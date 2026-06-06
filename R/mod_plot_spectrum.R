@@ -52,6 +52,8 @@ mod_plot_spectrum_ui <- function(id) {
                 numericInput(ns("ann_tol"), "± tol", value = 10, min = 0,
                              width = "90px"),
                 selectInput(ns("ann_unit"), "unit", c("ppm", "Da"), width = "90px")),
+            numericInput(ns("ann_min_int"), "Min intensity (% of base peak)",
+                         value = 1, min = 0, max = 100, step = 0.5),
             conditionalPanel(
               sprintf("input['%s'] != 'diff'", ns("ann_mode")),
               div(class = "d-flex gap-2",
@@ -61,7 +63,8 @@ mod_plot_spectrum_ui <- function(id) {
                               width = "130px")),
               radioButtons(ns("click_action"), "Click on a peak", inline = TRUE,
                            c("→ EIC list" = "eic", "→ set anchor" = "anchor")),
-              checkboxInput(ns("ann_iso"), "Isotopes (M+1)", value = TRUE),
+              numericInput(ns("ann_niso"), "Max isotope (M+n; 0 = off)",
+                           value = 2, min = 0, max = 6, step = 1),
               checkboxInput(ns("ann_frag"), "In-source fragments", value = TRUE),
               checkboxInput(ns("ann_ghost"), "Show expected-but-absent", value = FALSE)),
             conditionalPanel(
@@ -72,7 +75,9 @@ mod_plot_spectrum_ui <- function(id) {
             conditionalPanel(
               sprintf("input['%s'] == 'diff'", ns("ann_mode")),
               helpText("Annotates peak pairs whose m/z difference matches a known ",
-                       "adduct/fragment. Noisy on raw spectra — use a tight tolerance."))
+                       "adduct/fragment. The tolerance should match your ",
+                       "instrument's mass accuracy; raise the minimum intensity ",
+                       "to drop noise pairs."))
           )
         )
       ),
@@ -183,12 +188,19 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       }
     }, ignoreInit = TRUE)
 
+    # Minimum intensity threshold as a fraction of the base peak (noise filter).
+    ann_floor <- reactive({
+      v <- input$ann_min_int
+      if (is.null(v) || !is.finite(v) || v < 0) 0 else v / 100
+    })
+
     # findMAIN ranked hypotheses (auto mode); a row click fills the anchor.
     ranked <- eventReactive(input$suggest, {
       df <- spec_df(); validate(need(nrow(df) > 0, "No spectrum."))
       ppm <- if (identical(input$ann_unit, "ppm")) input$ann_tol else 5
       withProgress(message = "Ranking molecular-ion hypotheses…", value = 0.5,
-                   rank_anchors(df, mode = input$ann_pol, ppm = ppm))
+                   rank_anchors(df, mode = input$ann_pol, ppm = ppm,
+                                rel_floor = ann_floor()))
     })
     output$ranked <- renderDT({
       r <- ranked(); validate(need(nrow(r) > 0, "No hypothesis found."))
@@ -205,17 +217,24 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     })
 
     # The annotation result for the current single spectrum (anchor or diff mode).
+    # Peaks below the intensity floor are dropped first, so noise can't be matched.
     ann_result <- reactive({
       req(isTRUE(input$annotate), identical(input$layout, "single"))
       df <- spec_df(); req(nrow(df) > 0)
+      df <- df[is.finite(df$intensity) &
+                 df$intensity >= ann_floor() * max(df$intensity, na.rm = TRUE), ,
+               drop = FALSE]
+      req(nrow(df) > 0)
       if (identical(input$ann_mode, "diff"))
         return(list(mode = "diff",
-                    edges = difference_network(df, input$ann_tol, input$ann_unit)))
+                    edges = difference_network(df, input$ann_tol, input$ann_unit,
+                                               rel_floor = 0)))
       req(is.finite(input$anchor_mz), isTRUE(input$ann_adduct %in% quasi_adducts(input$ann_pol)))
+      niso <- suppressWarnings(as.integer(input$ann_niso))
+      if (is.na(niso) || niso < 0) niso <- 0L
       a <- annotate_anchor(df, input$anchor_mz, input$ann_adduct, input$ann_pol,
                            tol = input$ann_tol, unit = input$ann_unit,
-                           isotopes = if (isTRUE(input$ann_iso)) 1L else 0L,
-                           losses = isTRUE(input$ann_frag))
+                           isotopes = niso, losses = isTRUE(input$ann_frag))
       list(mode = "anchor", M = a$M, table = a$table, ghost = isTRUE(input$ann_ghost))
     })
 
@@ -399,13 +418,15 @@ annotate_layers <- function(p, ar, df, palette) {
   hit <- tab[tab$matched, , drop = FALSE]
   cols <- c(adduct = pal4[2], isotope = pal4[3], fragment = pal4[4])
   if (nrow(hit)) {
-    hit$.tip <- sprintf("%s\n%s\nm/z %.4f (%.1f ppm)", hit$label, hit$type,
-                        hit$mz_obs, hit$ppm_err)
+    hit <- collapse_hits(hit)   # one label per observed peak, "; "-joined
+    hit$.tip <- sprintf("%s\nm/z %.4f (%.1f ppm)", hit$label, hit$mz_obs, hit$ppm_err)
     p <- p +
       geom_point(data = hit, aes(x = mz_obs, y = intensity, color = type, text = .tip),
                  inherit.aes = FALSE, size = 1.8) +
+      # labels written vertically (angle 90) so dense clusters don't overlap
       geom_text(data = hit, aes(x = mz_obs, y = intensity, label = label, color = type),
-                inherit.aes = FALSE, vjust = -0.6, size = 2.7, show.legend = FALSE) +
+                inherit.aes = FALSE, angle = 90, hjust = 0, vjust = 0.5,
+                nudge_y = ymax * 0.02, size = 2.7, show.legend = FALSE) +
       scale_color_manual(values = cols, name = NULL)
   }
   if (isTRUE(ar$ghost)) {
@@ -418,4 +439,21 @@ annotate_layers <- function(p, ar, df, palette) {
     }
   }
   p
+}
+
+#' Collapse matched annotations that land on the same observed peak into one row,
+#' joining their labels with "; ". When several ion types coincide on a peak the
+#' colour/representative type is the highest priority present (adduct > fragment >
+#' isotope). Keeps the matched-peak m/z, intensity and (first) ppm error.
+#' @importFrom tibble tibble
+#' @noRd
+collapse_hits <- function(hit) {
+  prio <- c("adduct", "fragment", "isotope")
+  parts <- split(hit, round(hit$mz_obs, 4))
+  do.call(rbind, lapply(parts, function(g) {
+    g <- g[order(match(g$type, prio)), , drop = FALSE]
+    tibble(mz_obs = g$mz_obs[1], intensity = g$intensity[1],
+           label = paste(unique(g$label), collapse = "; "),
+           type = g$type[1], ppm_err = g$ppm_err[1])
+  }))
 }

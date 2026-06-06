@@ -99,22 +99,27 @@ package; the ion mode defaults to the file's polarity. There are three modes:
 - **Manual anchor** — pick the peak you believe is a known ion (default `[M+H]+` /
   `[M-H]-`, selectable). Switch *Click on a peak* to **→ set anchor** and click the
   peak, or type its *m/z*. The neutral mass is derived from it and every adduct,
-  M+1 isotope and common in-source neutral loss is projected onto the spectrum;
-  peaks within tolerance are labelled. This is the most reliable mode — *you*
-  decide the molecular ion, avoiding false hits on noisy raw data.
+  isotope (up to **Max isotope M+n**) and common in-source neutral loss is
+  projected onto the spectrum; peaks within tolerance are labelled. This is the
+  most reliable mode — *you* decide the molecular ion, avoiding false hits on
+  noisy raw data.
 - **Auto-suggest (findMAIN)** — uses
   [InterpretMSSpectrum](https://cran.r-project.org/package=InterpretMSSpectrum)
   to rank candidate molecular-ion hypotheses (by explained intensity, mass error
   and isotope support). Press **Suggest molecular ion** and click a row in the
   ranked table to load it as the anchor, then it annotates as above.
 - **Difference network** — annotates *pairs* of peaks whose *m/z* difference
-  matches a known adduct/fragment, with no anchor needed. Noisy on raw spectra —
-  keep the tolerance tight.
+  matches a known adduct/fragment, with no anchor needed (e.g. a ladder of water
+  losses). Its match window is your instrument's mass accuracy at the two peaks,
+  so set the tolerance to fit the instrument and raise the minimum intensity to
+  drop noise pairs.
 
-Tolerance follows your default-tolerance setting. **Isotopes**, **In-source
-fragments** and **Show expected-but-absent** (faint ghost ticks at projected but
-unobserved positions) are toggle-able. Annotations are part of the plot, so they
-carry through to exports.
+The **± tol** is the match window (ppm or Da); **Min intensity** drops peaks below
+that fraction of the base peak before matching, so noise can't be annotated.
+Labels are written vertically and multiple hits on one peak are joined with "; ".
+**In-source fragments** and **Show expected-but-absent** (faint ghost ticks at
+projected but unobserved positions) are toggle-able. Annotations are part of the
+plot, so they carry through to exports.
 
 ## 6. MS map
 

@@ -55,20 +55,33 @@ test_that("adduct_rules + project_ions + match round-trip on a planted spectrum"
   rules <- adduct_rules("pos")
   pick <- function(nm) adduct_mz(M, rules[rules$name == nm, , drop = FALSE])[1]
   mzH  <- pick("[M+H]+"); mzNa <- pick("[M+Na]+")
-  iso1 <- mzH + ISOTOPE_SPACING                 # M+1 of [M+H]+ (charge 1)
   frag <- mzH - 18.01057                         # in-source water loss
-  spec <- tibble::tibble(mz = c(mzH, mzNa, iso1, frag),
-                         intensity = c(1000, 400, 150, 250))
+  spec <- tibble::tibble(mz = c(mzH, mzNa, frag), intensity = c(1000, 400, 250))
 
-  exp_tab <- project_ions(M, "pos", isotopes = 1L, fragments = TRUE)
-  expect_true(all(c("adduct", "isotope", "fragment") %in% exp_tab$type))
+  exp_tab <- project_ions(M, "pos", fragments = TRUE)
+  expect_true(all(c("adduct", "fragment") %in% exp_tab$type))
+  expect_false("isotope" %in% exp_tab$type)      # isotopes are detected, not projected
 
   res <- match_spectrum(spec, exp_tab, tol = 10, unit = "ppm")
   is_match <- function(nm) isTRUE(res$matched[match(nm, res$label)])
   expect_true(is_match("[M+H]+"))
   expect_true(is_match("[M+Na]+"))
-  expect_true(is_match("[M+H]+ [+1]"))           # isotope label format
   expect_true(any(res$type == "fragment" & res$matched))
+})
+
+test_that("annotate_anchor labels DETECTED isotopes of a matched adduct", {
+  skip_if_not_installed("commonMZ")
+  skip_if_not_installed("MetaboCoreUtils")
+  rules <- adduct_rules("pos")
+  mzH <- adduct_mz(300.1, rules[rules$name == "[M+H]+", , drop = FALSE])[1]
+  # plausible 13C envelope for ~300 Da (M+1 ~23 %, M+2 ~3 %)
+  spec <- tibble::tibble(mz = c(mzH, mzH + ISOTOPE_SPACING, mzH + 2 * ISOTOPE_SPACING),
+                         intensity = c(1000, 230, 27))
+  ann <- annotate_anchor(spec, mzH, "[M+H]+", "pos", tol = 10, unit = "ppm",
+                         isotopes = 2, fragments = FALSE)
+  iso <- ann$table$label[ann$table$type == "isotope" & ann$table$matched]
+  expect_true("[M+H]+ [+1]" %in% iso)
+  expect_true("[M+H]+ [+2]" %in% iso)
 })
 
 test_that("is_fragment_rule separates in-source losses from adducts by mass", {
@@ -85,7 +98,7 @@ test_that("is_fragment_rule separates in-source losses from adducts by mass", {
 
 test_that("project_ions sources fragments only from the CAMERA dictionary", {
   skip_if_not_installed("commonMZ")
-  tab <- project_ions(300.1, "pos", isotopes = 0L, fragments = TRUE)
+  tab <- project_ions(300.1, "pos", fragments = TRUE)
   frags <- tab[tab$type == "fragment", ]
   expect_gt(nrow(frags), 0)
   expect_true("[M+H-H2O]+" %in% frags$label)            # water loss is a fragment
@@ -97,9 +110,9 @@ test_that("project_ions sources fragments only from the CAMERA dictionary", {
 
 test_that("project_ions max_charge filters multiply-charged ions", {
   skip_if_not_installed("commonMZ")
-  t1 <- project_ions(300.1, "pos", isotopes = 0L, fragments = FALSE, max_charge = 1)
+  t1 <- project_ions(300.1, "pos", fragments = FALSE, max_charge = 1)
   expect_true(all(abs(t1$charge) <= 1))
-  t2 <- project_ions(300.1, "pos", isotopes = 0L, fragments = FALSE, max_charge = 3)
+  t2 <- project_ions(300.1, "pos", fragments = FALSE, max_charge = 3)
   expect_true(max(abs(t2$charge)) > 1)
 })
 
@@ -138,14 +151,30 @@ test_that("difference_network window is the peak accuracy, not ppm of the delta"
   expect_true(all(grepl("H2O", rungs$origin, fixed = TRUE)))
 })
 
-test_that("difference_network ignores isotope-spaced pairs", {
+test_that("difference_network deisotopes before pairing", {
   skip_if_not_installed("commonMZ")
-  # 2.0067 apart = M+2 (13C) spacing; must NOT be annotated (e.g. as +/- 2H)
-  spec <- tibble::tibble(mz = c(400.0, 402.0067), intensity = c(1000, 200))
-  expect_equal(nrow(difference_network(spec, tol = 20, unit = "ppm")), 0)
-  # without the guard, that spacing does match a table entry
-  expect_gte(nrow(difference_network(spec, tol = 20, unit = "ppm",
-                                     ignore_isotopes = FALSE)), 1)
+  # 452 (mono) + 453.003 (M+1) + 470.011 (= 452 + H2O). The M+1 satellite must be
+  # dropped, so it forms no edge; the real water-loss edge (452-470) must remain.
+  spec <- tibble::tibble(mz = c(452.00000, 453.00336, 470.01057),
+                         intensity = c(1000, 250, 600))
+  net <- difference_network(spec, tol = 15, unit = "ppm")
+  expect_false(any(abs(net$mz_lo - 453.00336) < 0.01 |
+                   abs(net$mz_hi - 453.00336) < 0.01))   # 453 (M+1) not paired
+  expect_true(any(abs(net$delta - 18.01057) < 0.02))      # water loss kept
+
+  # deisotope() on its own keeps the monoisotope, drops the satellite
+  d <- deisotope(spec, tol = 15, unit = "ppm")
+  expect_true(452.0 %in% d$mz)
+  expect_false(453.00336 %in% d$mz)
+})
+
+test_that("difference_network skips an isotope-spaced delta the deisotoper keeps", {
+  skip_if_not_installed("commonMZ")
+  # M+1 is the TALLER peak, so deisotoping won't drop it; the ~1.003 spacing must
+  # still be skipped rather than matched to a near-1 Da table entry (deamidation).
+  spec <- tibble::tibble(mz = c(400.00000, 401.00336), intensity = c(100, 1000))
+  net <- difference_network(spec, tol = 30, unit = "ppm")
+  expect_equal(nrow(net), 0)
 })
 
 test_that("rank_anchors suggests the right molecular ion via findMAIN", {

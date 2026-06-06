@@ -88,22 +88,21 @@ adduct_mz <- function(M, rules) {
 
 # --- ion projection ----------------------------------------------------------
 
-#' Project every ion we expect to see for a neutral mass M from a SINGLE
-#' dictionary — commonMZ::MZ_CAMERA. That table already carries both true adducts
+#' Project the adduct and in-source-fragment ions for a neutral mass M from a
+#' SINGLE dictionary — commonMZ::MZ_CAMERA. That table carries both true adducts
 #' (`[M+H]+`, `[M+Na]+`, `[2M+H]+`, …) and in-source fragments (`[M+H-H2O]+`,
-#' `[M+H-CO2]+`, …); we classify each row by name so a fragment isn't also
-#' re-projected from a second source (which produced duplicate labels for the same
-#' ion). Adds M+1..M+k isotopes of the quasi-molecular adducts. Returns
-#' tibble(label, type, mz, charge) with `type` "adduct" | "isotope" | "fragment".
+#' `[M+H-CO2]+`, …); each row is classified by mass (is_fragment_rule). Isotopes
+#' are NOT projected here — they are DETECTED from the spectrum after matching
+#' (see add_detected_isotopes), the same isotopologue machinery deisotoping uses.
+#' Returns tibble(label, type, mz, charge) with `type` "adduct" | "fragment".
 #' @param M neutral monoisotopic mass.
 #' @param mode "pos" / "neg".
-#' @param isotopes number of isotope peaks (M+1..) to project per quasi adduct.
 #' @param fragments include the in-source-fragment rows.
 #' @param max_charge keep only ions with |charge| <= this.
 #' @importFrom tibble tibble
 #' @noRd
-project_ions <- function(M, mode = c("pos", "neg"), isotopes = 1L,
-                         fragments = TRUE, max_charge = Inf) {
+project_ions <- function(M, mode = c("pos", "neg"), fragments = TRUE,
+                         max_charge = Inf) {
   mode <- match.arg(mode)
   rules <- adduct_rules(mode)
   rules <- rules[abs(rules$charge) <= max_charge, , drop = FALSE]
@@ -111,16 +110,6 @@ project_ions <- function(M, mode = c("pos", "neg"), isotopes = 1L,
   if (!isTRUE(fragments)) { rules <- rules[kind == "adduct", ]; kind <- kind[kind == "adduct"] }
   out <- tibble(label = rules$name, type = kind,
                 mz = adduct_mz(M, rules), charge = rules$charge)
-
-  if (isotopes >= 1) {
-    q <- rules[rules$quasi == 1 & kind == "adduct", , drop = FALSE]
-    qmz <- adduct_mz(M, q)
-    iso <- lapply(seq_len(isotopes), function(k) {
-      tibble(label = sprintf("%s [+%d]", q$name, k), type = "isotope",
-             mz = qmz + k * ISOTOPE_SPACING / abs(q$charge), charge = q$charge)
-    })
-    out <- rbind_tibbles(out, iso)
-  }
   out[is.finite(out$mz), , drop = FALSE]
 }
 
@@ -162,8 +151,9 @@ match_spectrum <- function(spec_df, expected, tol = 10, unit = "ppm") {
 }
 
 #' Manual-anchor annotation (mode 1): treat `anchor_mz` as a known adduct ion,
-#' derive the neutral mass, project all ions and match them to the spectrum.
-#' Returns list(M = neutral mass, adduct, table = match_spectrum(...)).
+#' derive the neutral mass, project the adduct/fragment ions, match them, then
+#' DETECT and label the isotopes of each matched ion from the spectrum (up to
+#' `isotopes` members). Returns list(M = neutral mass, adduct, table).
 #' @noRd
 annotate_anchor <- function(spec_df, anchor_mz, adduct = NULL, mode = c("pos", "neg"),
                             tol = 10, unit = "ppm", isotopes = 1L, fragments = TRUE,
@@ -174,10 +164,10 @@ annotate_anchor <- function(spec_df, anchor_mz, adduct = NULL, mode = c("pos", "
   rule <- rules[rules$name == adduct, , drop = FALSE]
   if (!nrow(rule)) stop("Unknown adduct: ", adduct)
   M <- neutral_mass(anchor_mz, rule)
-  expected <- project_ions(M, mode, isotopes = isotopes, fragments = fragments,
-                           max_charge = max_charge)
-  list(M = M, adduct = adduct,
-       table = match_spectrum(spec_df, expected, tol, unit))
+  expected <- project_ions(M, mode, fragments = fragments, max_charge = max_charge)
+  tab <- match_spectrum(spec_df, expected, tol, unit)
+  if (isotopes >= 1) tab <- add_detected_isotopes(tab, spec_df, isotopes, tol, unit)
+  list(M = M, adduct = adduct, table = tab)
 }
 
 #' Auto-suggest the molecular ion (mode 2) with InterpretMSSpectrum::findMAIN.
@@ -219,9 +209,10 @@ rank_anchors <- function(spec_df, mode = c("pos", "neg"), ppm = 5,
 #' Difference network (mode 3): annotate peak PAIRS whose m/z difference matches a
 #' commonMZ adducts_fragments entry. No anchor needed. Returns tibble(mz_lo, mz_hi,
 #' delta, origin, int_lo, int_hi), one row per matched edge among the `top_n` most
-#' intense peaks. Isotope-spaced pairs (delta ~= k * 13C spacing, k = 1..3) are
-#' skipped by default — those are isotopes, not adduct/fragment relationships, and
-#' would otherwise be mislabelled (e.g. an M+2 spacing matching "+/- 2H").
+#' intense peaks. With `ignore_isotopes` the peak list is DEISOTOPED first (M+1/M+2
+#' satellites removed, so an M+1 at 453 can't pair with 470) AND any remaining
+#' isotope-spaced pair (delta ~= k * 13C, k = 1..3) is skipped — that covers the
+#' case where the satellite is the taller, or a noise peak one spacing away.
 #' @importFrom tibble tibble
 #' @noRd
 difference_network <- function(spec_df, tol = 10, unit = "ppm", top_n = 30L,
@@ -229,6 +220,7 @@ difference_network <- function(spec_df, tol = 10, unit = "ppm", top_n = 30L,
   empty <- tibble(mz_lo = numeric(), mz_hi = numeric(), delta = numeric(),
                   origin = character(), int_lo = numeric(), int_hi = numeric())
   cp <- centroid_peaks(spec_df, rel_floor = rel_floor)
+  if (isTRUE(ignore_isotopes)) cp <- deisotope(cp, tol, unit)
   if (nrow(cp) < 2) return(empty)
   cp <- cp[order(-cp$intensity), , drop = FALSE]
   cp <- utils::head(cp, top_n)
@@ -242,9 +234,10 @@ difference_network <- function(spec_df, tol = 10, unit = "ppm", top_n = 30L,
     # the tiny difference: a 10 ppm peak pair at m/z 425 leaves ~0.008 Da slack on
     # an 18 Da loss, but ppm-of-18 would be 0.0002 Da and miss the whole ladder.
     win <- tol_to_da(lo, tol, unit) + tol_to_da(hi, tol, unit)
-    if (ignore_isotopes) {                       # skip M+1 / M+2 / M+3 spacings
-      ik <- round(delta / ISOTOPE_SPACING)
-      if (ik >= 1 && ik <= 3 && abs(delta - ik * ISOTOPE_SPACING) <= win) next
+    if (ignore_isotopes) {                  # also skip any isotope-spaced delta:
+      ik <- round(delta / ISOTOPE_SPACING)  # deisotoping misses pairs where the
+      if (ik >= 1 && ik <= 3 &&             # satellite is the taller/noise peak.
+          abs(delta - ik * ISOTOPE_SPACING) <= win) next
     }
     m <- which(abs(af$mz_diff - delta) <= win)
     if (length(m)) {
@@ -257,6 +250,74 @@ difference_network <- function(spec_df, tol = 10, unit = "ppm", top_n = 30L,
   }
   if (!k) return(empty)
   do.call(rbind, rows)
+}
+
+#' Detect isotopologue groups in a spectrum with MetaboCoreUtils (the
+#' RforMassSpectrometry isotope model: 13C/34S/37Cl substitutions with expected
+#' intensity-ratio bounds, charge-aware — the machinery `Spectra::deisotopeSpectra`
+#' uses). Returns a list of integer vectors of ORIGINAL `spec_df` row indices, each
+#' an isotope envelope ordered by m/z (first = monoisotopic). The detector needs
+#' m/z-sorted input, so we sort and map indices back. Single isotope primitive used
+#' by both deisotoping (drop satellites) and annotation (label satellites).
+#' @noRd
+iso_groups <- function(spec_df, tol = 10, unit = "ppm", charge = 1L) {
+  if (nrow(spec_df) < 2) return(list())
+  o <- order(spec_df$mz)
+  x <- cbind(mz = spec_df$mz[o], intensity = spec_df$intensity[o])
+  ppm <- if (identical(unit, "ppm")) tol else 0
+  tolerance <- if (identical(unit, "ppm")) 0 else tol
+  grps <- tryCatch(
+    MetaboCoreUtils::isotopologues(x, ppm = ppm, tolerance = tolerance, charge = charge),
+    error = function(e) list())
+  lapply(grps, function(g) o[g])      # original indices, still ascending in m/z
+}
+
+#' Reduce a centroid list to monoisotopic peaks: drop every non-first member of a
+#' detected isotopologue group (tried for charge 1 and 2). Ungrouped peaks remain.
+#' @noRd
+deisotope <- function(cp, tol = 10, unit = "ppm", charges = 1:2) {
+  if (nrow(cp) < 2) return(cp)
+  drop <- integer(0)
+  for (z in charges)
+    drop <- union(drop, unlist(lapply(iso_groups(cp, tol, unit, z), function(g) g[-1])))
+  cp[setdiff(seq_len(nrow(cp)), drop), , drop = FALSE]
+}
+
+#' Label the isotopes of each matched adduct/fragment by DETECTION anchored to the
+#' expected position: for k = 1..n look for a real peak at mono + k*(13C/charge)
+#' within tolerance, with a plausible intensity (an isotope shouldn't dwarf its
+#' monoisotope). Only peaks actually present are labelled. Position-anchored rather
+#' than via isotopologues() grouping because real MS2 isotope centroids are often
+#' tens of ppm off the theoretical spacing, which defeats strict grouping at the
+#' user's tolerance and yields spurious groups in dense spectra; the user's
+#' tolerance governs how far off the spacing may be.
+#' @importFrom tibble tibble
+#' @noRd
+add_detected_isotopes <- function(tab, spec_df, n = 2L, tol = 10, unit = "ppm") {
+  hits <- tab[tab$matched & tab$type %in% c("adduct", "fragment"), , drop = FALSE]
+  if (!nrow(hits)) return(tab)
+  cp <- centroid_peaks(spec_df, rel_floor = 0)
+  if (!nrow(cp)) return(tab)
+  extra <- list()
+  for (i in seq_len(nrow(hits))) {
+    z <- abs(hits$charge[i]); if (!is.finite(z) || z < 1) z <- 1
+    mono_mz <- hits$mz_obs[i]; mono_int <- hits$intensity[i]
+    for (k in seq_len(n)) {
+      em <- mono_mz + k * ISOTOPE_SPACING / z
+      win <- tol_to_da(em, tol, unit)
+      cand <- which(abs(cp$mz - em) <= win)
+      if (!length(cand)) next                       # isotope must be present
+      j <- cand[which.min(abs(cp$mz[cand] - em))]
+      if (cp$intensity[j] > 1.5 * mono_int) next     # not a plausible satellite
+      extra[[length(extra) + 1L]] <- tibble(
+        label = sprintf("%s [+%d]", hits$label[i], k), type = "isotope",
+        mz = em, charge = hits$charge[i], mz_obs = cp$mz[j],
+        intensity = cp$intensity[j], ppm_err = (cp$mz[j] - em) / em * 1e6,
+        matched = TRUE)
+    }
+  }
+  if (!length(extra)) return(tab)
+  rbind(tab, do.call(rbind, extra)[, names(tab), drop = FALSE])
 }
 
 # --- small internals ---------------------------------------------------------

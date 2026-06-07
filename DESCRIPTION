@@ -2,13 +2,13 @@ Package: xcmsVisGUI
 Title: Interactive Raw LC-MS Viewer (Shiny)
 Version: 0.0.0.9000
 Authors@R:
-    person("Jan", "Stanstrup", email = "stanstrup@gmail.com", role = c("aut", "cre"))
+    person("Jan", "Stanstrup", email = "stanstrup@gmail.com", role = c("aut", "cre", "cph"))
 Description: A local Shiny desktop application for interactively visualising raw
     LC-MS data on the RforMassSpectrometry stack (Spectra, MsExperiment, xcms).
     Features asynchronous file reading, file inclusion control, rich filtering,
     multiple EICs per file, click-to-spectrum, 2D/3D maps, and
     publication-quality export.
-License: GPL-3
+License: MIT + file LICENSE
 URL: https://stanstrup.github.io/xcmsVisGUI, https://github.com/stanstrup/xcmsVisGUI
 BugReports: https://github.com/stanstrup/xcmsVisGUI/issues
 Encoding: UTF-8

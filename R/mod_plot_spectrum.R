@@ -312,6 +312,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
 
     plot_gg <- reactive({
       df <- spec_df(); req(nrow(df) > 0)
+      df$sample_name <- strip_ext(df$sample_name)   # display label: drop extension
       unit <- rv$settings$time_unit
       col1 <- brewer_qual(1, rv$settings$qual_palette)
       if (identical(input$layout, "stacked")) {

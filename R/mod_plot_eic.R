@@ -164,6 +164,7 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       df <- eic_df(); req(nrow(df) > 0)
       m <- meta()
       df$sample_group <- m$sample_group[match(df$sample_id, m$id)]
+      df$sample_name <- strip_ext(df$sample_name)   # display label: drop extension
       cby <- input$color_by
       unit <- rv$settings$time_unit
       df$rt_disp <- rt_to_disp(df$rt, unit)

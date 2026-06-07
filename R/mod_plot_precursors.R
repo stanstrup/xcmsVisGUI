@@ -51,6 +51,7 @@ mod_plot_precursors_server <- function(id, rv, included) {
 
     plot_gg <- reactive({
       df <- prec_df(); validate(need(nrow(df) > 0, "No precursor ions found."))
+      df$sample_name <- strip_ext(df$sample_name)   # display label: drop extension
       unit <- rv$settings$time_unit
       df$rt_disp <- rt_to_disp(df$rt, unit)
       df$.tip <- sprintf("precursor m/z: %.4f\nscan: %s\nrt: %.4g %s | %s",

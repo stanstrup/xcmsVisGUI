@@ -52,6 +52,7 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
       # recolors without re-extracting.
       m <- meta()
       df$sample_group <- m$sample_group[match(df$sample_id, m$id)]
+      df$sample_name <- strip_ext(df$sample_name)   # display label: drop extension
       cby <- input$color_by
       lvls <- unique(df[[cby]])
       pal <- brewer_named(lvls, rv$settings$qual_palette)

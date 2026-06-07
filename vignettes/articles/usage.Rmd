@@ -112,11 +112,7 @@ package; the ion mode defaults to the file's polarity. There are three modes:
   base peak is itself a water loss, that is the right call and the neutral mass is
   derived from it (so `[M+H]+` is then annotated at base + 18). Press **Suggest
   molecular ion**; the top-scoring hypothesis is annotated immediately — click
-  another row to switch. (Auto mode has no manual anchor box.) **Climb water-loss
-  ladder** (on by default) steps up the +H₂O series from the suggested ion to the
-  heaviest peak — findMAIN only knows a single water loss, so for spectra dominated
-  by sequential in-source water losses it otherwise anchors a lower rung and
-  under-calls the neutral mass.
+  another row to switch. (Auto mode has no manual anchor box.)
 - **Difference network** — annotates *pairs* of peaks whose *m/z* difference
   matches a known adduct/fragment, with no anchor needed (e.g. a ladder of water
   losses). Its match window is your instrument's mass accuracy at the two peaks,

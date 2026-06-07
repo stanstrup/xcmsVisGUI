@@ -86,8 +86,6 @@ mod_plot_spectrum_ui <- function(id) {
               sprintf("input['%s'] == 'auto'", ns("ann_mode")),
               actionButton(ns("suggest"), "Suggest molecular ion",
                            class = "btn-sm btn-outline-primary mb-2"),
-              checkboxInput(ns("ann_climb"),
-                            "Climb water-loss ladder to molecular ion", value = TRUE),
               helpText("findMAIN ranks molecular-ion hypotheses; the top one is ",
                        "annotated — click another row to switch."),
               DTOutput(ns("ranked"))),
@@ -271,17 +269,6 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         r <- ranked(); req(nrow(r) > 0)               # silent until Suggest is run
         pick <- min(auto_pick(), nrow(r))
         anchor <- r$adductmz[pick]; adduct <- r$adducthyp[pick]
-        # Climb the water-loss ladder to the molecular ion: findMAIN only knows the
-        # single water loss, so for water-loss-dominated spectra it anchors a lower
-        # rung. Re-anchor on the heaviest [M+H]+/[M-H]- the ladder reaches.
-        if (isTRUE(input$ann_climb)) {
-          rl <- adduct_rules(input$ann_pol)
-          principal <- quasi_adducts(input$ann_pol)[1]
-          M0 <- neutral_mass(anchor, rl[rl$name == adduct, , drop = FALSE])
-          mh <- adduct_mz(M0, rl[rl$name == principal, , drop = FALSE])[1]
-          top <- climb_water_ladder(df, mh, input$ann_tol, input$ann_unit)
-          if (is.finite(top) && top > mh + 0.5) { anchor <- top; adduct <- principal }
-        }
       } else {
         req(is.finite(input$anchor_mz),
             isTRUE(input$ann_adduct %in% quasi_adducts(input$ann_pol)))

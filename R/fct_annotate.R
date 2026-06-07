@@ -217,25 +217,6 @@ rank_anchors <- function(spec_df, mode = c("pos", "neg"), ppm = 5,
   tibble::as_tibble(utils::head(s, top_n))
 }
 
-#' Climb an in-source water-loss ladder to the molecular ion. findMAIN only knows
-#' the single water loss [M+H-H2O]+, so for a spectrum dominated by sequential
-#' water losses it under-calls the neutral mass (anchors a fragment rung). From a
-#' candidate principal-ion m/z, step UP by WATER_MASS while a peak exists there
-#' (the heaviest reachable rung is the true [M+H]+ / [M-H]-). Returns the topmost
-#' m/z (= the input when there is no ladder). Bounded by `max_steps`.
-#' @noRd
-climb_water_ladder <- function(spec_df, mh_mz, tol = 10, unit = "ppm", max_steps = 8L) {
-  if (!nrow(spec_df) || !is.finite(mh_mz)) return(mh_mz)
-  cur <- mh_mz
-  for (s in seq_len(max_steps)) {
-    target <- cur + WATER_MASS
-    hit <- which(abs(spec_df$mz - target) <= tol_to_da(target, tol, unit))
-    if (!length(hit)) break
-    cur <- spec_df$mz[hit[which.max(spec_df$intensity[hit])]]
-  }
-  cur
-}
-
 #' Difference network (mode 3): annotate peak PAIRS whose m/z difference matches a
 #' commonMZ adducts_fragments entry. No anchor needed. Returns tibble(mz_lo, mz_hi,
 #' delta, origin, int_lo, int_hi), one row per matched edge among the `top_n` most

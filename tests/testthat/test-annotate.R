@@ -186,15 +186,6 @@ test_that("isotope tolerance widens the isotope-spacing match", {
   expect_equal(nrow(loose[abs(loose$delta - 2.030) < 0.01, ]), 0)  # skipped
 })
 
-test_that("climb_water_ladder reaches the molecular ion at the top", {
-  w <- 18.010565; base <- 434.32056
-  spec <- tibble::tibble(mz = c(base - w, base, base + w, base + 2 * w, 999.0),
-                         intensity = c(50, 1000, 200, 80, 500))
-  expect_equal(climb_water_ladder(spec, base, tol = 30), base + 2 * w, tolerance = 1e-4)
-  expect_equal(climb_water_ladder(spec, base - w, tol = 30), base + 2 * w, tolerance = 1e-4)
-  expect_equal(climb_water_ladder(spec, 999.0, tol = 30), 999.0)  # no ladder -> stays
-})
-
 test_that("rank_anchors suggests the right molecular ion via findMAIN", {
   skip_if_not_installed("commonMZ")
   skip_if_not_installed("InterpretMSSpectrum")

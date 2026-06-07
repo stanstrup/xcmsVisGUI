@@ -24,10 +24,6 @@ ISOTOPE_SPACING <- 1.0033548
 # via the annotation "Isotope tol" control.
 ISO_TOL_DA <- 0.015
 
-# Monoisotopic mass of H2O — the in-source neutral loss used to climb a water-loss
-# ladder from a findMAIN water-loss suggestion up to the molecular ion.
-WATER_MASS <- 18.010565
-
 # --- Retention-time unit helpers ------------------------------------------
 # Data is always handled internally in SECONDS (xcms/Spectra native). These
 # convert to/from the user-facing display unit (minutes by default).

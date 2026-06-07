@@ -229,7 +229,8 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       df <- ann_peaks(spec_df()); validate(need(nrow(df) > 0, "No spectrum."))
       ppm <- if (identical(input$ann_unit, "ppm")) input$ann_tol else 5
       withProgress(message = "Ranking molecular-ion hypotheses…", value = 0.5,
-                   rank_anchors(df, mode = input$ann_pol, ppm = ppm, rel_floor = 0))
+                   rank_anchors(df, mode = input$ann_pol, ppm = ppm, rel_floor = 0,
+                                top_n = 25L))
     })
     auto_pick <- reactiveVal(1L)
     observeEvent(ranked(), auto_pick(1L))                       # reset on a new run
@@ -239,8 +240,11 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       disp <- data.frame(adduct = r$adducthyp, `neutral mass` = round(r$neutral_mass, 4),
                          peaks = r$adducts_explained, score = round(r$total_score, 2),
                          check.names = FALSE)
+      # Sortable + scrollable so the full hypothesis list is visible — click the
+      # "neutral mass" header to bring the heaviest (molecular-ion) hypothesis up.
       datatable(disp, rownames = FALSE, selection = "single",
-                options = list(dom = "t", paging = FALSE, ordering = FALSE))
+                options = list(dom = "t", paging = FALSE, ordering = TRUE,
+                               scrollY = "260px", scrollCollapse = TRUE))
     })
 
     # Isotope settings (shared by all modes).

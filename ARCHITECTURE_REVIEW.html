@@ -37,7 +37,10 @@
 
 <div id="architecture-review--xcmsvisgui" class="section level1">
 
-<p>Date: 2026-06-05. Method: two independent reviewers analysed the full codebase (<code>app.R</code>, <code>global.R</code>, all <code>R/*.R</code>, <code>test-smoke.R</code>, <code>PLAN.md</code>, <code>CLAUDE.md</code>), then debated to consensus:</p>
+<p>Date: 2026-06-05 (file refs updated 2026-06-06 for the package conversion). Method: two independent reviewers analysed the full codebase (then <code>app.R</code>, <code>global.R</code>, all <code>R/*.R</code>, <code>test-smoke.R</code>, <code>PLAN.md</code>, <code>CLAUDE.md</code>), then debated to consensus:</p>
+<blockquote>
+<p><strong>Note:</strong> this review predates the R-package conversion. Where it says <code>app.R</code> read <code>R/run_app.R</code>; <code>global.R</code> is now split into <code>R/zzz.R</code> (the <code>.onLoad</code> SerialParam fix), <code>R/constants.R</code>, and <code>R/daemons.R</code>; <code>test-smoke.R</code> / <code>tests/run-tests.R</code> are now <code>tests/testthat/</code>. See the <strong>Decision log</strong> at the bottom for everything done <em>after</em> this review (package, cache, export, pkgdown, Docker, CI, persistent settings, xcmsVis).</p>
+</blockquote>
 <ul><li>
 <strong>Agent P</strong> — pragmatic maintainer, bias toward low-risk incremental change.</li>
 <li>
@@ -79,9 +82,9 @@
 <div class="section level2">
 <h2 id="what-is-already-good--do-not-touch">What is already good — do not touch<a class="anchor" aria-label="anchor" href="#what-is-already-good--do-not-touch"></a></h2>
 <ul><li>
-<strong>Centralised performance contract.</strong> <code>register(SerialParam())</code> once in <code>global.R</code>; mirai workers only <code><a href="https://github.com/sneumann/mzR/" class="external-link">library(mzR)</a></code>; heavy Spectra/xcms work in the main process. This is the whole performance story — off-limits.</li>
+<strong>Centralised performance contract.</strong> <code>register(SerialParam())</code> once in <code>R/zzz.R</code> (<code>.onLoad</code>); mirai workers only <code><a href="https://github.com/sneumann/mzR/" class="external-link">requireNamespace("mzR")</a></code>; heavy Spectra/xcms work in the main process. This is the whole performance story — off-limits.</li>
 <li>
-<strong>Clean reactive graph</strong> in the composition root: <code>included()</code> → <code>data_key()</code> → <code>raw_msexp()</code> (cached) → <code>dataset()</code> → modules (<code>app.R</code>).</li>
+<strong>Clean reactive graph</strong> in the composition root: <code>included()</code> → <code>data_key()</code> → <code>raw_msexp()</code> (cached) → <code>dataset()</code> → modules (<code>R/run_app.R</code>).</li>
 <li>
 <strong>Cache discipline</strong>: <code>data_key()</code> keyed only on path-set + filter; <code>bindCache</code> on heavy reactives excludes cosmetic inputs.</li>
 <li>
@@ -159,7 +162,7 @@
 <div class="section level3">
 <h3 id="tier-1--do-now-low-risk-additive-high-value--white_check_mark-all-done">Tier 1 — do now (low-risk, additive, high value) — ✅ ALL DONE<a class="anchor" aria-label="anchor" href="#tier-1--do-now-low-risk-additive-high-value--white_check_mark-all-done"></a></h3>
 <ol style="list-style-type: decimal"><li><p>✅ <strong><code>finalize_plotly(p, source, keep_zoom)</code> helper</strong> — S · low. <em>DoD:</em> the identical <code>ggplotly → keep_zoom → 3× event_register</code> chain (issue 1) is one call in all 5 modules; app boots HTTP 200; zoom + click still work on faahKO + msdata. A <code>wire_selection(source, plot_name)</code> helper for the near-identical click→<code>rv$selection</code> handler can ride along. <em>Done:</em> added <code>register_plotly_events</code> / <code>finalize_plotly</code> / <code>wire_selection</code>; click→spectrum verified interactively.</p></li>
-<li><p>✅ <strong>Filter-equivalence invariant test</strong> — M · low. <em>The single highest-value item.</em> <em>DoD:</em> for a battery of filter configs (ms_level, rt, mz, intensity, polarity, spectrum_id), the spectra surviving <code>apply_filters</code> <strong>equal</strong> those surviving <code>apply_filters_spectra</code> on a real msdata file. Folds in the old <code>benchmarks/filter-test.R</code>. Makes the lock-step (issue 2) safe. <em>Done:</em> <code>tests/test-filters.R</code>. <strong>Note:</strong> implemented in a dependency-free runner (<code>tests/run-tests.R</code>), <strong>not</strong> <code>tests/testthat/</code> — testthat isn’t in the renv library and the app is sourced, not installed. (See future_work: “make it into an R package” would move this to testthat.)</p></li>
+<li><p>✅ <strong>Filter-equivalence invariant test</strong> — M · low. <em>The single highest-value item.</em> <em>DoD:</em> for a battery of filter configs (ms_level, rt, mz, intensity, polarity, spectrum_id), the spectra surviving <code>apply_filters</code> <strong>equal</strong> those surviving <code>apply_filters_spectra</code> on a real msdata file. Folds in the old <code>benchmarks/filter-test.R</code>. Makes the lock-step (issue 2) safe. <em>Done:</em> <code>tests/testthat/test-filters.R</code>. <strong>Update (2026-06-06):</strong> the original dependency-free <code>tests/run-tests.R</code> runner has since been folded into <code>tests/testthat/</code> as part of the package conversion — testthat (edition 3) is now the suite, run via <code>testthat::test_local(".")</code> / <code>R CMD check</code>.</p></li>
 <li><p>✅ <strong>Single filter schema + <code>make_filter()</code> constructor</strong> — S/M · low-med. <em>DoD:</em> <code>make_rv()</code> and <code>mod_filter</code> build the filter from one definition (issue 3). <em>Done:</em> <code>empty_filter()</code> + <code>make_filter()</code> in <code>fct_filters.R</code>.</p></li>
 <li><p>✅ <strong>Kill the <code>rv$filter$ms_level</code> leak</strong> — S · low. <em>DoD:</em> a single <code>chrom_ms_level(filter)</code> helper holds the <code>… else 1L</code> default (issue 4); tic/eic no longer read <code>rv$filter$ms_level</code> directly. <em>Done.</em></p></li>
 <li><p>✅ <strong>Tests for the pure helpers</strong> — S · low. <em>DoD:</em> covers rt round-trips, <code>bin_peaks</code>, <code>combined_ranges</code>, <code>polarity_label</code>, <code>isTRUE_vec</code>, scan-matching, palettes, filter helpers; <code>test-smoke.R</code> upgraded to assert. <em>Done:</em> <code>tests/test-helpers.R</code> (+ smoke <code>stopifnot</code>). 72 assertions.</p></li>
@@ -190,7 +193,7 @@
 <li>
 <strong>Async-ifying heavy reads, a state-management framework, a DT-checkbox abstraction, a swappable-backend layer</strong> — out of scope / speculative.</li>
 <li>
-<strong>Peak picking / grouping / alignment</strong> — deferred by design (<code>PLAN.md</code> §16).</li>
+<strong>Peak picking / grouping / alignment</strong> — deferred by design (see <strong>Deferred: preprocessing</strong> below).</li>
 </ul><hr></div>
 </div>
 <div class="section level2">
@@ -201,8 +204,82 @@
 <hr></div>
 <div class="section level2">
 <h2 id="suggested-execution-order">Suggested execution order<a class="anchor" aria-label="anchor" href="#suggested-execution-order"></a></h2>
-<p>✅ <strong>Done</strong> — all of Tier 1 and Tier 2 were implemented in this order across separate parse-checked, test- and smoke-verified commits on <code>main</code>. Remaining ideas (R package, CI, Docker, persistent settings, default tol setting, CommonMZ/CAMERA, xcms objects, persistent cache) are tracked in <code>future_work.md</code>.</p>
+<p>✅ <strong>Done</strong> — all of Tier 1 and Tier 2 were implemented in this order across separate parse-checked, test- and smoke-verified commits on <code>main</code>. The post-review work (R package, CI, Docker, persistent settings, default tol setting, persistent cache, rds export, spectrum annotation) is now also done — see the Decision log below. Remaining ideas (xcms objects, peak picking, CAMERA-style cross-sample grouping) live in <code>future_work.md</code> and the <strong>Deferred: preprocessing</strong> section below.</p>
+<hr></div>
+<div class="section level2">
+<h2 id="decision-log-work-done-after-the-review-above">Decision log (work done after the review above)<a class="anchor" aria-label="anchor" href="#decision-log-work-done-after-the-review-above"></a></h2>
+<p>Everything here landed on <code>main</code> after the Tier-1/Tier-2 roadmap, each as its own parse-checked + <code>R CMD check</code>-clean commit. Recorded so these decisions don’t get re-litigated.</p>
+<div class="section level3">
+<h3 id="packaging--infrastructure">Packaging &amp; infrastructure<a class="anchor" aria-label="anchor" href="#packaging--infrastructure"></a></h3>
+<ul><li>
+<strong>Converted the sourced app into an installable R package.</strong> <code>app.R</code> + the side-effecting tail of <code>global.R</code> → exported <code><a href="reference/run_app.html">run_app()</a></code> in <code>R/run_app.R</code>; <code>global.R</code> split into <code>R/zzz.R</code> (<code>.onLoad</code> → <code>register(SerialParam())</code>), <code>R/constants.R</code>, <code>R/daemons.R</code>. Imports declared per-function via roxygen; NAMESPACE/<code>man/</code> are generated. The MS S4 stack (Spectra/MsExperiment/xcms/ BiocParallel/mzR) is called via <code>::</code> to dodge overlapping-generic conflicts.</li>
+<li>
+<strong>Test suite → testthat (edition 3)</strong> in <code>tests/testthat/</code>; <code>R CMD check</code> passes Status: OK. Real-data tests skip when <code>msdata</code>/<code>faahKO</code> are absent.</li>
+<li>
+<strong>CI</strong> — GitHub Actions <code>R-CMD-check.yaml</code> (full suite incl. real data) + <code>pkgdown.yaml</code>; renv autoloader disabled in CI.</li>
+<li>
+<strong>pkgdown site</strong> with a screenshot-driven usage guide (<code>vignettes/articles/usage.Rmd</code>, chromote-captured figures via <code>data-raw/capture-screenshots.R</code>). Replaced the hand-written <code>USER_GUIDE.md</code>.</li>
+<li>
+<strong>Docker</strong> wrapper (Bioconductor base) for server deployment.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="persistence">Persistence<a class="anchor" aria-label="anchor" href="#persistence"></a></h3>
+<ul><li>
+<strong>Settings persist across restarts</strong> — allow-listed fields written as JSON to the per-user config dir (<code>tools::R_user_dir("xcmsVisGUI","config")</code>, <code>R/fct_settings_store.R</code>). Chosen over an in-package file so a normal install is writable. Added a <strong>default EIC tolerance</strong> setting (value + ppm/Da).</li>
+<li>
+<strong>Persistent extraction cache</strong> (<code>R/fct_cache.R</code>) — heavy <code>bindCache</code> results (TIC/BPC + EIC tibbles) go into a <strong>layered memory + disk</strong> cache: memory is the fast in-session primary, disk is the persistent backing so re-opening the app with the same files + filter is instant. The disk layer is a custom cachem-compatible store serialising with <strong>qs2 at <code>compress_level = 0</code></strong> (benchmarked: gzip RDS 1.5–4 s vs qs2 L0 0.1–0.4 s at this app’s 0.5–1.5M-row result sizes, similar file size). LRU eviction past ~2 GB / 30 days. The raw <code>MsExperiment</code> stays in a <strong>session (memory) cache only</strong> — not worth disk-serialising an S4 object with a file-backed backend. <code>clear_ms_caches()</code> (“Clear all”) also resets the disk cache. <strong>No mtime keying</strong> (files aren’t overwritten in practice — confirmed with the user).</li>
+</ul></div>
+<div class="section level3">
+<h3 id="export">Export<a class="anchor" aria-label="anchor" href="#export"></a></h3>
+<ul><li>
+<strong><code>rds</code> export</strong> added alongside png/svg/pdf — saves the ggplot object itself (<code>save_gg()</code> rds branch), so a figure can be reopened and re-tweaked in R.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="spectrum-annotation-adducts--isotopes--in-source-fragments">Spectrum annotation (adducts / isotopes / in-source fragments)<a class="anchor" aria-label="anchor" href="#spectrum-annotation-adducts--isotopes--in-source-fragments"></a></h3>
+<p>Single-spectrum annotation overlaid on the Spectrum view (<code>R/fct_annotate.R</code> + <code>mod_plot_spectrum</code>). <strong>commonMZ</strong> (GitHub-only, hence the <code>Remotes:</code> field) is the adduct/fragment <strong>dictionary</strong>; <strong>InterpretMSSpectrum::findMAIN</strong> is the auto <strong>ranker</strong> — both hard Imports. Three modes share one dictionary so manual and auto annotate identically: - <strong>Manual anchor</strong> — user designates a peak as a known ion; we invert to the neutral mass (<code>m/z = (nmol·M + massdiff)/|charge|</code>, massdiff from <code><a href="https://rdrr.io/pkg/commonMZ/man/MZ_CAMERA.html" class="external-link">commonMZ::MZ_CAMERA</a></code>) and project all adducts + M+1 isotopes + in-source neutral losses (<code><a href="https://rdrr.io/pkg/commonMZ/man/package.html" class="external-link">commonMZ::adducts_fragments</a></code>), matching within the shared ppm/Da tol. - <strong>Auto-suggest</strong> — <code>findMAIN</code> (constrained to commonMZ’s quasi-molecular adducts) ranks (M, main-adduct) hypotheses; the chosen row fills the anchor. - <strong>Difference network</strong> — peak pairs whose Δm/z matches a dictionary entry.</p>
+<p>Why <strong>not</strong> CAMERA / cliqueMS / RAMClustR: those need a multi-sample feature matrix (coelution/correlation across detected peaks) — incompatible with this app’s raw-only, one-spectrum-at-a-time model, and prone to false hits on noisy raw scans. The anchor-first design puts the molecular-ion decision with the user. The engine is pure (no Shiny) and unit-tested on synthetic + real (<code>msdata</code>) spectra. Click disambiguation: a <em>Click → EIC list | → set anchor</em> toggle reuses the existing spectrum-click plumbing. Annotation tolerance reuses the persisted default-tolerance setting (no new persisted fields). Re-encodes commonMZ’s Latin-1 origin text to UTF-8.</p>
 </div>
+<div class="section level3">
+<h3 id="xcmsvis--evaluated-and-declined-for-now">xcmsVis — evaluated and declined (for now)<a class="anchor" aria-label="anchor" href="#xcmsvis--evaluated-and-declined-for-now"></a></h3>
+<p>Re-examined whether to delegate plotting to <strong>xcmsVis</strong> (<code>gplot*</code> → ggplot, amendable post-hoc with <code>+ aes()/geom_/scale_</code>). <strong>Declined for the current raw-only scope.</strong> Reasons: 1. <strong>Loadability</strong> — in this R install, <em>accessing any exported symbol</em> segfaults (reproducible, exit 139; likely a lazy-load/Rcpp-ABI issue after Rcpp 1.1.0→1.1.1). <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library(xcmsVis)</a></code> loads but the first symbol touch crashes — so it isn’t even callable here right now. 2. <strong>Input type</strong> — its methods dispatch on <code>XChromatograms</code> / <code>XcmsExperiment</code> / <code>MChromatograms</code> (xcms/MSnbase result objects). We deliberately extract to plain tibbles (cached, computed under SerialParam); feeding xcmsVis means keeping xcms objects live, which fights the qs2 tibble cache. 3. <strong>Post-hoc <code>+</code> is additive only</strong> — it can’t rewire mappings already baked into existing layers. The GUI needs exactly such changes: the <code>key</code> aesthetic on the line geom for plotly click-nav, the seconds→display-unit transform, and ColorBrewer (xcmsVis uses viridis/topo/gradientn). None retrofit via <code>+</code>. 4. <strong>ggplotly round-trip</strong> isn’t guaranteed (custom <code>geom_polygon</code> fills; feature views compose with <strong>patchwork</strong>, which <code>ggplotly()</code> can’t convert). 5. <strong>Scope</strong> — most <code>gplot*</code> functions are peak/feature plots, the territory we defer (see <strong>Deferred: preprocessing</strong> below).</p>
+<p><strong>Revisit when:</strong> peak picking lands — we’d then have <code>XcmsExperiment</code> objects, the segfault is presumably fixed, and <code>gplotChromPeaks</code> / <code>gplotFeatureGroups</code> could back dedicated peak views (adding our own <code>key</code> layer on top is workable on fresh plots). Tracked in <code>future_work.md</code>.</p>
+<hr></div>
+</div>
+<div class="section level2">
+<h2 id="original-design-from-the-former-planmd">Original design (from the former PLAN.md)<a class="anchor" aria-label="anchor" href="#original-design-from-the-former-planmd"></a></h2>
+<p>The implementation plan is folded in here so there’s one design doc. The as-built app diverges from it in two big ways (both covered above): plotting is <strong>not</strong> delegated to xcmsVis (we build ggplots ourselves), and it’s an R package rather than a sourced <code>app.R</code>/<code>global.R</code> app dir. Everything else below held up.</p>
+<p><strong>Locked decisions</strong> (still in force):</p>
+<table class="table"><colgroup><col width="50%"><col width="50%"></colgroup><thead><tr><th>Decision</th>
+<th>Choice</th>
+</tr></thead><tbody><tr><td>Deployment</td>
+<td>
+<strong>Local desktop</strong>, single user</td>
+</tr><tr><td>Scope</td>
+<td>
+<strong>Raw visualisation only</strong> — no peak picking / grouping / alignment (deferred, below)</td>
+</tr><tr><td>Async engine</td>
+<td><strong><code>ExtendedTask</code> + <code>mirai</code></strong></td>
+</tr><tr><td>Colours</td>
+<td>
+<strong>ColorBrewer / viridis</strong> throughout</td>
+</tr><tr><td>Testing</td>
+<td>
+<strong>Always test on real data</strong> (<code>msdata</code> / <code>faahKO</code>)</td>
+</tr></tbody></table><p><strong>Tech stack:</strong> Shiny + <code>bslib</code> (<code>page_navbar</code>); Shiny modules (one per plot + ingest/filter/settings); <code>Spectra</code>/<code>MsExperiment</code>/<code>xcms</code> with the on-disk mzR backend; <code>DT</code> for the editable EIC target table; <code>ggsave</code> for vector export (the ggplot is the export source of truth, plotly is the on-screen widget only).</p>
+<p><strong>Plot catalog</strong> (the five raw-capable views that shipped): TIC/BPC overlay (<code>chromatogram(aggregationFun="sum"/"max")</code>), multi-m/z EIC (target table → mz-range matrix), click-driven Spectrum (nearest scan + scan-list browser), 2D MS map + 3D points/surface (plotly-native), and DDA Precursor ions.</p>
+<p><strong>Design points worth keeping in mind</strong> (resolved during the build): - mirai workers return <strong>extracted data</strong> (tibbles), not live on-disk <code>Spectra</code> handles — handles don’t cross process boundaries cleanly. - <code>gplot(XcmsExperiment)</code> on raw data was avoided entirely (we extract TIC / MS map directly), sidestepping its “requires detected peaks” coupling. - The Spectra <strong>backend</strong> question (<code>MsBackendMzR</code> vs Memory/Sql/Hdf5) was settled by the perf investigation: on-disk mzR under <code>SerialParam</code>, with header summaries read via raw mzR in workers. See CLAUDE.md “THE performance story” (the standalone benchmark write-up was filed as an upstream Bioconductor issue and removed from the repo).</p>
+<hr></div>
+<div class="section level2">
+<h2 id="deferred-preprocessing-do-not-build-now">Deferred: preprocessing (do NOT build now)<a class="anchor" aria-label="anchor" href="#deferred-preprocessing-do-not-build-now"></a></h2>
+<p>Out of current scope by design — recorded here (formerly PLAN.md §16) as the brief for a future <code>mod_preprocess</code>. References elsewhere to “the deferred preprocessing scope” point here.</p>
+<ul><li>
+<strong>Pipeline:</strong> <code>findChromPeaks</code> (CentWave / MatchedFilter params UI) → <code>groupChromPeaks</code> (PeakDensity) → <code>adjustRtime</code> (Obiwarp / PeakGroups) → <code>groupFeatures</code>. Run async (ExtendedTask + mirai); keep the processed <code>XcmsExperiment</code> alongside the raw data.</li>
+<li>
+<strong>Unlocks the peak/feature plots</strong> — <code>gplotChromPeaks</code>, <code>gplotChromPeakImage</code>, <code>ghighlightChromPeaks</code> (peak overlay on EICs), <code>gplotChromPeakDensity</code> (param tuning), <code>gplotFeatureGroups</code>, <code>gplotAdjustedRtime</code> (alignment QC). This is the natural moment to <strong>reconsider xcmsVis</strong> (see the Decision log): we’d then have <code>XcmsExperiment</code> objects, which is exactly what its <code>gplot*</code> methods want.</li>
+<li>
+<code>gplotChromPeakDensity</code> is ideal for interactive <code>bw</code> / <code>minFraction</code> tuning.</li>
+<li>Also deferred: importing an already-processed <code>XcmsExperiment</code> / <code>.rds</code>.</li>
+</ul></div>
 </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

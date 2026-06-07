@@ -55,11 +55,12 @@
 <div class="page-header"><h1 id="xcmsvisgui">xcmsVisGUI<a class="anchor" aria-label="anchor" href="#xcmsvisgui"></a>
 </h1></div>
 <p>A local Shiny desktop app (packaged as an R package) for interactively visualising <strong>raw LC-MS data</strong> on the RforMassSpectrometry stack (<code>Spectra</code> / <code>MsExperiment</code> / <code>xcms</code>). Plots are ggplot2 rendered through plotly for interactivity (click, zoom, hover); static export is via ggsave.</p>
-<p>See <a href="PLAN.html"><code>PLAN.md</code></a> for the original design and <a href="ARCHITECTURE_REVIEW.html"><code>ARCHITECTURE_REVIEW.md</code></a> for the current architecture.</p>
+<p>See <a href="ARCHITECTURE_REVIEW.html"><code>ARCHITECTURE_REVIEW.md</code></a> for the design, architecture, and decision log (it also folds in the original implementation plan).</p>
 <div class="section level2">
 <h2 id="status">Status<a class="anchor" aria-label="anchor" href="#status"></a>
 </h2>
-<p>Working: async file ingestion, settings (ColorBrewer/viridis palette, retention-time unit, default EIC tolerance, export defaults — persisted across restarts), global filters (rt / m/z / MS level / polarity / intensity / spectrum-id), and all raw-data plot views — TIC/BPC, multi-EIC, click-to-spectrum (+ scan-list browser), 2D MS map, 3D (points/surface), and DDA precursor ions. Scope is <strong>raw visualisation only</strong> — no peak picking / grouping / alignment (deferred; <code>PLAN.md</code> §16).</p>
+<p>Working: async file ingestion, settings (ColorBrewer/viridis palette, retention-time unit, default EIC tolerance, export defaults — persisted across restarts), global filters (rt / m/z / MS level / polarity / intensity / repeatable spectrum-id rules), and all raw-data plot views — TIC/BPC, multi-EIC, click-to-spectrum (+ scan-list browser), 2D MS map, 3D (points/surface), and DDA precursor ions. The Spectrum view also does single-spectrum <strong>adduct / isotope / in-source-fragment annotation</strong> (manual anchor, findMAIN auto-suggest, or difference network), using the <a href="https://github.com/stanstrup/commonMZ" class="external-link">commonMZ</a> dictionary + <a href="https://cran.r-project.org/package=InterpretMSSpectrum" class="external-link">InterpretMSSpectrum</a>. Scope is <strong>raw visualisation only</strong> — no peak picking / grouping / alignment (deferred; see <code>ARCHITECTURE_REVIEW.md</code>).</p>
+<p>Extraction results are cached to disk (qs2), so re-opening the app with the same files + filter is instant. Figures export as png/svg/pdf or as the raw ggplot object (rds) for later tweaking in R.</p>
 </div>
 <div class="section level2">
 <h2 id="running">Running<a class="anchor" aria-label="anchor" href="#running"></a>
@@ -113,11 +114,12 @@ R/
   mod_plot_spectrum.R  # spectrum at a clicked rt / picked scan + scan-list browser
   mod_plot_map.R       # 2D MS map + 3D points/surface (plotly-native)
   mod_plot_precursors.R# DDA precursor-ion map
-  mod_export.R         # reusable png/svg/pdf export modal
+  mod_export.R         # reusable png/svg/pdf/rds export modal
   fct_extract.R        # data extraction (summaries, chromatograms, peaks, spectra)
   fct_filters.R        # compose filter state into Spectra/xcms calls
-  fct_export.R         # ggsave-based export
+  fct_export.R         # ggsave-based export (+ rds = the ggplot object itself)
   fct_palettes.R       # ColorBrewer / viridis helpers
+  fct_cache.R          # layered mem+disk (qs2) cache backing bindCache, persistent across restarts
   fct_settings_store.R # persist settings to the per-user config dir
   utils_reactive.R     # central reactive state (rv) + plotly/zoom helpers
 tests/testthat/        # unit + real-data tests</code></pre>

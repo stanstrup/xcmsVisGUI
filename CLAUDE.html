@@ -37,10 +37,10 @@
 
 <div id="claudemd--working-notes-for-xcmsvisgui" class="section level1">
 
-<p>Read this before changing anything. It captures the non-obvious decisions, the performance traps, and the conventions this codebase follows. Also read <code>PLAN.md</code> (original design), <code>BENCHMARK.md</code> (the perf investigation), <code>ARCHITECTURE_REVIEW.md</code> (current architecture), and the pkgdown usage guide (<code>vignettes/articles/usage.Rmd</code>, user-facing behaviour).</p>
+<p>Read this before changing anything. It captures the non-obvious decisions, the performance traps, and the conventions this codebase follows. Also read <code>ARCHITECTURE_REVIEW.md</code> — the single design+architecture doc (folds in the former PLAN.md original design + the deferred-preprocessing brief, and carries the Decision log: package conversion, cache, export, xcmsVis). The perf root cause is summarised below under “THE performance story” (the standalone BENCHMARK.md write-up was filed upstream and removed). User-facing behaviour is in the pkgdown usage guide (<code>vignettes/articles/usage.Rmd</code>).</p>
 <div class="section level2">
 <h2 id="what-this-is">What this is<a class="anchor" aria-label="anchor" href="#what-this-is"></a></h2>
-<p>A <strong>local desktop Shiny app</strong> for interactively visualising <strong>raw</strong> LC-MS data (TIC/BPC, EICs, spectra, 2D/3D MS maps, DDA precursors). Single user, runs locally. Scope is <strong>raw visualisation only</strong> — no peak picking / grouping / alignment (deferred; see <code>PLAN.md</code> §16).</p>
+<p>A <strong>local desktop Shiny app</strong> for interactively visualising <strong>raw</strong> LC-MS data (TIC/BPC, EICs, spectra, 2D/3D MS maps, DDA precursors). Single user, runs locally. Scope is <strong>raw visualisation only</strong> — no peak picking / grouping / alignment (deferred; see <code>ARCHITECTURE_REVIEW.md</code> → “Deferred: preprocessing”).</p>
 </div>
 <div class="section level2">
 <h2 id="run--test-windows-dev-box">Run / test (Windows dev box)<a class="anchor" aria-label="anchor" href="#run--test-windows-dev-box"></a></h2>
@@ -82,7 +82,17 @@
 <code>brewer_qual/seq/colorscale</code> (ColorBrewer + viridis; <code>invert</code> reverses)</td>
 </tr><tr><td><code>R/fct_export.R</code></td>
 <td>
-<code>save_gg</code> (png/svg/pdf via ggsave)</td>
+<code>save_gg</code> (png/svg/pdf via ggsave; <strong>rds</strong> = save the ggplot object itself)</td>
+</tr><tr><td><code>R/fct_cache.R</code></td>
+<td>
+<code>cache_disk_qs2</code> (qs2 disk store), <code>app_cache</code> (layered mem+disk), <code>clear_disk_cache</code>
+</td>
+</tr><tr><td><code>R/fct_settings_store.R</code></td>
+<td>
+<code>load_settings</code>/<code>save_settings</code> — persist allow-listed settings as JSON to the per-user config dir</td>
+</tr><tr><td><code>R/fct_annotate.R</code></td>
+<td>spectrum annotation engine (pure): <code>adduct_rules</code>/<code>quasi_adducts</code> (commonMZ dict), <code>neutral_mass</code>/<code>adduct_mz</code>/<code>project_ions</code>, <code>match_spectrum</code>, <code>annotate_anchor</code> (manual), <code>rank_anchors</code> (findMAIN auto), <code>difference_network</code>, <code>centroid_peaks</code>. Overlaid by <code>mod_plot_spectrum</code>’s <code>annotate_layers</code>
+</td>
 </tr><tr><td><code>R/utils_reactive.R</code></td>
 <td>
 <code>make_rv</code>, <code>zoom_keeper</code>, helpers</td>
@@ -98,7 +108,9 @@
 <li>
 <strong>Zoom persistence</strong>: use <code>zoom_keeper(source)</code> (captures <code>plotly_relayout</code>, re-applies the range each render) — <code>uirevision</code> did NOT hold zoom here. Keep <code>dynamicTicks=TRUE</code>.</li>
 <li>
-<strong>Caching</strong>: heavy reactives use <code>bindCache</code> keyed on <code>data_key()</code> (+ their own inputs). <code>file_scan_table</code> / <code>.ms_cache</code> cache per-file reads in memory. Don’t key caches on cosmetic inputs (colour, contrast, points) — that breaks zoom and wastes work.</li>
+<strong>Caching</strong>: heavy reactives use <code>bindCache</code> keyed on <code>data_key()</code> (+ their own inputs). <code>file_scan_table</code> / <code>.ms_cache</code> cache per-file reads in memory. Don’t key caches on cosmetic inputs (colour, contrast, points) — that breaks zoom and wastes work. The app-level <code>bindCache</code> store (<code>shinyOptions(cache=)</code> in <code>setup_runtime</code>) is the <strong>layered mem+disk</strong> <code>app_cache()</code> from <code>R/fct_cache.R</code>: in-session hits stay in memory; the <strong>disk</strong> layer (qs2, <code>compress_level=0</code>, under <code>R_user_dir(...,"cache")</code>) persists TIC/EIC tibbles across restarts. <strong>No mtime keying</strong> (files aren’t overwritten in practice). <code>raw_msexp</code> uses the in-memory <code>"session"</code> cache only — the MsExperiment is a file-backed S4 object, not worth disk-serialising. Clear-all resets the disk cache via <code>clear_ms_caches</code> → <code>clear_disk_cache</code>.</li>
+<li>
+<strong>Settings persist</strong> across restarts (<code>fct_settings_store.R</code>): an allow-list (<code>.PERSISTED_SETTINGS</code>) is written as JSON to <code>R_user_dir("xcmsVisGUI","config")</code> (not the package dir — must work for a normal install). Restored on startup, saved debounced.</li>
 <li>
 <strong>Cross-plot nav</strong> via <code>rv$selection</code> (list: plot, file_id, rt[sec], mz). A plotly <code>key = sample_id</code> aesthetic carries the file id into click events.</li>
 <li>
@@ -114,6 +126,8 @@
 <li>ggplot2 is v4 (S7 objects) — don’t mutate <code>aes()</code> objects; build geoms conditionally.</li>
 <li>Don’t use PowerShell here-strings (<code>@'...'@</code>) in the Bash tool — they leak a stray <code>@</code>.</li>
 <li>shinyFiles was removed (users disliked the custom modal); loading = typed path (no copy) + native <code>fileInput</code> Browse (copies to temp — documented trade-off).</li>
+<li>
+<strong>xcmsVis is NOT used</strong> — we build ggplots ourselves. It was evaluated and declined for the raw-only scope (wrong input type, can’t carry the <code>key</code>/time-unit/ColorBrewer aesthetics via post-hoc <code>+</code>, doesn’t ggplotly cleanly, mostly peak/feature plots) and it currently <em>segfaults on first symbol access</em> in this R install. Full rationale + “revisit when peak picking lands” in <code>ARCHITECTURE_REVIEW.md</code> Decision log. Don’t add it back without checking that.</li>
 </ul></div>
 <div class="section level2">
 <h2 id="git-workflow">Git workflow<a class="anchor" aria-label="anchor" href="#git-workflow"></a></h2>

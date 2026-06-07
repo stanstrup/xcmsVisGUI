@@ -38,19 +38,18 @@
 
 <div class="section level2">
 <h2 id="todo">TODO<a class="anchor" aria-label="anchor" href="#todo"></a></h2>
-<ul><li>can you confirm explicitly that you are right that the browser copies the file to temp?</li>
-<li>make default ppm and Da a setting</li>
-<li>make it into an R package</li>
-<li>add tests</li>
-<li>add CI that runs tests</li>
-<li>make a docker wrapper as an easy way to deploy on a server</li>
-<li>make it possible for settings to persist restart. what is the right place to save the data for this?</li>
+<ul><li>CommonMZ/CAMERA/??? integration</li>
+<li>xcms objects</li>
+</ul></div>
+<div class="section level2">
+<h2 id="decided--parked">Decided / parked<a class="anchor" aria-label="anchor" href="#decided--parked"></a></h2>
+<ul><li>
+<strong>xcmsVIS — declined for now (2026-06-06).</strong> Evaluated using xcmsVis’s <code>gplot*</code> output and amending it post-hoc with <code>+ aes()/geom_/scale_</code>. Doesn’t fit the raw-only scope: its methods want xcms/MSnbase result objects (not our cached tibbles); post-hoc <code>+</code> is additive and can’t add the <code>key</code> click-nav aesthetic, the seconds→display-unit transform, or ColorBrewer to layers it already built; it doesn’t ggplotly cleanly (patchwork/geom_polygon); most <code>gplot*</code> are peak/feature plots (deferred). Also currently segfaults on first symbol access in this R install. Full rationale in <code>ARCHITECTURE_REVIEW.md</code> Decision log.</li>
 </ul></div>
 <div class="section level2">
 <h2 id="for-later">For later<a class="anchor" aria-label="anchor" href="#for-later"></a></h2>
-<ul><li>CommonMZ/CAMERA/??? integration</li>
-<li>xcms objects</li>
-<li>persistent cache</li>
+<ul><li>
+<strong>more use of xcmsVIS</strong> — revisit when peak picking lands (see ARCHITECTURE_REVIEW.md “Deferred: preprocessing”): we’d then have XcmsExperiment objects and <code>gplotChromPeaks</code>/<code>gplotFeatureGroups</code> could back dedicated peak views (adding our own <code>key</code> layer on fresh plots is workable).</li>
 </ul></div>
 
 

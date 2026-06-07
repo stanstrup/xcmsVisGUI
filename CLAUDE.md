@@ -2,17 +2,21 @@
 
 Read this before changing anything. It captures the non-obvious
 decisions, the performance traps, and the conventions this codebase
-follows. Also read `PLAN.md` (original design), `BENCHMARK.md` (the perf
-investigation), `ARCHITECTURE_REVIEW.md` (current architecture), and the
-pkgdown usage guide (`vignettes/articles/usage.Rmd`, user-facing
-behaviour).
+follows. Also read `ARCHITECTURE_REVIEW.md` — the single
+design+architecture doc (folds in the former PLAN.md original design +
+the deferred-preprocessing brief, and carries the Decision log: package
+conversion, cache, export, xcmsVis). The perf root cause is summarised
+below under “THE performance story” (the standalone BENCHMARK.md
+write-up was filed upstream and removed). User-facing behaviour is in
+the pkgdown usage guide (`vignettes/articles/usage.Rmd`).
 
 ## What this is
 
 A **local desktop Shiny app** for interactively visualising **raw**
 LC-MS data (TIC/BPC, EICs, spectra, 2D/3D MS maps, DDA precursors).
 Single user, runs locally. Scope is **raw visualisation only** — no peak
-picking / grouping / alignment (deferred; see `PLAN.md` §16).
+picking / grouping / alignment (deferred; see `ARCHITECTURE_REVIEW.md` →
+“Deferred: preprocessing”).
 
 ## Run / test (Windows dev box)
 
@@ -98,7 +102,10 @@ SnowParam default upstream, the SerialParam workaround can be dropped.
 | `R/fct_extract.R` | all data extraction: `read_ms_header` (mzR), `build_msexp`, `chromatogram` helpers, `extract_peaks/_spectrum/_precursors`, `file_scan_table` (cached), `add_scan_numbers`, `bin_peaks` |
 | `R/fct_filters.R` | `apply_filters` (MsExperiment) + `apply_filters_spectra` (Spectra) — keep them consistent; `combined_ranges` for filter hints |
 | `R/fct_palettes.R` | `brewer_qual/seq/colorscale` (ColorBrewer + viridis; `invert` reverses) |
-| `R/fct_export.R` | `save_gg` (png/svg/pdf via ggsave) |
+| `R/fct_export.R` | `save_gg` (png/svg/pdf via ggsave; **rds** = save the ggplot object itself) |
+| `R/fct_cache.R` | `cache_disk_qs2` (qs2 disk store), `app_cache` (layered mem+disk), `clear_disk_cache` |
+| `R/fct_settings_store.R` | `load_settings`/`save_settings` — persist allow-listed settings as JSON to the per-user config dir |
+| `R/fct_annotate.R` | spectrum annotation engine (pure): `adduct_rules`/`quasi_adducts` (commonMZ dict), `neutral_mass`/`adduct_mz`/`project_ions`, `match_spectrum`, `annotate_anchor` (manual), `rank_anchors` (findMAIN auto), `difference_network`, `centroid_peaks`. Overlaid by `mod_plot_spectrum`’s `annotate_layers` |
 | `R/utils_reactive.R` | `make_rv`, `zoom_keeper`, helpers |
 
 ## Conventions / dogmas
@@ -119,7 +126,20 @@ SnowParam default upstream, the SerialParam workaround can be dropped.
 - **Caching**: heavy reactives use `bindCache` keyed on `data_key()` (+
   their own inputs). `file_scan_table` / `.ms_cache` cache per-file
   reads in memory. Don’t key caches on cosmetic inputs (colour,
-  contrast, points) — that breaks zoom and wastes work.
+  contrast, points) — that breaks zoom and wastes work. The app-level
+  `bindCache` store (`shinyOptions(cache=)` in `setup_runtime`) is the
+  **layered mem+disk** `app_cache()` from `R/fct_cache.R`: in-session
+  hits stay in memory; the **disk** layer (qs2, `compress_level=0`,
+  under `R_user_dir(...,"cache")`) persists TIC/EIC tibbles across
+  restarts. **No mtime keying** (files aren’t overwritten in practice).
+  `raw_msexp` uses the in-memory `"session"` cache only — the
+  MsExperiment is a file-backed S4 object, not worth disk-serialising.
+  Clear-all resets the disk cache via `clear_ms_caches` →
+  `clear_disk_cache`.
+- **Settings persist** across restarts (`fct_settings_store.R`): an
+  allow-list (`.PERSISTED_SETTINGS`) is written as JSON to
+  `R_user_dir("xcmsVisGUI","config")` (not the package dir — must work
+  for a normal install). Restored on startup, saved debounced.
 - **Cross-plot nav** via `rv$selection` (list: plot, file_id, rt\[sec\],
   mz). A plotly `key = sample_id` aesthetic carries the file id into
   click events.
@@ -145,6 +165,13 @@ SnowParam default upstream, the SerialParam workaround can be dropped.
 - shinyFiles was removed (users disliked the custom modal); loading =
   typed path (no copy) + native `fileInput` Browse (copies to temp —
   documented trade-off).
+- **xcmsVis is NOT used** — we build ggplots ourselves. It was evaluated
+  and declined for the raw-only scope (wrong input type, can’t carry the
+  `key`/time-unit/ColorBrewer aesthetics via post-hoc `+`, doesn’t
+  ggplotly cleanly, mostly peak/feature plots) and it currently
+  *segfaults on first symbol access* in this R install. Full rationale +
+  “revisit when peak picking lands” in `ARCHITECTURE_REVIEW.md` Decision
+  log. Don’t add it back without checking that.
 
 ## Git workflow
 

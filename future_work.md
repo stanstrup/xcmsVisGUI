@@ -2,18 +2,25 @@
 
 ## TODO
 
-- can you confirm explicitly that you are right that the browser copies
-  the file to temp?
-- make default ppm and Da a setting
-- make it into an R package
-- add tests
-- add CI that runs tests
-- make a docker wrapper as an easy way to deploy on a server
-- make it possible for settings to persist restart. what is the right
-  place to save the data for this?
+- CommonMZ/CAMERA/??? integration
+- xcms objects
+
+## Decided / parked
+
+- **xcmsVIS — declined for now (2026-06-06).** Evaluated using xcmsVis’s
+  `gplot*` output and amending it post-hoc with `+ aes()/geom_/scale_`.
+  Doesn’t fit the raw-only scope: its methods want xcms/MSnbase result
+  objects (not our cached tibbles); post-hoc `+` is additive and can’t
+  add the `key` click-nav aesthetic, the seconds→display-unit transform,
+  or ColorBrewer to layers it already built; it doesn’t ggplotly cleanly
+  (patchwork/geom_polygon); most `gplot*` are peak/feature plots
+  (deferred). Also currently segfaults on first symbol access in this R
+  install. Full rationale in `ARCHITECTURE_REVIEW.md` Decision log.
 
 ## For later
 
-- CommonMZ/CAMERA/??? integration
-- xcms objects
-- persistent cache
+- **more use of xcmsVIS** — revisit when peak picking lands (see
+  ARCHITECTURE_REVIEW.md “Deferred: preprocessing”): we’d then have
+  XcmsExperiment objects and `gplotChromPeaks`/`gplotFeatureGroups`
+  could back dedicated peak views (adding our own `key` layer on fresh
+  plots is workable).

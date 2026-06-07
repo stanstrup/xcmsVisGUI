@@ -2,8 +2,9 @@
 
 xcmsVisGUI is a local Shiny desktop app for exploring **raw** LC-MS data
 interactively. This guide walks through a typical session. The
-screenshots use the `faahKO` (6 CDF files) and `msdata` demo datasets
-that ship with Bioconductor.
+screenshots come from example LC-MS runs — a positive-mode QTOF urine
+series and the `faahKO` / `msdata` demo datasets that ship with
+Bioconductor.
 
 ## Launch
 
@@ -35,14 +36,17 @@ files in place (no copy) except the OS file browser:
   files to a temp folder.
 
 Files are read asynchronously (a status badge flips from ⏳ to ✅), so
-the UI stays responsive even with many files. **Tick a file to include
-it** in the plots — unticked files stay loaded. Use **All / None /
-Invert** for bulk selection. As soon as one file is included, the TIC
-renders:
+the UI stays responsive even with many files. **Click a file’s row to
+include it** in the plots (the row highlights); click it again to
+exclude. Files stay loaded either way, so toggling is cheap. **All /
+None / Invert** select in bulk, and double-clicking the **Group** cell
+renames that file’s sample group (used for colouring and faceting). As
+soon as one file is included, the TIC renders:
 
-![Files loaded and the TIC overlay](figures/tic.png)
+![The file list (selected rows are included) and the TIC
+overlay](figures/tic.png)
 
-Files loaded and the TIC overlay
+The file list (selected rows are included) and the TIC overlay
 
 ## 2. Filter (optional)
 
@@ -50,13 +54,20 @@ The **Filters** panel applies globally to every view. Leave a box blank
 for no limit; retention-time boxes use the display unit (set in
 Settings) and the data range is shown as a hint.
 
-![Global filters](figures/filters.png)
+![Global filters, including spectrum-ID rules](figures/filters.png)
 
-Global filters
+Global filters, including spectrum-ID rules
 
-You can constrain retention time, *m/z*, intensity, MS level, polarity,
-and (for vendor-specific subsetting) a spectrum-ID substring. **Reset
-filters** clears them.
+You can constrain retention time, *m/z*, intensity, MS level and
+polarity. The **Spectrum ID** section matches against the raw spectrum
+id (e.g. the Waters `function=1 process=0 scan=…`): add one or more
+rules with **Add rule**, each set to **contains** (the id must include
+the term) or **exclude** (it must not). Multiple `contains` rules are
+ANDed, so you can keep e.g. `function=1` while excluding `function=2`.
+Matching is a literal substring (so `scan=1` also matches `scan=10`,
+`scan=199`, …). **Reset filters** clears everything. If a filter
+combination matches no spectra, the plots show “No spectra match the
+current filters.” rather than an error.
 
 ## 3. TIC / BPC
 
@@ -82,7 +93,9 @@ Multiple EICs across files
 Enter a retention time (or an acquisition scan number), or arrive here
 by clicking a chromatogram trace. **Single file** shows the clicked
 file; **Facet** / **Stacked** compare all included files at that
-retention time. Clicking a peak adds its *m/z* to the EIC target list.
+retention time. Clicking a peak adds its *m/z* to the EIC target list
+(unless the click action is switched to setting the annotation anchor —
+see below).
 
 ![A single spectrum](figures/spectrum.png)
 
@@ -96,6 +109,62 @@ load that scan.
 ![Scan-list browser](figures/scanlist.png)
 
 Scan-list browser
+
+### Annotating adducts, isotopes & fragments
+
+Tick **Annotate adducts / fragments** (single-file view) to overlay
+adduct, isotope and in-source-fragment labels on the spectrum. The
+adduct/fragment dictionary comes from the
+[commonMZ](https://github.com/stanstrup/commonMZ) package; the ion mode
+defaults to the file’s polarity.
+
+![Adduct, isotope and in-source-fragment annotation on a
+spectrum](figures/annotation.png)
+
+Adduct, isotope and in-source-fragment annotation on a spectrum
+
+There are three modes:
+
+- **Manual anchor** — pick the peak you believe is a known ion (default
+  `[M+H]+` / `[M-H]-`, selectable). Switch *Click on a peak* to **→ set
+  anchor** and click the peak, or type its *m/z*. The neutral mass is
+  derived from it and every adduct and in-source fragment (from
+  [commonMZ](https://github.com/stanstrup/commonMZ); the `[M+H-H2O]+`
+  water-loss ladder, etc. — toggle with **In-source fragments**) is
+  projected; matched peaks are labelled, and their isotopes (up to **Max
+  isotope M+n**) are detected and labelled `[+1]`, `[+2]`, … An isotope
+  peak is never also labelled an adduct/fragment. This is the most
+  reliable mode — *you* decide the molecular ion, avoiding false hits on
+  noisy raw data.
+- **Auto-suggest (findMAIN)** — uses
+  [InterpretMSSpectrum](https://cran.r-project.org/package=InterpretMSSpectrum)
+  to rank candidate molecular-ion hypotheses (by explained intensity,
+  mass error and isotope support). Hypotheses include the water-loss ion
+  `[M+H-H2O]+`: if the base peak is itself a water loss, that is the
+  right call and the neutral mass is derived from it (so `[M+H]+` is
+  then annotated at base + 18). Press **Suggest molecular ion**; the
+  top-scoring hypothesis is annotated immediately — click another row to
+  switch. (Auto mode has no manual anchor box.)
+- **Difference network** — annotates *pairs* of peaks whose *m/z*
+  difference matches a known adduct/fragment, with no anchor needed
+  (e.g. a ladder of water losses). Its match window is your instrument’s
+  mass accuracy at the two peaks, so set the tolerance to fit the
+  instrument and raise the minimum intensity to drop noise pairs.
+  Isotope-spaced differences are ignored.
+
+The **± tol** is the adduct/fragment match window (ppm or Da); **Min
+intensity** drops peaks below that fraction of the base peak before
+matching; **Max charge** limits the charge states projected; **Annotate
+only top N peaks** keeps the N most intense *annotated* peaks. **Isotope
+tol (mDa)** is a separate, usually wider window for the isotope spacing
+(MS2 isotope centroids drift off the theoretical spacing, and the error
+grows with each M+n step). **Isotopes decrease in intensity** assumes a
+falling envelope (true for most biological samples) — with it on, a
+heavier peak that is *more* intense is treated as a real loss (e.g. −H₂)
+rather than an isotope. Labels are written vertically and multiple hits
+on one peak are joined with “;”. **Show expected-but-absent** ghost
+ticks can be toggled. Annotations are part of the plot, so they carry
+through to exports.
 
 ## 6. MS map
 

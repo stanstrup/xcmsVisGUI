@@ -13,6 +13,11 @@
 mod_ingest_ui <- function(id) {
   ns <- NS(id)
   tagList(
+    # Wrap long file names (underscore-joined tokens don't break on their own) so
+    # the File column never forces the sidebar to scroll horizontally.
+    tags$style(HTML(sprintf(
+      "#%s td:nth-child(2){white-space:normal;overflow-wrap:anywhere;word-break:break-word}",
+      ns("file_table")))),
     # 1) paste a folder/file path, or pick a folder server-side — both NO copy
     div(class = "d-flex gap-2 mb-2",
         div(style = "flex:1;",

@@ -68,11 +68,14 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       disp <- data.frame(` ` = check, label = tg$label, mz = tg$mz, tol = tg$tol,
                          unit = tg$unit, rt_min = tg$rt_min, rt_max = tg$rt_max,
                          check.names = FALSE, stringsAsFactors = FALSE)
+      # Round only the DISPLAY (DT render) — the stored target m/z keeps full
+      # precision, so editing a cell doesn't truncate it.
       datatable(
         disp, escape = FALSE, rownames = FALSE, selection = "multiple",
         editable = list(target = "cell", columns = 1:6),   # all but the checkbox
         options = list(dom = "t", paging = FALSE, ordering = FALSE,
-                       columnDefs = list(list(className = "dt-center", targets = "_all"))))
+                       columnDefs = list(list(className = "dt-center", targets = "_all")))) %>%
+        DT::formatRound("mz", 4) %>% DT::formatRound(c("rt_min", "rt_max"), 3)
     })
 
     observeEvent(input$toggle, {

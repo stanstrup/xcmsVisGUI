@@ -72,7 +72,9 @@ mod_plot_spectrum_ui <- function(id) {
             # Projection options (manual + auto): isotopes, fragments, max charge.
             conditionalPanel(
               sprintf("input['%s'] != 'diff'", ns("ann_mode")),
-              div(class = "d-flex gap-2",
+              # align-items-end: the "Max isotope M+n" label wraps to two lines,
+              # so align the input boxes at the bottom to keep them level.
+              div(class = "d-flex gap-2 align-items-end",
                   numericInput(ns("ann_niso"), "Max isotope M+n", value = 3, min = 0,
                                max = 6, step = 1, width = "120px"),
                   numericInput(ns("ann_max_z"), "Max charge", value = 1, min = 1,
@@ -249,18 +251,20 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       # molecular ion [M+H]+/[M-H]- is at <ion>".
       pr <- quasi_adducts(input$ann_pol)[1]
       prule <- adduct_rules(input$ann_pol)[adduct_rules(input$ann_pol)$name == pr, ]
-      ion <- adduct_mz(r$neutral_mass, prule)
       disp <- data.frame(
-        `main m/z` = round(r$adductmz, 4), `is a` = r$adducthyp,
-        `neutral M` = round(r$neutral_mass, 4), pr2 = round(ion, 4),
-        peaks = r$adducts_explained, score = round(r$total_score, 2),
+        `main m/z` = r$adductmz, `is a` = r$adducthyp,
+        `neutral M` = r$neutral_mass, pr2 = adduct_mz(r$neutral_mass, prule),
+        peaks = r$adducts_explained, score = r$total_score,
         check.names = FALSE)
       names(disp)[4] <- pr                      # the molecular-ion column, e.g. [M+H]+
       # Sortable + scrollable so the full list shows — click the "neutral M" or the
       # molecular-ion header to bring the heaviest (molecular-ion) hypothesis up.
+      # Round in the DT render, not the data, so sorting stays numeric.
       datatable(disp, rownames = FALSE, selection = "single",
                 options = list(dom = "t", paging = FALSE, ordering = TRUE,
-                               scrollX = TRUE, scrollY = "260px", scrollCollapse = TRUE))
+                               scrollX = TRUE, scrollY = "260px", scrollCollapse = TRUE)) %>%
+        DT::formatRound(c("main m/z", "neutral M", pr), 4) %>%
+        DT::formatRound("score", 2)
     })
 
     # Isotope settings (shared by all modes).
@@ -392,7 +396,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     scan_tab <- reactive({
       f <- cur_row()
       tab <- file_scan_table(f$path)
-      tab$rt_disp <- round(rt_to_disp(tab$rt, rv$settings$time_unit), 4)
+      tab$rt_disp <- rt_to_disp(tab$rt, rv$settings$time_unit)   # rounded in the DT render
       tab
     })
     # Persisted scan-list filter state (survives modal close/reopen).
@@ -451,9 +455,14 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       tab <- filtered_scans()
       disp <- tab[, c("scan", "rt_disp", "msLevel", "polarity", "precursorMZ",
                       "tic", "basePeakMZ", "spectrumId")]
-      names(disp)[2] <- paste0("rt(", rv$settings$time_unit, ")")
+      rtcol <- paste0("rt(", rv$settings$time_unit, ")")
+      names(disp)[2] <- rtcol
+      # Round rt / m/z / TIC in the DT render, not the data.
       datatable(disp, rownames = FALSE, selection = "single",
-                    options = list(pageLength = 15, scrollX = TRUE))
+                    options = list(pageLength = 15, scrollX = TRUE)) %>%
+        DT::formatRound(rtcol, 4) %>%
+        DT::formatRound(c("precursorMZ", "basePeakMZ"), 4) %>%
+        DT::formatRound("tic", 0)
     })
     observeEvent(input$scantable_rows_selected, {
       i <- input$scantable_rows_selected; req(length(i) == 1)

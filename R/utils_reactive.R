@@ -84,6 +84,10 @@ notify_read_failures <- function(names) {
     type = "warning", duration = 6)
 }
 
+#' The plotly events every interactive plot registers (and that the modules
+#' query via `event_data`).
+PLOTLY_EVENTS <- c("plotly_click", "plotly_relayout", "plotly_doubleclick")
+
 #' Register the click/relayout/doubleclick events on a plotly object. Used by
 #' every interactive plot so clicks and zoom-persistence reach the server.
 #' @importFrom plotly event_register
@@ -93,6 +97,24 @@ register_plotly_events <- function(p) {
     event_register("plotly_click") %>%
     event_register("plotly_relayout") %>%
     event_register("plotly_doubleclick")
+}
+
+#' Pre-seed plotly's per-session registry of event IDs so `event_data()` does
+#' not warn before (or unless) the matching plot renders. plotly only marks a
+#' source's events "registered" when that plot actually renders
+#' (`register_plot_events`); our plot modules live on lazy nav tabs that don't
+#' render until visited, yet their `zoom_keeper`/`wire_selection` observers call
+#' `event_data` on every flush. event_data defers the registration check to an
+#' `onFlushed` callback and `warning()`s there — OUTSIDE any `suppressWarnings`
+#' at the call site — so hidden tabs flood the log. Seeding the IDs up front
+#' silences that without touching real event delivery (the client side still
+#' only emits events for plots that rendered with `event_register`; a later
+#' render just re-adds the same IDs via `unique()`).
+#' @noRd
+prime_plotly_events <- function(session, sources, events = PLOTLY_EVENTS) {
+  ids <- as.vector(outer(events, sources, paste, sep = "-"))
+  ud <- session$userData
+  ud$plotlyShinyEventIDs <- unique(c(ud$plotlyShinyEventIDs, ids))
 }
 
 #' Convert a ggplot to plotly and finalize it for an interactive plot module:
@@ -109,12 +131,12 @@ finalize_plotly <- function(gg, source, keep_zoom) {
 
 #' Wire a plotly click on `source` to `rv$selection` (drives the linked Spectrum
 #' view). `file_id` comes from the click `key` aesthetic; `mz_from(ev)` yields the
-#' m/z (default NA). Call ONCE inside a moduleServer. `suppressWarnings` hides the
-#' benign "source not registered" notice emitted before the first render.
+#' m/z (default NA). Call ONCE inside a moduleServer. (The "source not registered"
+#' warning is silenced up front by `prime_plotly_events`.)
 #' @importFrom plotly event_data
 #' @noRd
 wire_selection <- function(source, plot, rv, mz_from = function(ev) NA_real_) {
-  click <- reactive(suppressWarnings(event_data("plotly_click", source = source)))
+  click <- reactive(event_data("plotly_click", source = source))
   observeEvent(click(), {
     ev <- click(); req(ev)
     rv$selection <- list(plot = plot, file_id = ev$key,
@@ -138,10 +160,10 @@ zoom_keeper <- function(source) {
   # echo can't wipe a pinned axis — while a genuine x-only zoom (which autoranges
   # y) correctly drops the now-stale y range, instead of leaving it to be
   # re-applied on the next re-render (which snapped the view back — the bug).
-  # suppressWarnings on the trigger too: event_data emits a benign "source not
-  # registered" warning before the plot first renders.
-  observeEvent(suppressWarnings(event_data("plotly_relayout", source = source)), {
-    e <- suppressWarnings(event_data("plotly_relayout", source = source))
+  # (The "source not registered" warning is silenced up front by
+  # prime_plotly_events.)
+  observeEvent(event_data("plotly_relayout", source = source), {
+    e <- event_data("plotly_relayout", source = source)
     if (is.null(e)) return()
     if (!is.null(e[["xaxis.range[0]"]]))
       z$x <- c(e[["xaxis.range[0]"]], e[["xaxis.range[1]"]])
@@ -151,7 +173,7 @@ zoom_keeper <- function(source) {
     else if (isTRUE(e[["yaxis.autorange"]])) z$y <- NULL
   }, ignoreInit = TRUE)
   # A genuine reset is a double-click -> forget the zoom.
-  observeEvent(suppressWarnings(event_data("plotly_doubleclick", source = source)), {
+  observeEvent(event_data("plotly_doubleclick", source = source), {
     z$x <- NULL; z$y <- NULL
   }, ignoreInit = TRUE)
   function(p) {

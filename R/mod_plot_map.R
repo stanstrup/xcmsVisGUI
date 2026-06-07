@@ -154,7 +154,7 @@ mod_plot_map_server <- function(id, rv, included) {
     })
 
     # Click a 2D-map point -> spectrum at that rt (first included file).
-    click <- reactive(suppressWarnings(event_data("plotly_click", source = "map")))
+    click <- reactive(event_data("plotly_click", source = "map"))
     observeEvent(click(), {
       ev <- click(); req(ev, !is.null(ev$x))
       inc <- included(); req(nrow(inc) > 0)

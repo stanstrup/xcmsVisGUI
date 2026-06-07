@@ -43,6 +43,10 @@ app_ui <- function() {
 app_server <- function(input, output, session) {
   rv <- make_rv()
 
+  # Silence plotly's "<event> ... is not registered" warnings that hidden nav
+  # tabs would otherwise flood the log with (see prime_plotly_events).
+  prime_plotly_events(session, c("tic", "eic", "spec", "map", "prec"))
+
   mod_settings_server("settings", rv)
   mod_ingest_server("ingest", rv)
 

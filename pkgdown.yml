@@ -2,8 +2,14 @@ pandoc: 3.8.3
 pkgdown: 2.2.0
 pkgdown_sha: ~
 articles:
-  articles/usage: usage.html
-last_built: 2026-06-07T20:17Z
+  articles/developer: developer.html
+  articles/eic: eic.html
+  articles/getting_started: getting_started.html
+  articles/ms_map: ms_map.html
+  articles/precursors: precursors.html
+  articles/spectrum: spectrum.html
+  articles/tic_bpc: tic_bpc.html
+last_built: 2026-06-07T20:40Z
 urls:
   reference: https://stanstrup.github.io/xcmsVisGUI/reference
   article: https://stanstrup.github.io/xcmsVisGUI/articles

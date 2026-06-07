@@ -34,7 +34,15 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="articles/usage.html">Using xcmsVisGUI</a></li>
+<li><a class="dropdown-item" href="articles/getting_started.html">Getting started</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Plot views</h6></li>
+    <li><a class="dropdown-item" href="articles/tic_bpc.html">TIC / BPC</a></li>
+    <li><a class="dropdown-item" href="articles/eic.html">EIC</a></li>
+    <li><a class="dropdown-item" href="articles/spectrum.html">Spectrum</a></li>
+    <li><a class="dropdown-item" href="articles/ms_map.html">MS map</a></li>
+    <li><a class="dropdown-item" href="articles/precursors.html">Precursors</a></li>
+    <li><a class="dropdown-item" href="articles/developer.html">Developer guide</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
@@ -54,75 +62,59 @@
   <main id="main" class="col-md-9"><div class="section level1">
 <div class="page-header"><h1 id="xcmsvisgui">xcmsVisGUI<a class="anchor" aria-label="anchor" href="#xcmsvisgui"></a>
 </h1></div>
-<p>A local Shiny desktop app (packaged as an R package) for interactively visualising <strong>raw LC-MS data</strong> on the RforMassSpectrometry stack (<code>Spectra</code> / <code>MsExperiment</code> / <code>xcms</code>). Plots are ggplot2 rendered through plotly for interactivity (click, zoom, hover); static export is via ggsave.</p>
-<p>See <a href="ARCHITECTURE_REVIEW.html"><code>ARCHITECTURE_REVIEW.md</code></a> for the design, architecture, and decision log (it also folds in the original implementation plan).</p>
-<div class="section level2">
-<h2 id="status">Status<a class="anchor" aria-label="anchor" href="#status"></a>
-</h2>
-<p>Working: async file ingestion, settings (ColorBrewer/viridis palette, retention-time unit, default EIC tolerance, export defaults — persisted across restarts), global filters (rt / m/z / MS level / polarity / intensity / repeatable spectrum-id rules), and all raw-data plot views — TIC/BPC, multi-EIC, click-to-spectrum (+ scan-list browser), 2D MS map, 3D (points/surface), and DDA precursor ions. The Spectrum view also does single-spectrum <strong>adduct / isotope / in-source-fragment annotation</strong> (manual anchor, findMAIN auto-suggest, or difference network), using the <a href="https://github.com/stanstrup/commonMZ" class="external-link">commonMZ</a> dictionary + <a href="https://cran.r-project.org/package=InterpretMSSpectrum" class="external-link">InterpretMSSpectrum</a>. Scope is <strong>raw visualisation only</strong> — no peak picking / grouping / alignment (deferred; see <code>ARCHITECTURE_REVIEW.md</code>).</p>
-<p>Extraction results are cached to disk (qs2), so re-opening the app with the same files + filter is instant. Figures export as png/svg/pdf or as the raw ggplot object (rds) for later tweaking in R.</p>
+<p>A local Shiny desktop app for interactively visualising <strong>raw LC-MS data</strong> on the RforMassSpectrometry stack (<code>Spectra</code> / <code>MsExperiment</code> / <code>xcms</code>) — TIC/BPC, extracted-ion chromatograms, spectra with adduct / isotope / fragment annotation, 2D/3D maps, and DDA precursors. Plots are ggplot2 rendered through plotly (click, zoom, hover); static export is via ggsave. Scope is <strong>raw visualisation only</strong> — no peak picking, grouping or alignment.</p>
+<div class="float">
+<img src="reference/figures/README-hero.png" alt="The file list and a TIC overlay"><div class="figcaption">The file list and a TIC overlay</div>
 </div>
 <div class="section level2">
-<h2 id="running">Running<a class="anchor" aria-label="anchor" href="#running"></a>
+<h2 id="install">Install<a class="anchor" aria-label="anchor" href="#install"></a>
 </h2>
-<p>This is an R package; the app is the exported <code><a href="reference/run_app.html">run_app()</a></code>.</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># dev (from a clone, no install needed):</span></span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>Rscript run.R                       <span class="co"># = pkgload::load_all() + run_app(launch.browser = TRUE)</span></span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a></span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="co"># or installed:</span></span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>xcmsVisGUI<span class="sc">::</span><span class="fu">run_app</span>()</span></code></pre></div>
+<p>xcmsVisGUI depends on Bioconductor packages and on the GitHub-only <a href="https://github.com/stanstrup/commonMZ" class="external-link">commonMZ</a>, so install with a tool that resolves both. The easiest is <a href="https://pak.r-lib.org/" class="external-link">pak</a>:</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"stanstrup/xcmsVisGUI"</span><span class="op">)</span></span></code></pre></div>
+<p>Or with <strong>remotes</strong> + <strong>BiocManager</strong> (point at the Bioconductor repos first so the Bioc dependencies resolve):</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># install.packages(c("remotes", "BiocManager"))</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>repos <span class="op">=</span> <span class="fu">BiocManager</span><span class="fu">::</span><span class="fu"><a href="https://bioconductor.github.io/BiocManager/reference/repositories.html" class="external-link">repositories</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"stanstrup/xcmsVisGUI"</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="run">Run<a class="anchor" aria-label="anchor" href="#run"></a>
+</h2>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">xcmsVisGUI</span><span class="fu">::</span><span class="fu"><a href="reference/run_app.html">run_app</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p>A browser tab opens with the plot views across the top (TIC/BPC, EIC, Spectrum, MS map, Precursors), a <strong>Settings</strong> page, and a left sidebar with <strong>Files</strong> and <strong>Filters</strong>. Paste a folder of <code>.mzML</code> / <code>.mzXML</code> / <code>.CDF</code> files into the Files box to begin.</p>
+</div>
+<div class="section level2">
+<h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
+</h2>
+<p>Full guides live on the <a href="https://stanstrup.github.io/xcmsVisGUI/">package website</a>:</p>
+<ul>
+<li>
+<a href="https://stanstrup.github.io/xcmsVisGUI/articles/getting_started.html"><strong>Getting started</strong></a> — loading files, filtering, settings, export, and moving between tabs</li>
+<li><a href="https://stanstrup.github.io/xcmsVisGUI/articles/tic_bpc.html">TIC / BPC</a></li>
+<li><a href="https://stanstrup.github.io/xcmsVisGUI/articles/eic.html">EIC</a></li>
+<li>
+<a href="https://stanstrup.github.io/xcmsVisGUI/articles/spectrum.html">Spectrum</a> — single spectra, the scan-list browser, and annotation</li>
+<li><a href="https://stanstrup.github.io/xcmsVisGUI/articles/ms_map.html">MS map</a></li>
+<li><a href="https://stanstrup.github.io/xcmsVisGUI/articles/precursors.html">Precursors</a></li>
+<li>
+<a href="https://stanstrup.github.io/xcmsVisGUI/articles/developer.html">Developer guide</a> — status, running from a clone, tests, renv, and the project layout</li>
+</ul>
 </div>
 <div class="section level2">
 <h2 id="deploy-with-docker">Deploy with Docker<a class="anchor" aria-label="anchor" href="#deploy-with-docker"></a>
 </h2>
 <p>A <code>Dockerfile</code> (based on the Bioconductor image) runs the app as a server:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="ex">docker</span> build <span class="at">-t</span> xcmsvisgui .</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="ex">docker</span> run <span class="at">--rm</span> <span class="at">-p</span> 3838:3838 <span class="at">-v</span> /path/to/ms-data:/data xcmsvisgui</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="ex">docker</span> build <span class="at">-t</span> xcmsvisgui .</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="ex">docker</span> run <span class="at">--rm</span> <span class="at">-p</span> 3838:3838 <span class="at">-v</span> /path/to/ms-data:/data xcmsvisgui</span></code></pre></div>
 <p>Open <a href="http://localhost:3838" class="external-link uri">http://localhost:3838</a> and paste <code>/data</code> (your mounted files) into the Files box. Mount a volume at <code>/root/.config/R</code> to persist settings across restarts.</p>
 </div>
 <div class="section level2">
-<h2 id="tests">Tests<a class="anchor" aria-label="anchor" href="#tests"></a>
+<h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">testthat</span><span class="fu">::</span><span class="fu"><a href="https://testthat.r-lib.org/reference/test_package.html" class="external-link">test_local</a></span><span class="op">(</span><span class="st">"."</span><span class="op">)</span>           <span class="co"># or: R CMD check</span></span></code></pre></div>
-<p>The suite covers the pure helpers and the key invariant that <code>apply_filters</code> (MsExperiment) and <code>apply_filters_spectra</code> (Spectra) select the same spectra. Real-data tests use the <code>msdata</code>/<code>faahKO</code> Bioconductor packages and skip if absent. CI runs <code>R CMD check</code> on push/PR (<code>.github/workflows/R-CMD-check.yaml</code>).</p>
-</div>
-<div class="section level2">
-<h2 id="dependencies--reproducibility-renv">Dependencies &amp; reproducibility (renv)<a class="anchor" aria-label="anchor" href="#dependencies--reproducibility-renv"></a>
-</h2>
-<p>Dependencies are pinned with <a href="https://rstudio.github.io/renv/" class="external-link"><code>renv</code></a> (<code>renv.lock</code>), with Bioconductor support configured. On a fresh clone:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">renv</span><span class="fu">::</span><span class="fu">restore</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p><code>renv-setup.R</code> is a one-shot installer/snapshotter for first-time setup.</p>
-</div>
-<div class="section level2">
-<h2 id="project-layout">Project layout<a class="anchor" aria-label="anchor" href="#project-layout"></a>
-</h2>
-<pre><code>run.R                  # convenience launcher (load_all + run_app)
-DESCRIPTION / NAMESPACE # package metadata; NAMESPACE is roxygen-generated
-R/
-  run_app.R            # app_ui() / app_server() + exported run_app()
-  zzz.R                # .onLoad: register BiocParallel SerialParam (the perf fix)
-  constants.R          # MS-file constants, palette names, rt-unit helpers
-  daemons.R            # mirai daemon pool + per-run setup
-  xcmsVisGUI-package.R # roxygen import declarations + globalVariables
-  mod_ingest.R         # typed-path / choose.dir / fileInput + async mirai reader + file list
-  mod_settings.R       # palette, rt unit, default tolerance, daemon count, export; persistence
-  mod_filter.R         # global rt/mz/MS-level/polarity/intensity/spectrum-id filters
-  mod_plot_tic_bpc.R   # TIC/BPC overlay, colour by group/sample, click-&gt;spectrum
-  mod_plot_eic.R       # editable multi-m/z target table -&gt; overlaid EICs
-  mod_plot_spectrum.R  # spectrum at a clicked rt / picked scan + scan-list browser
-  mod_plot_map.R       # 2D MS map + 3D points/surface (plotly-native)
-  mod_plot_precursors.R# DDA precursor-ion map
-  mod_export.R         # reusable png/svg/pdf/rds export modal
-  fct_extract.R        # data extraction (summaries, chromatograms, peaks, spectra)
-  fct_filters.R        # compose filter state into Spectra/xcms calls
-  fct_export.R         # ggsave-based export (+ rds = the ggplot object itself)
-  fct_palettes.R       # ColorBrewer / viridis helpers
-  fct_cache.R          # layered mem+disk (qs2) cache backing bindCache, persistent across restarts
-  fct_settings_store.R # persist settings to the per-user config dir
-  utils_reactive.R     # central reactive state (rv) + plotly/zoom helpers
-tests/testthat/        # unit + real-data tests</code></pre>
+<p>MIT © Jan Stanstrup. See <a href="LICENSE.html">LICENSE.md</a>.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
@@ -136,7 +128,8 @@ tests/testthat/        # unit + real-data tests</code></pre>
 <div class="license">
 <h2 data-toc-skip>License</h2>
 <ul class="list-unstyled">
-<li><a href="https://www.r-project.org/Licenses/GPL-3" class="external-link">GPL-3</a></li>
+<li><a href="LICENSE.html">Full license</a></li>
+<li><small><a href="https://opensource.org/licenses/mit-license.php" class="external-link">MIT</a> + file <a href="LICENSE-text.html">LICENSE</a></small></li>
 </ul>
 </div>
 
@@ -151,7 +144,7 @@ tests/testthat/        # unit + real-data tests</code></pre>
 <div class="developers">
 <h2 data-toc-skip>Developers</h2>
 <ul class="list-unstyled">
-<li>Jan Stanstrup <br><small class="roles"> Author, maintainer </small>   </li>
+<li>Jan Stanstrup <br><small class="roles"> Author, maintainer, copyright holder </small>   </li>
 </ul>
 </div>
 

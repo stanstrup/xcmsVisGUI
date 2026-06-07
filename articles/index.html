@@ -17,7 +17,15 @@
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto"><li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/usage.html">Using xcmsVisGUI</a></li>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/getting_started.html">Getting started</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Plot views</h6></li>
+    <li><a class="dropdown-item" href="../articles/tic_bpc.html">TIC / BPC</a></li>
+    <li><a class="dropdown-item" href="../articles/eic.html">EIC</a></li>
+    <li><a class="dropdown-item" href="../articles/spectrum.html">Spectrum</a></li>
+    <li><a class="dropdown-item" href="../articles/ms_map.html">MS map</a></li>
+    <li><a class="dropdown-item" href="../articles/precursors.html">Precursors</a></li>
+    <li><a class="dropdown-item" href="../articles/developer.html">Developer guide</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -35,13 +43,36 @@
     </div>
 
     <div class="section ">
-      <h3>Guides</h3>
+      <h3>Get started</h3>
       <div class="section-desc"></div>
 
-      <dl><dt><a href="usage.html">Using xcmsVisGUI</a></dt>
-        <dd><p>A walkthrough of the app: loading files, filtering, and every plot view.</p>
+      <dl><dt><a href="getting_started.html">Getting started</a></dt>
+        <dd><p>Launch the app, load files, filter, and find your way around the tabs.</p>
       </dd></dl></div>
-  </main></div>
+    <div class="section ">
+      <h3>Plot views</h3>
+      <div class="section-desc"></div>
+
+      <dl><dt><a href="tic_bpc.html">TIC / BPC</a></dt>
+        <dd><p>Overlay the total- or base-peak chromatogram of every included file.</p>
+        </dd><dt><a href="eic.html">EIC</a></dt>
+        <dd><p>Extracted-ion chromatograms for one or many m/z targets across files.</p>
+        </dd><dt><a href="spectrum.html">Spectrum</a></dt>
+        <dd><p>View a single spectrum, browse the scan list, and annotate adducts, isotopes and in-source fragments.</p>
+        </dd><dt><a href="ms_map.html">MS map</a></dt>
+        <dd><p>A 2D m/z x retention-time map, plus 3D surface and point views.</p>
+        </dd><dt><a href="precursors.html">Precursors</a></dt>
+        <dd><p>Map every fragmented precursor ion (rt x precursor m/z) for DDA data.</p>
+      </dd></dl></div>
+    <div class="section ">
+      <h3>Development</h3>
+      <div class="section-desc"></div>
+
+      <dl><dt><a href="developer.html">Developer guide</a></dt>
+        <dd><p>Status, running from a clone, tests, the renv lockfile, and the project layout.</p>
+      </dd></dl></div>
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">

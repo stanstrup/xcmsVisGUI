@@ -2,7 +2,7 @@
 
 ## Authors
 
-- **Jan Stanstrup**. Author, maintainer.
+- **Jan Stanstrup**. Author, maintainer, copyright holder.
 
 ## Citation
 

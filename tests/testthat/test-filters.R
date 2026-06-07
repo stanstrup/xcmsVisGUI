@@ -28,6 +28,10 @@ test_that("apply_filters and apply_filters_spectra select identical spectra", {
   rt_lo <- as.numeric(stats::quantile(rts, 0.3))
   rt_hi <- as.numeric(stats::quantile(rts, 0.7))
   f <- function(...) modifyList(empty_filter(), list(...))
+  # NB: assign spectrum_id_rules directly, never via modifyList — modifyList
+  # recurses into the existing empty list() and, the rule list being unnamed,
+  # would silently merge it back to list() (no filter). The app sets it directly.
+  with_rules <- function(flt, ...) { flt$spectrum_id_rules <- list(...); flt }
   tok <- sub(".*\\b(scan=[0-9]+).*", "\\1", raw$spectrumId[1])
 
   battery <- list(
@@ -38,7 +42,8 @@ test_that("apply_filters and apply_filters_spectra select identical spectra", {
     "mz window"        = f(ms_level = NA_integer_, mz_min = 400, mz_max = 800),
     "intensity >=5000" = f(ms_level = NA_integer_, int_min = 5000),
     "polarity pos"     = f(ms_level = NA_integer_, polarity = "pos"),
-    "spectrumId"       = f(ms_level = NA_integer_, spectrum_id = tok))
+    "spectrumId"       = with_rules(f(ms_level = NA_integer_),
+                                    list(mode = "contains", text = tok)))
 
   msexp <- build_msexp(fdf)
   for (nm in names(battery)) {
@@ -61,7 +66,16 @@ test_that("filters reach the extraction path", {
   expect_gte(min(p_flt$intensity), 5000)
   expect_lt(nrow(p_flt), nrow(p_all))
 
+  # assign spectrum_id_rules directly (not via modifyList — see the note in the
+  # equivalence test above).
   tok <- sub(".*\\b(scan=[0-9]+).*", "\\1", raw$spectrumId[1])
-  sp2 <- apply_filters_spectra(raw, modifyList(base, list(ms_level = NA_integer_, spectrum_id = tok)))
+  fl <- modifyList(base, list(ms_level = NA_integer_))
+  fl$spectrum_id_rules <- list(list(mode = "contains", text = tok))
+  sp2 <- apply_filters_spectra(raw, fl)
   expect_equal(length(sp2), 1)
+
+  # exclude inverts: everything except that one spectrum
+  fl$spectrum_id_rules <- list(list(mode = "exclude", text = tok))
+  sp3 <- apply_filters_spectra(raw, fl)
+  expect_equal(length(sp3), length(raw) - 1)
 })

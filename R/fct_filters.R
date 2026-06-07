@@ -24,7 +24,7 @@ empty_filter <- function() {
        mz_min = NA_real_, mz_max = NA_real_,
        ms_level = 1L, polarity = "any",
        int_min = NA_real_, int_max = NA_real_,
-       spectrum_id = "")
+       spectrum_id_rules = list())
 }
 
 #' Build a filter list from the mod_filter UI inputs. rt inputs are in `unit`
@@ -42,7 +42,7 @@ make_filter <- function(inputs, unit) {
   f$ms_level <- if (is.null(inputs$ms_level) || identical(inputs$ms_level, "all"))
                   NA_integer_ else as.integer(inputs$ms_level)
   f$polarity <- if (!is.null(inputs$polarity)) inputs$polarity else "any"
-  f$spectrum_id <- inputs$spectrum_id %||% ""
+  f$spectrum_id_rules <- inputs$spectrum_id_rules %||% list()
   f
 }
 
@@ -70,8 +70,8 @@ apply_filters <- function(x, f) {
   ii <- .flt_int(f)
   if (!is.null(ii))
     x <- MsExperiment::filterSpectra(x, Spectra::filterIntensity, intensity = ii)
-  if (!is.null(f$spectrum_id) && nzchar(f$spectrum_id))
-    x <- MsExperiment::filterSpectra(x, .filter_spectrumid, pat = f$spectrum_id)
+  if (has_id_rules(f))
+    x <- MsExperiment::filterSpectra(x, .filter_spectrumid, rules = f$spectrum_id_rules)
   x
 }
 
@@ -89,17 +89,40 @@ apply_filters_spectra <- function(sp, f) {
     sp <- Spectra::filterPolarity(sp, if (identical(f$polarity, "pos")) 1L else 0L)
   ii <- .flt_int(f)
   if (!is.null(ii)) sp <- Spectra::filterIntensity(sp, intensity = ii)
-  if (!is.null(f$spectrum_id) && nzchar(f$spectrum_id))
-    sp <- .filter_spectrumid(sp, f$spectrum_id)
+  if (has_id_rules(f))
+    sp <- .filter_spectrumid(sp, f$spectrum_id_rules)
   sp
 }
 
-# Keep spectra whose spectrumId matches a (fixed-string) pattern, e.g.
-# "function=1 process=0 scan=7". Used for Waters-style function/scanEvent subset.
-.filter_spectrumid <- function(sp, pat) {
+# Does the filter carry any spectrum-ID rule with a non-empty term?
+has_id_rules <- function(f) {
+  rules <- f$spectrum_id_rules %||% list()
+  any(vapply(rules, function(r) nzchar(r$text %||% ""), logical(1)))
+}
+
+# Keep spectra by their spectrumId against a list of rules (each
+# list(mode = "contains"|"exclude", text = ...)), e.g. require "function=1" and
+# exclude "process=0". Used for Waters-style function/scanEvent subsetting.
+.filter_spectrumid <- function(sp, rules) {
   ids <- tryCatch(sp$spectrumId, error = function(e) NULL)
   if (is.null(ids)) return(sp)
-  sp[grepl(pat, ids, fixed = TRUE)]
+  sp[match_spectrum_id_rules(ids, rules)]
+}
+
+#' Logical keep-mask for spectrum ids given a list of rules. Empty-term rules are
+#' ignored; "contains" rules are ANDed (the id must contain the fixed term) and
+#' "exclude" rules require the term to be absent. No effective rule keeps all.
+#' Pure (no Spectra dependency) so it can be unit-tested directly.
+#' @noRd
+match_spectrum_id_rules <- function(ids, rules) {
+  keep <- rep(TRUE, length(ids))
+  for (rule in rules) {
+    txt <- rule$text %||% ""
+    if (!nzchar(txt)) next
+    hit <- grepl(txt, ids, fixed = TRUE)
+    keep <- keep & if (identical(rule$mode, "exclude")) !hit else hit
+  }
+  keep
 }
 
 #' Combined data ranges across the included files (for input hints).

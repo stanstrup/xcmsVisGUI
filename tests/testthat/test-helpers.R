@@ -15,21 +15,59 @@ test_that("empty_filter / make_filter / chrom_ms_level behave", {
   ef <- empty_filter()
   expect_identical(names(ef),
     c("rt_min","rt_max","mz_min","mz_max","ms_level","polarity","int_min",
-      "int_max","spectrum_id"))
+      "int_max","spectrum_id_rules"))
   expect_equal(ef$ms_level, 1L)
+  expect_identical(ef$spectrum_id_rules, list())
   expect_true(is.na(ef$rt_min) && is.na(ef$mz_max))
 
+  rules <- list(list(mode = "contains", text = "x"))
   mf <- make_filter(list(rt_min = 1.5, rt_max = NA, mz_min = 100, ms_level = "2",
-                         polarity = "pos", spectrum_id = "x"), "min")
+                         polarity = "pos", spectrum_id_rules = rules), "min")
   expect_equal(mf$rt_min, 90)            # 1.5 min -> 90 s
   expect_true(is.na(mf$rt_max))
   expect_equal(mf$ms_level, 2L)
   expect_identical(mf$polarity, "pos")
-  expect_identical(mf$spectrum_id, "x")
+  expect_identical(mf$spectrum_id_rules, rules)
+  expect_identical(make_filter(list(), "min")$spectrum_id_rules, list())
   expect_true(is.na(make_filter(list(ms_level = "all"), "min")$ms_level))
 
   expect_equal(chrom_ms_level(list(ms_level = 2L)), 2L)
   expect_equal(chrom_ms_level(list(ms_level = NA_integer_)), 1L)
+})
+
+test_that("spectrum-ID rules: contains ANDed, exclude inverts, empty ignored", {
+  ids <- c("function=1 process=0 scan=1",
+           "function=1 process=1 scan=2",
+           "function=2 process=0 scan=3")
+  m <- match_spectrum_id_rules
+
+  # no effective rule -> keep all
+  expect_equal(m(ids, list()), rep(TRUE, 3))
+  expect_equal(m(ids, list(list(mode = "contains", text = ""))), rep(TRUE, 3))
+
+  # single contains
+  expect_equal(m(ids, list(list(mode = "contains", text = "function=1"))),
+               c(TRUE, TRUE, FALSE))
+  # contains AND contains
+  expect_equal(m(ids, list(list(mode = "contains", text = "function=1"),
+                           list(mode = "contains", text = "process=0"))),
+               c(TRUE, FALSE, FALSE))
+  # contains AND NOT exclude
+  expect_equal(m(ids, list(list(mode = "contains", text = "function=1"),
+                           list(mode = "exclude", text = "process=0"))),
+               c(FALSE, TRUE, FALSE))
+  # exclude alone
+  expect_equal(m(ids, list(list(mode = "exclude", text = "scan=2"))),
+               c(TRUE, FALSE, TRUE))
+  # fixed-string (not regex): a dot is literal
+  expect_equal(m(c("a.b", "axb"), list(list(mode = "contains", text = "a.b"))),
+               c(TRUE, FALSE))
+
+  expect_false(has_id_rules(list(spectrum_id_rules = list())))
+  expect_false(has_id_rules(list(spectrum_id_rules =
+                                   list(list(mode = "contains", text = "")))))
+  expect_true(has_id_rules(list(spectrum_id_rules =
+                                  list(list(mode = "exclude", text = "scan=2")))))
 })
 
 test_that(".flt_mz / .flt_int compose ranges", {

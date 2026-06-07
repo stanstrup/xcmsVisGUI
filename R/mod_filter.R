@@ -6,8 +6,20 @@ mod_filter_ui <- function(id) {
   ns <- NS(id)
   tagList(
     uiOutput(ns("controls")),
+    # Spectrum-ID rules. Each row is contains/exclude + a fixed-string term;
+    # contains-rows are ANDed (id must contain the term), exclude-rows require it
+    # absent. Rows are added/removed with insertUI/removeUI so the others keep
+    # their typed values.
+    tags$hr(class = "my-2"),
+    tags$label(class = "control-label", "Spectrum ID"),
+    tags$small(class = "text-muted d-block mb-1",
+               "Match the raw spectrum id (e.g. function=1). ",
+               "Add rows to require or exclude terms."),
+    div(id = ns("id_rules")),
+    actionButton(ns("id_add"), "Add rule", icon = icon("plus"),
+                 class = "btn-sm btn-outline-primary"),
     actionButton(ns("reset"), "Reset filters",
-                 class = "btn-sm btn-outline-secondary mt-2")
+                 class = "btn-sm btn-outline-secondary mt-2 d-block")
   )
 }
 
@@ -25,6 +37,39 @@ mod_filter_ui <- function(id) {
 mod_filter_server <- function(id, rv, included) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    # --- Spectrum-ID rules (dynamic rows) --------------------------------
+    rule_ids <- reactiveVal(character())   # rids currently shown
+    rule_seq <- reactiveVal(0L)            # monotonic counter for unique ids
+
+    rule_row <- function(rid) {
+      div(id = ns(paste0("id_row_", rid)),
+          class = "d-flex gap-1 mb-1 align-items-center",
+          div(style = "flex:0 0 90px",
+              selectInput(ns(paste0("id_mode_", rid)), NULL, width = "100%",
+                          choices = c("contains", "exclude"), selectize = FALSE)),
+          div(style = "flex:1",
+              textInput(ns(paste0("id_text_", rid)), NULL, width = "100%",
+                        placeholder = "function=1")),
+          tags$button(icon("xmark"), type = "button", title = "Remove rule",
+                      class = "btn btn-sm btn-outline-secondary",
+                      onclick = sprintf(
+                        "Shiny.setInputValue('%s', '%s', {priority:'event'})",
+                        ns("id_remove"), rid)))
+    }
+
+    observeEvent(input$id_add, {
+      rule_seq(rule_seq() + 1L)
+      rid <- paste0("r", rule_seq())
+      rule_ids(c(rule_ids(), rid))
+      insertUI(paste0("#", ns("id_rules")), "beforeEnd", rule_row(rid), immediate = TRUE)
+    })
+
+    observeEvent(input$id_remove, {
+      rid <- input$id_remove
+      removeUI(paste0("#", ns(paste0("id_row_", rid))), immediate = TRUE)
+      rule_ids(setdiff(rule_ids(), rid))
+    })
 
     ranges <- reactive({
       inc <- included()
@@ -54,18 +99,19 @@ mod_filter_server <- function(id, rv, included) {
             div(style = "flex:1",
                 selectInput(ns("polarity"), "Polarity", width = "100%",
                             choices = c("any", "pos", "neg"), selected = "any"))),
-        textInput(ns("spectrum_id"), "Spectrum ID contains",
-                  placeholder = "e.g. function=1 process=0"),
         helpText("Leave a box blank for no limit.")
       )
     })
 
     filter_inputs <- reactive({
+      rules <- lapply(rule_ids(), function(rid) list(
+        mode = input[[paste0("id_mode_", rid)]] %||% "contains",
+        text = input[[paste0("id_text_", rid)]] %||% ""))
       list(rt_min = input$rt_min, rt_max = input$rt_max,
            mz_min = input$mz_min, mz_max = input$mz_max,
            int_min = input$int_min, int_max = input$int_max,
            ms_level = input$ms_level, polarity = input$polarity,
-           spectrum_id = input$spectrum_id)
+           spectrum_id_rules = rules)
     }) %>% debounce(600)
 
     observeEvent(filter_inputs(), {
@@ -75,7 +121,9 @@ mod_filter_server <- function(id, rv, included) {
     observeEvent(input$reset, {
       for (k in c("rt_min","rt_max","mz_min","mz_max","int_min","int_max"))
         updateNumericInput(session, k, value = NA)
-      updateTextInput(session, "spectrum_id", value = "")
+      for (rid in rule_ids())
+        removeUI(paste0("#", ns(paste0("id_row_", rid))), immediate = TRUE)
+      rule_ids(character())
       updateSelectInput(session, "polarity", selected = "any")
       updateSelectInput(session, "ms_level",
         selected = if ("1" %in% ranges()$ms_levels) "1" else "all")

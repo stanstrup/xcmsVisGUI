@@ -117,7 +117,7 @@ extract_spectrum <- function(path, rt = NA_real_, scan = NA_integer_, f = list()
     idx <- which.min(abs(anum - as.integer(scan)))
     pf <- f
     pf$ms_level <- NA_integer_; pf$rt_min <- NA_real_; pf$rt_max <- NA_real_
-    pf$polarity <- "any"; pf$spectrum_id <- ""
+    pf$polarity <- "any"; pf$spectrum_id_rules <- list()
     return(one_to_df(apply_filters_spectra(sp[idx], pf)))
   }
   # rt-based selection: the global filter chooses which spectrum (ms level etc.).

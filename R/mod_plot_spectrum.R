@@ -1,4 +1,4 @@
-# mod_plot_spectrum — spectrum viewer driven by the included files (no separate
+# mod_plot_spectrum -- spectrum viewer driven by the included files (no separate
 # file picker). Single view uses the clicked / first included file; Facet and
 # Stacked views compare the spectrum at the chosen rt across all included files.
 # A scan-list browser shows every scan's metadata. The single view can overlay
@@ -35,7 +35,7 @@ mod_plot_spectrum_ui <- function(id) {
         numericInput(ns("rt"), "Retention time", value = NA, step = 0.1),
         conditionalPanel(
           sprintf("input['%s'] == 'single'", ns("layout")),
-          numericInput(ns("scan"), "…or scan (acquisition) number", value = NA, step = 1)),
+          numericInput(ns("scan"), "\u2026or scan (acquisition) number", value = NA, step = 1)),
         helpText("Single view uses the file you clicked (or the first included). ",
                  "Facet / Stacked compare all included files at the rt. MS level ",
                  "and intensity / spectrum-id filters come from the global filter."),
@@ -49,14 +49,14 @@ mod_plot_spectrum_ui <- function(id) {
           conditionalPanel(
             single(sprintf("input['%s'] == true", ns("annotate"))),
             radioButtons(ns("click_action"), "Click on a peak", inline = TRUE,
-                         c("→ EIC list" = "eic", "→ set anchor" = "anchor")),
+                         c("\u2192 EIC list" = "eic", "\u2192 set anchor" = "anchor")),
             selectInput(ns("ann_mode"), "Mode",
                         c("Manual anchor" = "manual", "Auto-suggest (findMAIN)" = "auto",
                           "Difference network" = "diff")),
             selectInput(ns("ann_pol"), "Ion mode",
                         c("Positive" = "pos", "Negative" = "neg")),
             div(class = "d-flex gap-2",
-                numericInput(ns("ann_tol"), "± tol", value = 10, min = 0,
+                numericInput(ns("ann_tol"), "\u00b1 tol", value = 10, min = 0,
                              width = "90px"),
                 selectInput(ns("ann_unit"), "unit", c("ppm", "Da"), width = "90px")),
             numericInput(ns("ann_min_int"), "Min intensity (% of base peak)",
@@ -95,7 +95,7 @@ mod_plot_spectrum_ui <- function(id) {
                            class = "btn-sm btn-outline-primary mb-2"),
               helpText("Each row: findMAIN reads the main-peak m/z as that adduct, ",
                        "giving the neutral mass M and the molecular-ion m/z. The top ",
-                       "row is annotated — click another to switch; sort by a column ",
+                       "row is annotated \u2014 click another to switch; sort by a column ",
                        "header (e.g. neutral M) to reorder."),
               DTOutput(ns("ranked"))),
             conditionalPanel(
@@ -145,7 +145,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     })
 
     # Snap an out-of-range scan back into the input box. The box holds an
-    # ACQUISITION number, not a 1..n position — clamp to the file's actual
+    # ACQUISITION number, not a 1..n position -- clamp to the file's actual
     # acquisition-number range (these can start well above 1 and be non-contiguous).
     observeEvent(input$scan, {
       if (!isTRUE(is.finite(input$scan))) return()
@@ -172,7 +172,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       validate(need(use_scan || is.finite(rt_disp),
                     "Enter a retention time (or scan number), or click a chromatogram."))
       rt_sec <- if (is.finite(rt_disp)) rt_to_sec(rt_disp, unit) else NA_real_
-      withProgress(message = "Reading spectrum…", value = 0.5, {
+      withProgress(message = "Reading spectrum\u2026", value = 0.5, {
         if (identical(input$layout, "single")) {
           f <- cur_row()
           d <- one_spectrum(f$path, rt_sec, input$scan); d$sample_name <- f$name; d
@@ -225,7 +225,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       if (is.null(v) || !is.finite(v) || v < 1) NA_integer_ else as.integer(v)
     })
     # Peaks above the intensity floor (the noise filter). The top-N cap is applied
-    # later to the ANNOTATED peaks, not here — the user wants the N strongest hits,
+    # later to the ANNOTATED peaks, not here -- the user wants the N strongest hits,
     # not annotation restricted to the N strongest peaks of the whole spectrum.
     ann_peaks <- function(df) {
       df[is.finite(df$intensity) &
@@ -233,11 +233,11 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     }
 
     # findMAIN ranked hypotheses (auto mode). The selected row (default the top,
-    # best-scoring one) becomes the anchor — no manual anchor entry in auto mode.
+    # best-scoring one) becomes the anchor -- no manual anchor entry in auto mode.
     ranked <- eventReactive(input$suggest, {
       df <- ann_peaks(spec_df()); validate(need(nrow(df) > 0, "No spectrum."))
       ppm <- if (identical(input$ann_unit, "ppm")) input$ann_tol else 5
-      withProgress(message = "Ranking molecular-ion hypotheses…", value = 0.5,
+      withProgress(message = "Ranking molecular-ion hypotheses\u2026", value = 0.5,
                    rank_anchors(df, mode = input$ann_pol, ppm = ppm, rel_floor = 0,
                                 top_n = 25L))
     })
@@ -257,7 +257,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         peaks = r$adducts_explained, score = r$total_score,
         check.names = FALSE)
       names(disp)[4] <- pr                      # the molecular-ion column, e.g. [M+H]+
-      # Sortable + scrollable so the full list shows — click the "neutral M" or the
+      # Sortable + scrollable so the full list shows -- click the "neutral M" or the
       # molecular-ion header to bring the heaviest (molecular-ion) hypothesis up.
       # Round in the DT render, not the data, so sorting stays numeric.
       datatable(disp, rownames = FALSE, selection = "single",
@@ -280,7 +280,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       df <- ann_peaks(spec_df()); req(nrow(df) > 0)
       if (identical(input$ann_mode, "diff")) {
         # diff is O(n^2) over the candidate peaks, so it must cap its INPUT by
-        # intensity (top-N, or 30 when blank) — there's no per-result cap here.
+        # intensity (top-N, or 30 when blank) -- there's no per-result cap here.
         cap <- if (is.na(ann_top())) 30L else ann_top()
         return(list(mode = "diff",
                     edges = difference_network(df, input$ann_tol, input$ann_unit,
@@ -344,11 +344,11 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         if (length(pmz) != 1 || !is.finite(pmz) || pmz <= 0) pmz <- NA_real_
       }
       ttl <- if (identical(input$layout, "single"))
-        sprintf("%s — scan %s @ rt %.4g %s%s", df$sample_name[1],
+        sprintf("%s \u2014 scan %s @ rt %.4g %s%s", df$sample_name[1],
                 if (is.na(df$scan[1])) "?" else df$scan[1],
                 rt_to_disp(df$rt[1], unit), unit,
-                if (is.finite(pmz)) sprintf("  •  precursor m/z %.4f", pmz) else "")
-      else sprintf("rt %.4g %s — %d files", rt_to_disp(df$rt[1], unit), unit,
+                if (is.finite(pmz)) sprintf("  \u2022  precursor m/z %.4f", pmz) else "")
+      else sprintf("rt %.4g %s \u2014 %d files", rt_to_disp(df$rt[1], unit), unit,
                    length(unique(df$sample_name)))
       p <- ggplot(df, aes(x = mz, ymin = 0, ymax = intensity, text = .tip)) +
         geom_linerange(linewidth = 0.4, color = col1) +
@@ -424,7 +424,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       if (!is.null(sl$sid) && nzchar(sl$sid))
         keep <- keep & grepl(sl$sid, tab$spectrumId, fixed = TRUE)
       # NA fields (e.g. MS1 precursor m/z, unset polarity) make a clause NA, which
-      # would materialize all-NA phantom rows in the DT — drop those rows.
+      # would materialize all-NA phantom rows in the DT -- drop those rows.
       keep[is.na(keep)] <- FALSE
       tab[keep, , drop = FALSE]
     })
@@ -432,21 +432,21 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       ms_choices <- c("all", sort(unique(scan_tab()$msLevel)))
       u <- rv$settings$time_unit
       showModal(modalDialog(
-        title = paste("Scans —", cur_row()$name), size = "xl", easyClose = TRUE,
+        title = paste("Scans \u2014", cur_row()$name), size = "xl", easyClose = TRUE,
         helpText("Type filters (blank = no limit); click a row to load that scan."),
         layout_columns(
           col_widths = c(2, 2, 2, 2, 2, 2),
-          numericInput(ns("sl_scan_min"), "scan ≥", sl$scan_min),
-          numericInput(ns("sl_scan_max"), "scan ≤", sl$scan_max),
-          numericInput(ns("sl_rt_min"), paste0("rt(", u, ") ≥"), sl$rt_min),
-          numericInput(ns("sl_rt_max"), paste0("rt(", u, ") ≤"), sl$rt_max),
+          numericInput(ns("sl_scan_min"), "scan \u2265", sl$scan_min),
+          numericInput(ns("sl_scan_max"), "scan \u2264", sl$scan_max),
+          numericInput(ns("sl_rt_min"), paste0("rt(", u, ") \u2265"), sl$rt_min),
+          numericInput(ns("sl_rt_max"), paste0("rt(", u, ") \u2264"), sl$rt_max),
           selectInput(ns("sl_ms"), "MS", choices = ms_choices, selected = sl$ms),
           selectInput(ns("sl_pol"), "Polarity", choices = c("any","pos","neg"),
                       selected = sl$pol)),
         layout_columns(
           col_widths = c(3, 3, 6),
-          numericInput(ns("sl_pmz_min"), "precursor m/z ≥", sl$pmz_min),
-          numericInput(ns("sl_pmz_max"), "precursor m/z ≤", sl$pmz_max),
+          numericInput(ns("sl_pmz_min"), "precursor m/z \u2265", sl$pmz_min),
+          numericInput(ns("sl_pmz_max"), "precursor m/z \u2264", sl$pmz_max),
           textInput(ns("sl_sid"), "spectrumId contains", value = sl$sid)),
         DTOutput(ns("scantable")),
         footer = modalButton("Close")
@@ -490,7 +490,7 @@ annotate_layers <- function(p, ar, df, palette) {
     if (!nrow(e)) return(p)
     e$y <- ymax * (1.06 + 0.05 * (seq_len(nrow(e)) - 1))   # stack brackets
     e$xmid <- (e$mz_lo + e$mz_hi) / 2
-    e$lab <- sprintf("Δ %.4f\n%s", e$delta, e$origin)
+    e$lab <- sprintf("\u0394 %.4f\n%s", e$delta, e$origin)
     e$.tip <- e$lab
     return(p +
       geom_segment(data = e, aes(x = mz_lo, xend = mz_hi, y = y, yend = y, text = .tip),
@@ -555,7 +555,7 @@ cap_matched <- function(tab, n) {
 }
 
 #' Render the annotation labels vertically. ggplotly turns geom_text into scatter
-#' text traces, and this plotly.js (2.25) ignores `textangle` on those — but it
+#' text traces, and this plotly.js (2.25) ignores `textangle` on those -- but it
 #' does honour it on LAYOUT ANNOTATIONS. So convert each text trace's labels into
 #' layout annotations (rotated -90, reading upward, anchored above the peak) and
 #' drop the now-redundant text trace. Operate on a built object so trace `mode`,

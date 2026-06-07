@@ -21,13 +21,14 @@ mod_plot_spectrum_ui <- function(id) {
           actionButton(ns("scanlist"), "Scan list", class = "btn-sm btn-outline-secondary"),
           mod_export_ui(ns("export")))
     ),
-    # Compact the ranked findMAIN table so its six columns fit the sidebar.
-    tags$style(HTML(sprintf(
-      "#%s table.dataTable{font-size:11px} #%s table.dataTable th,#%s table.dataTable td{padding:2px 5px;white-space:nowrap}",
-      ns("ranked"), ns("ranked"), ns("ranked")))),
     layout_sidebar(
       sidebar = sidebar(
         width = 420, position = "right", open = "open",
+        # Compact the ranked findMAIN table so its six columns fit. Kept inside the
+        # sidebar (not a card child) so it isn't wrapped in an empty card body.
+        tags$style(HTML(sprintf(
+          "#%s table.dataTable{font-size:11px} #%s table.dataTable th,#%s table.dataTable td{padding:2px 5px;white-space:nowrap}",
+          ns("ranked"), ns("ranked"), ns("ranked")))),
         radioButtons(ns("layout"), "Layout",
                      c("Single file" = "single", "Facet by file" = "facet",
                        "Stacked" = "stacked")),

@@ -58,6 +58,12 @@ mod_plot_spectrum_ui <- function(id) {
                          value = 0, min = 0, max = 100, step = 0.5),
             numericInput(ns("ann_top_n"), "Annotate only top N peaks (blank = all)",
                          value = NA, min = 1, step = 1),
+            # Isotope controls (all modes): how far off the theoretical spacing a
+            # peak may sit, and whether to require a decreasing envelope.
+            numericInput(ns("ann_iso_tol"), "Isotope tol (mDa, per M+1 step)",
+                         value = 15, min = 0, step = 1),
+            checkboxInput(ns("ann_iso_dec"), "Isotopes decrease in intensity",
+                          value = TRUE),
             # Projection options (manual + auto): isotopes, fragments, max charge.
             conditionalPanel(
               sprintf("input['%s'] != 'diff'", ns("ann_mode")),
@@ -66,6 +72,7 @@ mod_plot_spectrum_ui <- function(id) {
                                max = 6, step = 1, width = "120px"),
                   numericInput(ns("ann_max_z"), "Max charge", value = 1, min = 1,
                                max = 5, step = 1, width = "110px")),
+              checkboxInput(ns("ann_frag"), "In-source fragments", value = TRUE),
               checkboxInput(ns("ann_ghost"), "Show expected-but-absent", value = FALSE)),
             # Manual-only: the anchor ion. Auto mode drives the anchor from findMAIN.
             conditionalPanel(
@@ -85,9 +92,9 @@ mod_plot_spectrum_ui <- function(id) {
             conditionalPanel(
               sprintf("input['%s'] == 'diff'", ns("ann_mode")),
               helpText("Annotates peak pairs whose m/z difference matches a known ",
-                       "adduct/fragment. The tolerance should match your ",
-                       "instrument's mass accuracy; raise the minimum intensity ",
-                       "to drop noise pairs."))
+                       "adduct/fragment. Isotope-spaced pairs are ignored (see the ",
+                       "isotope controls). Set the tolerance to your instrument's ",
+                       "mass accuracy; raise the minimum intensity to drop noise."))
           )
         )
       ),
@@ -236,6 +243,13 @@ mod_plot_spectrum_server <- function(id, rv, included) {
                 options = list(dom = "t", paging = FALSE, ordering = FALSE))
     })
 
+    # Isotope settings (shared by all modes).
+    iso_tol <- reactive({
+      v <- input$ann_iso_tol
+      if (is.null(v) || !is.finite(v) || v < 0) ISO_TOL_DA else v / 1000
+    })
+    iso_dec <- reactive(isTRUE(input$ann_iso_dec))
+
     # The annotation result for the current single spectrum (anchor or diff mode).
     ann_result <- reactive({
       req(isTRUE(input$annotate), identical(input$layout, "single"))
@@ -246,7 +260,9 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         cap <- if (is.na(ann_top())) 30L else ann_top()
         return(list(mode = "diff",
                     edges = difference_network(df, input$ann_tol, input$ann_unit,
-                                               top_n = cap, rel_floor = 0)))
+                                               top_n = cap, rel_floor = 0,
+                                               iso_tol = iso_tol(),
+                                               iso_decreasing = iso_dec())))
       }
       # anchor ion: typed (manual) or the picked findMAIN hypothesis (auto)
       if (identical(input$ann_mode, "auto")) {
@@ -264,7 +280,8 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       if (is.na(maxz) || maxz < 1) maxz <- Inf
       a <- annotate_anchor(df, anchor, adduct, input$ann_pol,
                            tol = input$ann_tol, unit = input$ann_unit, isotopes = niso,
-                           max_charge = maxz)
+                           fragments = isTRUE(input$ann_frag), max_charge = maxz,
+                           iso_tol = iso_tol(), iso_decreasing = iso_dec())
       list(mode = "anchor", M = a$M, table = cap_matched(a$table, ann_top()),
            ghost = isTRUE(input$ann_ghost))
     })

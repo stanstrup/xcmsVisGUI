@@ -54,17 +54,18 @@ test_that("adduct_rules + project_ions + match round-trip on a planted spectrum"
   M <- 300.1
   rules <- adduct_rules("pos")
   pick <- function(nm) adduct_mz(M, rules[rules$name == nm, , drop = FALSE])[1]
-  mzH  <- pick("[M+H]+"); mzNa <- pick("[M+Na]+")
-  spec <- tibble::tibble(mz = c(mzH, mzNa), intensity = c(1000, 400))
+  mzH  <- pick("[M+H]+"); mzNa <- pick("[M+Na]+"); frag <- mzH - 18.01056
+  spec <- tibble::tibble(mz = c(mzH, mzNa, frag), intensity = c(1000, 400, 250))
 
   exp_tab <- project_ions(M, "pos")
-  expect_true(all(exp_tab$type == "adduct"))         # adducts only
-  expect_false("[M+H-H2O]+" %in% exp_tab$label)      # in-source fragments excluded
+  expect_true(all(c("adduct", "fragment") %in% exp_tab$type))
+  expect_false("isotope" %in% exp_tab$type)          # isotopes are detected, not projected
 
   res <- match_spectrum(spec, exp_tab, tol = 10, unit = "ppm")
   is_match <- function(nm) isTRUE(res$matched[match(nm, res$label)])
   expect_true(is_match("[M+H]+"))
   expect_true(is_match("[M+Na]+"))
+  expect_true(is_match("[M+H-H2O]+"))                # in-source fragment matched
 })
 
 test_that("annotate_anchor labels DETECTED isotopes as [+k]", {
@@ -93,13 +94,14 @@ test_that("is_fragment_rule separates in-source losses from adducts by mass", {
   expect_false(is_fragment_rule(-2 * p, -2))        # [M-2H]2-: deprotonation
 })
 
-test_that("project_ions returns adducts only (no in-source fragments)", {
+test_that("project_ions includes adducts and in-source fragments, toggleable", {
   skip_if_not_installed("commonMZ")
   tab <- project_ions(300.1, "pos")
-  expect_gt(nrow(tab), 0)
-  expect_true(all(tab$type == "adduct"))
-  expect_true("[M+H]+" %in% tab$label)
-  expect_false("[M+H-H2O]+" %in% tab$label)       # fragments excluded
+  expect_true("[M+H]+" %in% tab$label && "[M+H-H2O]+" %in% tab$label)
+  expect_true("fragment" %in% tab$type)
+  nof <- project_ions(300.1, "pos", fragments = FALSE)
+  expect_true(all(nof$type == "adduct"))
+  expect_false("[M+H-H2O]+" %in% nof$label)
 })
 
 test_that("project_ions max_charge filters multiply-charged ions", {
@@ -157,18 +159,31 @@ test_that("difference_network deisotopes before pairing", {
   expect_true(any(abs(net$delta - 18.01057) < 0.02))      # water loss kept
 
   # deisotope() on its own keeps the monoisotope, drops the satellite
-  d <- deisotope(spec, tol = 15, unit = "ppm")
+  d <- deisotope(spec, iso_tol = 0.02)
   expect_true(452.0 %in% d$mz)
   expect_false(453.00336 %in% d$mz)
 })
 
-test_that("difference_network skips an isotope-spaced delta the deisotoper keeps", {
+test_that("difference_network: iso_decreasing keeps a -H2 loss, else drops it", {
   skip_if_not_installed("commonMZ")
-  # M+1 is the TALLER peak, so deisotoping won't drop it; the ~1.003 spacing must
-  # still be skipped rather than matched to a near-1 Da table entry (deamidation).
-  spec <- tibble::tibble(mz = c(400.00000, 401.00336), intensity = c(100, 1000))
-  net <- difference_network(spec, tol = 30, unit = "ppm")
-  expect_equal(nrow(net), 0)
+  # heavier peak (300) MORE intense than the lighter (297.984): not the isotope
+  # direction, so with iso_decreasing the 2.0157 spacing is a -H2 loss, kept.
+  spec <- tibble::tibble(mz = c(297.98435, 300.0), intensity = c(200, 1000))
+  net_dec <- difference_network(spec, tol = 30, unit = "ppm", iso_decreasing = TRUE)
+  expect_true(any(abs(net_dec$delta - 2.01565) < 0.02))
+  # treat ALL isotope-spaced deltas as isotopes regardless of direction -> dropped
+  net_all <- difference_network(spec, tol = 30, unit = "ppm", iso_decreasing = FALSE)
+  expect_equal(nrow(net_all[abs(net_all$delta - 2.01565) < 0.02, ]), 0)
+})
+
+test_that("isotope tolerance widens the isotope-spacing match", {
+  skip_if_not_installed("commonMZ")
+  # spacing 2.030 is 0.0235 off 2*13C; only caught when k*iso_tol covers it
+  spec <- tibble::tibble(mz = c(340.2715, 342.3017), intensity = c(600, 60))
+  tight <- difference_network(spec, tol = 30, unit = "ppm", iso_tol = 0.005)
+  expect_true(any(abs(tight$delta - 2.030) < 0.01))     # not skipped (tight iso tol)
+  loose <- difference_network(spec, tol = 30, unit = "ppm", iso_tol = 0.02)
+  expect_equal(nrow(loose[abs(loose$delta - 2.030) < 0.01, ]), 0)  # skipped
 })
 
 test_that("rank_anchors suggests the right molecular ion via findMAIN", {

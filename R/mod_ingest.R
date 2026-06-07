@@ -12,35 +12,59 @@
 #' @noRd
 mod_ingest_ui <- function(id) {
   ns <- NS(id)
+  info <- function(txt)
+    bslib::tooltip(icon("circle-info", class = "text-muted ms-1"), txt, placement = "right")
+  # All/None/Invert manipulate the DT row selection *client-side* via the
+  # binding's own shinyMethods (reliable; the server->client selectRows message
+  # is flaky for empty sets and races with async redraws). The selection change
+  # then flows back to the server through the normal rows_selected event.
+  tid <- ns("file_table")
+  sel_js <- function(mode) sprintf(paste0(
+    "var t=$('#%s').data('datatable'); if(t&&t.shinyMethods){",
+    "var n=t.rows().count(),a=[];for(var i=1;i<=n;i++)a.push(i);",
+    "var c=t.rows('.selected').indexes().toArray().map(function(i){return i+1;});",
+    "t.shinyMethods.selectRows(%s);}"),
+    tid,
+    switch(mode,
+           all = "a", none = "[]",
+           inv = "a.filter(function(x){return c.indexOf(x)<0;})"))
   tagList(
-    # Wrap long file names (underscore-joined tokens don't break on their own) so
-    # the File column never forces the sidebar to scroll horizontally.
-    tags$style(HTML(sprintf(
-      "#%s td:nth-child(2){white-space:normal;overflow-wrap:anywhere;word-break:break-word}",
-      ns("file_table")))),
+    # Compact file table: small text, tight padding, one-line File names (truncated,
+    # full name on hover) so the list stays short and never scrolls horizontally.
+    tags$style(HTML(sprintf(paste0(
+      "#%s td,#%s th{padding:1px 4px;font-size:12px;white-space:nowrap} ",
+      "#%s .fname{display:block;max-width:115px;overflow:hidden;",
+      "text-overflow:ellipsis;white-space:nowrap}"),
+      ns("file_table"), ns("file_table"), ns("file_table")))),
     # 1) paste a folder/file path, or pick a folder server-side — both NO copy
-    div(class = "d-flex gap-2 mb-2",
+    div(class = "d-flex gap-2 mb-1",
         div(style = "flex:1;",
             textInput(ns("folder"), NULL, width = "100%",
                       placeholder = "Paste a folder or file path\u2026")),
         actionButton(ns("add_folder"), "Add", class = "btn-primary"),
         actionButton(ns("clear"), NULL, icon = icon("trash"),
                      class = "btn-outline-secondary", title = "Clear all files")),
-    div(class = "mb-2",
+    div(class = "d-flex gap-2 mb-1 align-items-center",
         actionButton(ns("pick_dir"), "Choose folder\u2026", icon = icon("folder-open"),
-                     class = "btn-outline-secondary btn-sm")),
+                     class = "btn-outline-secondary btn-sm"),
+        info(paste0("Paste a path or use \u2018Choose folder\u2026\u2019 (native OS folder ",
+                    "dialog, no copy) to load every MS file in a directory \u2014 best for ",
+                    "many/large files. \u2018Browse files\u2026\u2019 is the OS file dialog but ",
+                    "copies files to a temp folder."))),
     # 2) standard OS file browser (note: copies files to a temp dir)
     fileInput(ns("browse"), NULL, multiple = TRUE,
               accept = c(".mzML", ".mzXML", ".CDF", ".cdf"),
               buttonLabel = "Browse files\u2026", placeholder = "or the OS file browser"),
-    helpText("Paste a path or use \u2018Choose folder\u2026\u2019 (native OS folder dialog, no copy) ",
-             "to load every MS file in a directory \u2014 best for many/large files. ",
-             "\u2018Browse files\u2026\u2019 is the OS file dialog but copies files to a temp folder."),
-    div(class = "d-flex gap-2 mb-2",
-        actionButton(ns("sel_all"),  "All",    class = "btn-sm btn-outline-secondary"),
-        actionButton(ns("sel_none"), "None",   class = "btn-sm btn-outline-secondary"),
-        actionButton(ns("sel_inv"),  "Invert", class = "btn-sm btn-outline-secondary")),
-    helpText("Tick a file to include it in plots. Files stay loaded when unticked."),
+    div(class = "d-flex gap-2 mb-1 align-items-center",
+        tags$button("All",    type = "button", class = "btn btn-sm btn-outline-secondary",
+                    onclick = sel_js("all")),
+        tags$button("None",   type = "button", class = "btn btn-sm btn-outline-secondary",
+                    onclick = sel_js("none")),
+        tags$button("Invert", type = "button", class = "btn btn-sm btn-outline-secondary",
+                    onclick = sel_js("inv")),
+        info(paste0("Click a row to include that file in plots; click again to ",
+                    "exclude. Files stay loaded when excluded. Double-click the ",
+                    "Group cell to rename its sample group."))),
     DTOutput(ns("file_table"))
   )
 }
@@ -171,10 +195,8 @@ mod_ingest_server <- function(id, rv) {
       pump()
     })
 
-    # --- Include/exclude controls ----------------------------------------
-    observeEvent(input$sel_all,  if (nrow(rv$files)) rv$files$include <- TRUE)
-    observeEvent(input$sel_none, if (nrow(rv$files)) rv$files$include <- FALSE)
-    observeEvent(input$sel_inv,  if (nrow(rv$files)) rv$files$include <- !rv$files$include)
+    # --- Clear-all -------------------------------------------------------
+    # (All/None/Invert are handled client-side in the UI; see mod_ingest_ui.)
     observeEvent(input$clear, {
       rv$files <- rv$files[0, ]
       queue(character()); current(NULL)
@@ -187,7 +209,7 @@ mod_ingest_server <- function(id, rv) {
     # caused the list to flash empty and was slow.
     disp_df <- reactive({
       f <- rv$files
-      cols <- c(" ", "File", "Group", "St", "MS", "Pol")
+      cols <- c("File", "Group", "St", "MS", "Pol")
       if (nrow(f) == 0) {
         empty <- as.data.frame(matrix(character(), 0, length(cols)))
         names(empty) <- cols
@@ -198,16 +220,12 @@ mod_ingest_server <- function(id, rv) {
         f$status == "reading" ~ "\u23f3",
         TRUE                  ~ "\u274c"
       )
-      check <- vapply(seq_len(nrow(f)), function(i) {
-        as.character(tags$input(
-          type = "checkbox", checked = if (f$include[i]) "checked" else NULL,
-          onclick = sprintf(
-            "Shiny.setInputValue('%s', {id: '%s', checked: this.checked}, {priority:'event'})",
-            ns("toggle"), f$id[i])
-        ))
-      }, character(1))
+      # File name truncated to one line (full name on hover) so long names neither
+      # wrap into tall rows nor force the sidebar to scroll.
+      fname <- vapply(f$name, function(nm)
+        as.character(tags$span(class = "fname", title = nm, nm)), character(1))
       data.frame(
-        ` ` = check, File = f$name, Group = f$sample_group,
+        File = fname, Group = f$sample_group,
         St = status_badge, MS = f$ms_levels, Pol = f$polarities,
         check.names = FALSE, stringsAsFactors = FALSE
       )
@@ -215,31 +233,47 @@ mod_ingest_server <- function(id, rv) {
 
     output$file_table <- renderDT({
       isolate(datatable(
-        disp_df(), escape = FALSE, rownames = FALSE, selection = "none",
+        disp_df(), escape = FALSE, rownames = FALSE,
+        selection = list(mode = "multiple", selected = which(rv$files$include),
+                         target = "row"),
         class = "compact stripe hover", width = "100%",
-        editable = list(target = "cell", columns = 2),  # Group editable
+        editable = list(target = "cell", columns = 1),  # Group editable
         options = list(dom = "t", paging = FALSE, ordering = FALSE, autoWidth = FALSE,
                        language = list(emptyTable = "No files yet."),
                        columnDefs = list(
-                         list(className = "dt-center", targets = c(0, 3, 4, 5)),
-                         list(width = "22px", targets = c(0, 3)),     # ✓ + status
-                         list(width = "auto", targets = 1)))           # File name
+                         list(className = "dt-center", targets = c(2, 3, 4)),
+                         list(width = "22px", targets = 2),            # status
+                         list(width = "auto", targets = 0)))           # File name
       ))
     })
     file_proxy <- dataTableProxy("file_table")
+    # Push row updates ONLY when the displayed content changes. disp_df() carries
+    # no include column, so toggling inclusion leaves it identical and skips the
+    # replaceData — otherwise that redraw would race with the client-side
+    # selection changes and scramble the row selection.
+    last_disp <- reactiveVal(NULL)
     observeEvent(disp_df(), {
-      replaceData(file_proxy, disp_df(), rownames = FALSE, resetPaging = FALSE)
+      cur <- disp_df()
+      if (identical(cur, last_disp())) return()
+      last_disp(cur)
+      replaceData(file_proxy, cur, rownames = FALSE, resetPaging = FALSE,
+                  clearSelection = "none")
     }, ignoreInit = TRUE)
 
-    # Checkbox toggles
-    observeEvent(input$toggle, {
-      idx <- which(rv$files$id == input$toggle$id)
-      if (length(idx)) rv$files$include[idx] <- isTRUE(input$toggle$checked)
-    })
-    # Sample group edits
+    # --- Selection drives inclusion --------------------------------------
+    # The selected rows ARE the included files: clicking a row (de)selects it,
+    # and this observer is the single writer of $include. The All/None/Invert
+    # buttons reach $include only by re-selecting rows on the client, so there
+    # is one source of truth and no feedback loop.
+    observeEvent(input$file_table_rows_selected, {
+      want <- seq_len(nrow(rv$files)) %in% input$file_table_rows_selected
+      if (!identical(want, rv$files$include)) rv$files$include <- want
+    }, ignoreNULL = FALSE, ignoreInit = TRUE)
+
+    # Sample group edits (Group is now display column 1)
     observeEvent(input$file_table_cell_edit, {
       info <- input$file_table_cell_edit
-      if (identical(as.integer(info$col), 2L)) {
+      if (identical(as.integer(info$col), 1L)) {
         rv$files$sample_group[info$row] <- as.character(info$value)
       }
     }, ignoreInit = TRUE)

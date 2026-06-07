@@ -201,16 +201,15 @@ rank_anchors <- function(spec_df, mode = c("pos", "neg"), ppm = 5,
     cp <- cp[order(-cp$intensity), , drop = FALSE][seq_len(max_peaks), , drop = FALSE]
   spec <- cbind(mz = cp$mz, int = cp$intensity)
   ionmode <- if (mode == "pos") "positive" else "negative"
-  # findMAIN is chatty (per-hypothesis scoring warnings) — quiet it for the app.
-  # Hypotheses are real adducts only — NOT in-source fragments like [M+H-H2O]+.
-  # Allowing a fragment as the main-ion hypothesis let findMAIN call the base peak
-  # a water loss (neutral mass off by +H2O) and produced confusing annotations.
-  r <- adduct_rules(mode)
-  hyp <- r$name[r$quasi == 1 & !is_fragment_rule(r$massdiff, r$charge)]
+  # Hypotheses are commonMZ's quasi-molecular ions, INCLUDING the water-loss
+  # quasi ion [M+H-H2O]+: when the base peak is itself a water loss that is the
+  # correct main-ion call, and annotate_anchor derives M from it (M = base + H2O
+  # - H) and then projects [M+H]+ at base+18 alongside it. (findMAIN is chatty —
+  # quiet its per-hypothesis scoring warnings for the app.)
   res <- tryCatch(
     suppressWarnings(suppressMessages(
       InterpretMSSpectrum::findMAIN(spec, ionmode = ionmode,
-                                    adducthyp = hyp, ppm = ppm))),
+                                    adducthyp = quasi_adducts(mode), ppm = ppm))),
     error = function(e) NULL)
   if (is.null(res)) return(empty)
   s <- tryCatch(as.data.frame(summary(res)), error = function(e) NULL)

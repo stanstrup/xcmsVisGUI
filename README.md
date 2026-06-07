@@ -1,42 +1,59 @@
 # xcmsVisGUI
 
-A local Shiny desktop app (packaged as an R package) for interactively visualising
-**raw LC-MS data** on the RforMassSpectrometry stack (`Spectra` / `MsExperiment` /
-`xcms`). Plots are ggplot2 rendered through plotly for interactivity (click, zoom,
-hover); static export is via ggsave.
+A local Shiny desktop app for interactively visualising **raw LC-MS data** on the
+RforMassSpectrometry stack (`Spectra` / `MsExperiment` / `xcms`) — TIC/BPC,
+extracted-ion chromatograms, spectra with adduct / isotope / fragment annotation,
+2D/3D maps, and DDA precursors. Plots are ggplot2 rendered through plotly (click,
+zoom, hover); static export is via ggsave. Scope is **raw visualisation only** — no
+peak picking, grouping or alignment.
 
-See [`ARCHITECTURE_REVIEW.md`](ARCHITECTURE_REVIEW.md) for the design, architecture,
-and decision log (it also folds in the original implementation plan).
+![The file list and a TIC overlay](man/figures/README-hero.png)
 
-## Status
+## Install
 
-Working: async file ingestion, settings (ColorBrewer/viridis palette, retention-time
-unit, default EIC tolerance, export defaults — persisted across restarts), global
-filters (rt / m/z / MS level / polarity / intensity / repeatable spectrum-id rules),
-and all raw-data plot views — TIC/BPC, multi-EIC, click-to-spectrum (+ scan-list
-browser), 2D MS map, 3D (points/surface), and DDA precursor ions. The Spectrum view
-also does single-spectrum **adduct / isotope / in-source-fragment annotation**
-(manual anchor, findMAIN auto-suggest, or difference network), using the
-[commonMZ](https://github.com/stanstrup/commonMZ) dictionary +
-[InterpretMSSpectrum](https://cran.r-project.org/package=InterpretMSSpectrum). Scope is
-**raw visualisation only** — no peak picking / grouping / alignment (deferred; see
-`ARCHITECTURE_REVIEW.md`).
-
-Extraction results are cached to disk (qs2), so re-opening the app with the same files +
-filter is instant. Figures export as png/svg/pdf or as the raw ggplot object (rds) for
-later tweaking in R.
-
-## Running
-
-This is an R package; the app is the exported `run_app()`.
+xcmsVisGUI depends on Bioconductor packages and on the GitHub-only
+[commonMZ](https://github.com/stanstrup/commonMZ), so install with a tool that
+resolves both. The easiest is [pak](https://pak.r-lib.org/):
 
 ```r
-# dev (from a clone, no install needed):
-Rscript run.R                       # = pkgload::load_all() + run_app(launch.browser = TRUE)
+# install.packages("pak")
+pak::pak("stanstrup/xcmsVisGUI")
+```
 
-# or installed:
+Or with **remotes** + **BiocManager** (point at the Bioconductor repos first so the
+Bioc dependencies resolve):
+
+```r
+# install.packages(c("remotes", "BiocManager"))
+options(repos = BiocManager::repositories())
+remotes::install_github("stanstrup/xcmsVisGUI")
+```
+
+## Run
+
+```r
 xcmsVisGUI::run_app()
 ```
+
+A browser tab opens with the plot views across the top (TIC/BPC, EIC, Spectrum, MS
+map, Precursors), a **Settings** page, and a left sidebar with **Files** and
+**Filters**. Paste a folder of `.mzML` / `.mzXML` / `.CDF` files into the Files box
+to begin.
+
+## Documentation
+
+Full guides live on the [package website](https://stanstrup.github.io/xcmsVisGUI/):
+
+- [**Getting started**](https://stanstrup.github.io/xcmsVisGUI/articles/getting_started.html)
+  — loading files, filtering, settings, export, and moving between tabs
+- [TIC / BPC](https://stanstrup.github.io/xcmsVisGUI/articles/tic_bpc.html)
+- [EIC](https://stanstrup.github.io/xcmsVisGUI/articles/eic.html)
+- [Spectrum](https://stanstrup.github.io/xcmsVisGUI/articles/spectrum.html)
+  — single spectra, the scan-list browser, and annotation
+- [MS map](https://stanstrup.github.io/xcmsVisGUI/articles/ms_map.html)
+- [Precursors](https://stanstrup.github.io/xcmsVisGUI/articles/precursors.html)
+- [Developer guide](https://stanstrup.github.io/xcmsVisGUI/articles/developer.html)
+  — status, running from a clone, tests, renv, and the project layout
 
 ## Deploy with Docker
 
@@ -50,54 +67,6 @@ docker run --rm -p 3838:3838 -v /path/to/ms-data:/data xcmsvisgui
 Open <http://localhost:3838> and paste `/data` (your mounted files) into the Files
 box. Mount a volume at `/root/.config/R` to persist settings across restarts.
 
-## Tests
+## License
 
-```r
-testthat::test_local(".")           # or: R CMD check
-```
-
-The suite covers the pure helpers and the key invariant that `apply_filters`
-(MsExperiment) and `apply_filters_spectra` (Spectra) select the same spectra.
-Real-data tests use the `msdata`/`faahKO` Bioconductor packages and skip if absent.
-CI runs `R CMD check` on push/PR (`.github/workflows/R-CMD-check.yaml`).
-
-## Dependencies & reproducibility (renv)
-
-Dependencies are pinned with [`renv`](https://rstudio.github.io/renv/) (`renv.lock`),
-with Bioconductor support configured. On a fresh clone:
-
-```r
-renv::restore()
-```
-
-`renv-setup.R` is a one-shot installer/snapshotter for first-time setup.
-
-## Project layout
-
-```
-run.R                  # convenience launcher (load_all + run_app)
-DESCRIPTION / NAMESPACE # package metadata; NAMESPACE is roxygen-generated
-R/
-  run_app.R            # app_ui() / app_server() + exported run_app()
-  zzz.R                # .onLoad: register BiocParallel SerialParam (the perf fix)
-  constants.R          # MS-file constants, palette names, rt-unit helpers
-  daemons.R            # mirai daemon pool + per-run setup
-  xcmsVisGUI-package.R # roxygen import declarations + globalVariables
-  mod_ingest.R         # typed-path / choose.dir / fileInput + async mirai reader + file list
-  mod_settings.R       # palette, rt unit, default tolerance, daemon count, export; persistence
-  mod_filter.R         # global rt/mz/MS-level/polarity/intensity/spectrum-id filters
-  mod_plot_tic_bpc.R   # TIC/BPC overlay, colour by group/sample, click->spectrum
-  mod_plot_eic.R       # editable multi-m/z target table -> overlaid EICs
-  mod_plot_spectrum.R  # spectrum at a clicked rt / picked scan + scan-list browser
-  mod_plot_map.R       # 2D MS map + 3D points/surface (plotly-native)
-  mod_plot_precursors.R# DDA precursor-ion map
-  mod_export.R         # reusable png/svg/pdf/rds export modal
-  fct_extract.R        # data extraction (summaries, chromatograms, peaks, spectra)
-  fct_filters.R        # compose filter state into Spectra/xcms calls
-  fct_export.R         # ggsave-based export (+ rds = the ggplot object itself)
-  fct_palettes.R       # ColorBrewer / viridis helpers
-  fct_cache.R          # layered mem+disk (qs2) cache backing bindCache, persistent across restarts
-  fct_settings_store.R # persist settings to the per-user config dir
-  utils_reactive.R     # central reactive state (rv) + plotly/zoom helpers
-tests/testthat/        # unit + real-data tests
-```
+MIT © Jan Stanstrup. See [LICENSE.md](LICENSE.md).

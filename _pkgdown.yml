@@ -9,10 +9,22 @@ navbar:
     right: [search, github]
 
 articles:
-- title: Guides
+- title: Get started
   navbar: ~
   contents:
-  - articles/usage
+  - articles/getting_started
+- title: Plot views
+  navbar: Plot views
+  contents:
+  - articles/tic_bpc
+  - articles/eic
+  - articles/spectrum
+  - articles/ms_map
+  - articles/precursors
+- title: Development
+  navbar: ~
+  contents:
+  - articles/developer
 
 reference:
 - title: Launch the app

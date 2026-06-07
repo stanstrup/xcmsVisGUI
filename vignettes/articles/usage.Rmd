@@ -10,8 +10,9 @@ knitr::opts_chunk$set(echo = FALSE, eval = FALSE)
 ```
 
 xcmsVisGUI is a local Shiny desktop app for exploring **raw** LC-MS data
-interactively. This guide walks through a typical session. The screenshots use the
-`faahKO` (6 CDF files) and `msdata` demo datasets that ship with Bioconductor.
+interactively. This guide walks through a typical session. The screenshots come from
+example LC-MS runs — a positive-mode QTOF urine series and the `faahKO` / `msdata`
+demo datasets that ship with Bioconductor.
 
 ## Launch
 
@@ -41,11 +42,13 @@ place (no copy) except the OS file browser:
   temp folder.
 
 Files are read asynchronously (a status badge flips from ⏳ to ✅), so the UI stays
-responsive even with many files. **Tick a file to include it** in the plots —
-unticked files stay loaded. Use **All / None / Invert** for bulk selection. As
-soon as one file is included, the TIC renders:
+responsive even with many files. **Click a file's row to include it** in the plots
+(the row highlights); click it again to exclude. Files stay loaded either way, so
+toggling is cheap. **All / None / Invert** select in bulk, and double-clicking the
+**Group** cell renames that file's sample group (used for colouring and faceting).
+As soon as one file is included, the TIC renders:
 
-![Files loaded and the TIC overlay](figures/tic.png){width=100%}
+![The file list (selected rows are included) and the TIC overlay](figures/tic.png){width=100%}
 
 ## 2. Filter (optional)
 
@@ -53,10 +56,17 @@ The **Filters** panel applies globally to every view. Leave a box blank for no
 limit; retention-time boxes use the display unit (set in Settings) and the data
 range is shown as a hint.
 
-![Global filters](figures/filters.png){width=100%}
+![Global filters, including spectrum-ID rules](figures/filters.png){width=100%}
 
-You can constrain retention time, *m/z*, intensity, MS level, polarity, and (for
-vendor-specific subsetting) a spectrum-ID substring. **Reset filters** clears them.
+You can constrain retention time, *m/z*, intensity, MS level and polarity. The
+**Spectrum ID** section matches against the raw spectrum id (e.g. the Waters
+`function=1 process=0 scan=…`): add one or more rules with **Add rule**, each set to
+**contains** (the id must include the term) or **exclude** (it must not). Multiple
+`contains` rules are ANDed, so you can keep e.g. `function=1` while excluding
+`function=2`. Matching is a literal substring (so `scan=1` also matches `scan=10`,
+`scan=199`, …). **Reset filters** clears everything. If a filter combination matches
+no spectra, the plots show "No spectra match the current filters." rather than an
+error.
 
 ## 3. TIC / BPC
 
@@ -94,7 +104,11 @@ boxes to narrow it, and click a row to load that scan.
 Tick **Annotate adducts / fragments** (single-file view) to overlay adduct,
 isotope and in-source-fragment labels on the spectrum. The adduct/fragment
 dictionary comes from the [commonMZ](https://github.com/stanstrup/commonMZ)
-package; the ion mode defaults to the file's polarity. There are three modes:
+package; the ion mode defaults to the file's polarity.
+
+![Adduct, isotope and in-source-fragment annotation on a spectrum](figures/annotation.png){width=100%}
+
+There are three modes:
 
 - **Manual anchor** — pick the peak you believe is a known ion (default `[M+H]+` /
   `[M-H]-`, selectable). Switch *Click on a peak* to **→ set anchor** and click the

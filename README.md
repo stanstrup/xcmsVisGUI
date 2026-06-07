@@ -12,10 +12,15 @@ and decision log (it also folds in the original implementation plan).
 
 Working: async file ingestion, settings (ColorBrewer/viridis palette, retention-time
 unit, default EIC tolerance, export defaults — persisted across restarts), global
-filters (rt / m/z / MS level / polarity / intensity / spectrum-id), and all raw-data
-plot views — TIC/BPC, multi-EIC, click-to-spectrum (+ scan-list browser), 2D MS map,
-3D (points/surface), and DDA precursor ions. Scope is **raw visualisation only** — no
-peak picking / grouping / alignment (deferred; see `ARCHITECTURE_REVIEW.md`).
+filters (rt / m/z / MS level / polarity / intensity / repeatable spectrum-id rules),
+and all raw-data plot views — TIC/BPC, multi-EIC, click-to-spectrum (+ scan-list
+browser), 2D MS map, 3D (points/surface), and DDA precursor ions. The Spectrum view
+also does single-spectrum **adduct / isotope / in-source-fragment annotation**
+(manual anchor, findMAIN auto-suggest, or difference network), using the
+[commonMZ](https://github.com/stanstrup/commonMZ) dictionary +
+[InterpretMSSpectrum](https://cran.r-project.org/package=InterpretMSSpectrum). Scope is
+**raw visualisation only** — no peak picking / grouping / alignment (deferred; see
+`ARCHITECTURE_REVIEW.md`).
 
 Extraction results are cached to disk (qs2), so re-opening the app with the same files +
 filter is instant. Figures export as png/svg/pdf or as the raw ggplot object (rds) for

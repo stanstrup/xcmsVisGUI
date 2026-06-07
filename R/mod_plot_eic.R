@@ -17,6 +17,10 @@ mod_plot_eic_ui <- function(id) {
     layout_sidebar(
       sidebar = sidebar(
         width = 420, position = "right", open = "open",
+        # Compact the target table so its columns fit the sidebar without scroll.
+        tags$style(HTML(sprintf(
+          "#%s table.dataTable{font-size:11px} #%s td,#%s th{padding:2px 4px;white-space:nowrap}",
+          ns("targets"), ns("targets"), ns("targets")))),
         DTOutput(ns("targets")),
         div(class = "d-flex gap-2 mt-2",
             actionButton(ns("add"), "Add row", class = "btn-sm btn-outline-primary"),

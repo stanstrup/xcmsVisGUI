@@ -11,6 +11,11 @@ app_ui <- function() {
     id = "main_nav",
     sidebar = sidebar(
       width = 360,
+      # Tighten the default bslib accordion chrome so the Files/Filters panels
+      # waste less vertical space (smaller header + body padding).
+      tags$style(HTML(paste0(
+        ".sidebar .accordion-body{padding:0.4rem 0.6rem} ",
+        ".sidebar .accordion-button{padding:0.4rem 0.75rem}"))),
       accordion(
         accordion_panel("Files", icon = icon("folder-open"), mod_ingest_ui("ingest")),
         accordion_panel("Filters", icon = icon("filter"), mod_filter_ui("filter"))

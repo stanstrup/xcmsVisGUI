@@ -29,13 +29,15 @@ mod_ingest_ui <- function(id) {
            all = "a", none = "[]",
            inv = "a.filter(function(x){return c.indexOf(x)<0;})"))
   tagList(
-    # Compact file table: small text, tight padding, one-line File names (truncated,
-    # full name on hover) so the list stays short and never scrolls horizontally.
+    # Compact file table: small text, tight padding, one-line File names. A fixed
+    # table layout lets the File column claim all the width the small status/MS/Pol
+    # columns don't use, with the name ellipsised (full name on hover) only when it
+    # genuinely overflows — so the list stays short and never scrolls horizontally.
     tags$style(HTML(sprintf(paste0(
-      "#%s td,#%s th{padding:1px 4px;font-size:12px;white-space:nowrap} ",
-      "#%s .fname{display:block;max-width:115px;overflow:hidden;",
-      "text-overflow:ellipsis;white-space:nowrap}"),
-      ns("file_table"), ns("file_table"), ns("file_table")))),
+      "#%s table{table-layout:fixed;width:100%%} ",
+      "#%s td,#%s th{padding:1px 4px;font-size:12px;white-space:nowrap;overflow:hidden} ",
+      "#%s .fname{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"),
+      ns("file_table"), ns("file_table"), ns("file_table"), ns("file_table")))),
     # 1) paste a folder/file path, or pick a folder server-side — both NO copy
     div(class = "d-flex gap-2 mb-1",
         div(style = "flex:1;",
@@ -240,10 +242,14 @@ mod_ingest_server <- function(id, rv) {
         editable = list(target = "cell", columns = 1),  # Group editable
         options = list(dom = "t", paging = FALSE, ordering = FALSE, autoWidth = FALSE,
                        language = list(emptyTable = "No files yet."),
+                       # Fixed widths for the small columns; File (target 0) takes
+                       # the remaining space under table-layout:fixed.
                        columnDefs = list(
                          list(className = "dt-center", targets = c(2, 3, 4)),
-                         list(width = "22px", targets = 2),            # status
-                         list(width = "auto", targets = 0)))           # File name
+                         list(width = "58px", targets = 1),            # Group
+                         list(width = "26px", targets = 2),            # status
+                         list(width = "30px", targets = 3),            # MS
+                         list(width = "38px", targets = 4)))           # Pol
       ))
     })
     file_proxy <- dataTableProxy("file_table")

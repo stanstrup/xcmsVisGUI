@@ -65,7 +65,7 @@ chrom_to_df <- function(chr, meta, labels = NULL) {
     if (!length(rt)) next
     k <- k + 1L
     pieces[[k]] <- tibble(
-      target = labels[i], sample_id = meta$id[j], sample_name = meta$name[j],
+      target = labels[i], sample_id = meta$id[j], sample_name = strip_ext(meta$name[j]),
       sample_group = meta$sample_group[j], rt = rt, intensity = int)
   }
   out <- bind_rows(pieces[seq_len(k)])
@@ -211,7 +211,7 @@ extract_over_files <- function(files_df, extractor, cols = "sample_id",
     if (is.null(d)) return(NULL)              # read failed -> skip this file
     if (nrow(d)) {
       if ("sample_id"    %in% cols) d$sample_id    <- files_df$id[i]
-      if ("sample_name"  %in% cols) d$sample_name  <- files_df$name[i]
+      if ("sample_name"  %in% cols) d$sample_name  <- strip_ext(files_df$name[i])
       if ("sample_group" %in% cols) d$sample_group <- files_df$sample_group[i]
       if (scan) d$scan <- scan_for_rt(d$rt, file_scan_table(files_df$path[i]))
     }

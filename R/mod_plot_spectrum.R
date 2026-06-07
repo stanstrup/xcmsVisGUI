@@ -175,7 +175,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       withProgress(message = "Reading spectrum…", value = 0.5, {
         if (identical(input$layout, "single")) {
           f <- cur_row()
-          d <- one_spectrum(f$path, rt_sec, input$scan); d$sample_name <- f$name; d
+          d <- one_spectrum(f$path, rt_sec, input$scan); d$sample_name <- strip_ext(f$name); d
         } else {
           inc <- included(); validate(need(nrow(inc) > 0, "Include at least one file."))
           extract_over_files(inc, function(p) one_spectrum(p, rt_sec, NA_integer_),

@@ -4,6 +4,11 @@
 MS_FILE_EXTS  <- c("mzML", "mzXML", "CDF", "cdf", "mzml", "mzxml")
 MS_FILE_REGEX <- "\\.(mzML|mzXML|CDF)$"
 
+# Drop the MS file extension for display *in plots* (legends/facets/tooltips) —
+# it's noise there and wastes horizontal space. The file list keeps the full
+# name (extension distinguishes mzML/CDF and matches what's on disk).
+strip_ext <- function(x) sub(MS_FILE_REGEX, "", x, ignore.case = TRUE)
+
 # ColorBrewer qualitative palettes for groups/EIC traces, viridis/sequential for maps.
 QUAL_PALETTES <- c("Set1", "Set2", "Set3", "Dark2", "Paired", "Accent",
                    "Pastel1", "Pastel2")

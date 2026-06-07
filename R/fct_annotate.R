@@ -349,13 +349,6 @@ add_detected_isotopes <- function(tab, cp, n = 2L, iso_tol = ISO_TOL_DA,
 
 # --- small internals ---------------------------------------------------------
 
-#' rbind a base tibble with a list of tibbles, all-same-columns. Local rather than
-#' dplyr::bind_rows to keep this file dependency-light and explicit.
-#' @noRd
-rbind_tibbles <- function(x, pieces) {
-  do.call(rbind, c(list(x), pieces[vapply(pieces, nrow, integer(1)) > 0]))
-}
-
 #' Re-encode commonMZ origin text to UTF-8. The adducts_fragments table carries
 #' Latin-1 bytes (e.g. the "±" in "± H2O"); left as-is they break grepl/printing
 #' downstream. The only non-ASCII content is Latin-1, so this conversion is exact.

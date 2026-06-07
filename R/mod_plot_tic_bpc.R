@@ -38,6 +38,11 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
     # (path set + filter + aggregation) so group/color changes never re-extract.
     chrom_df <- reactive({
       x <- dataset(); req(x)
+      # An over-restrictive filter (e.g. a spectrum-ID rule matching nothing) can
+      # leave zero spectra; xcms::chromatogram() would then error "No spectra
+      # available" \u2014 show a clear message instead.
+      validate(need(length(MsExperiment::spectra(x)) > 0,
+                    "No spectra match the current filters."))
       ms <- chrom_ms_level(rv$filter)
       withProgress(message = "Extracting chromatograms\u2026", value = 0.5, {
         chr <- xcms::chromatogram(x, aggregationFun = input$agg, msLevel = ms)

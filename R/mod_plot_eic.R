@@ -135,6 +135,9 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       x <- dataset(); req(x)
       tg <- enabled_targets()
       validate(need(nrow(tg) > 0, "Add at least one enabled target with a valid m/z."))
+      # See TIC: a filter matching no spectra would make chromatogram() error.
+      validate(need(length(MsExperiment::spectra(x)) > 0,
+                    "No spectra match the current filters."))
       unit <- rv$settings$time_unit
       tol_da <- ifelse(tg$unit == "ppm", tg$mz * tg$tol / 1e6, tg$tol)
       mzmat <- cbind(tg$mz - tol_da, tg$mz + tol_da)

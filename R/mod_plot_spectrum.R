@@ -86,8 +86,10 @@ mod_plot_spectrum_ui <- function(id) {
               sprintf("input['%s'] == 'auto'", ns("ann_mode")),
               actionButton(ns("suggest"), "Suggest molecular ion",
                            class = "btn-sm btn-outline-primary mb-2"),
-              helpText("findMAIN ranks molecular-ion hypotheses; the top one is ",
-                       "annotated — click another row to switch."),
+              helpText("Each row: findMAIN reads the main-peak m/z as that adduct, ",
+                       "giving the neutral mass M and the molecular-ion m/z. The top ",
+                       "row is annotated — click another to switch; sort by a column ",
+                       "header (e.g. neutral M) to reorder."),
               DTOutput(ns("ranked"))),
             conditionalPanel(
               sprintf("input['%s'] == 'diff'", ns("ann_mode")),
@@ -237,14 +239,23 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     observeEvent(input$ranked_rows_selected, auto_pick(input$ranked_rows_selected))
     output$ranked <- renderDT({
       r <- ranked(); validate(need(nrow(r) > 0, "No hypothesis found."))
-      disp <- data.frame(adduct = r$adducthyp, `neutral mass` = round(r$neutral_mass, 4),
-                         peaks = r$adducts_explained, score = round(r$total_score, 2),
-                         check.names = FALSE)
-      # Sortable + scrollable so the full hypothesis list is visible — click the
-      # "neutral mass" header to bring the heaviest (molecular-ion) hypothesis up.
+      # Show the MAIN PEAK and the implied molecular-ion m/z so each row is
+      # readable: "findMAIN reads <main m/z> as <adduct>, so M = <neutral> and the
+      # molecular ion [M+H]+/[M-H]- is at <ion>".
+      pr <- quasi_adducts(input$ann_pol)[1]
+      prule <- adduct_rules(input$ann_pol)[adduct_rules(input$ann_pol)$name == pr, ]
+      ion <- adduct_mz(r$neutral_mass, prule)
+      disp <- data.frame(
+        `main m/z` = round(r$adductmz, 4), `is a` = r$adducthyp,
+        `neutral M` = round(r$neutral_mass, 4), pr2 = round(ion, 4),
+        peaks = r$adducts_explained, score = round(r$total_score, 2),
+        check.names = FALSE)
+      names(disp)[4] <- pr                      # the molecular-ion column, e.g. [M+H]+
+      # Sortable + scrollable so the full list shows — click the "neutral M" or the
+      # molecular-ion header to bring the heaviest (molecular-ion) hypothesis up.
       datatable(disp, rownames = FALSE, selection = "single",
                 options = list(dom = "t", paging = FALSE, ordering = TRUE,
-                               scrollY = "260px", scrollCollapse = TRUE))
+                               scrollX = TRUE, scrollY = "260px", scrollCollapse = TRUE))
     })
 
     # Isotope settings (shared by all modes).

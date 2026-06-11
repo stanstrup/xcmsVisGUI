@@ -61,13 +61,20 @@ absent. CI runs `R CMD check` on push/PR (`.github/workflows/R-CMD-check.yaml`).
 ## Dependencies & reproducibility (renv)
 
 Dependencies are pinned with [`renv`](https://rstudio.github.io/renv/)
-(`renv.lock`), with Bioconductor support configured. On a fresh clone:
+(`renv.lock`), with Bioconductor support configured.
+
+For **first-time setup, or after upgrading R to a new version**, run the
+one-shot installer — it installs everything declared in `DESCRIPTION` (Imports +
+Suggests and the `commonMZ` GitHub remote), picks the Bioconductor release that
+matches your R, and re-snapshots `renv.lock`:
 
 ```{r, eval = FALSE, echo = TRUE}
-# renv::restore()
+# Rscript renv-setup.R
 ```
 
-`renv-setup.R` is a one-shot installer/snapshotter for first-time setup.
+To reproduce the exact pinned versions from the lockfile on the **same** R
+version, use `renv::restore()`. (renv libraries are R-version-specific, so an R
+upgrade needs a fresh install via `renv-setup.R` rather than `restore()`.)
 
 ## Regenerating the documentation screenshots
 

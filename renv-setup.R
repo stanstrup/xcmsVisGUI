@@ -1,33 +1,30 @@
 # One-shot dependency install for the renv library, then snapshot.
-# Run with the project's R (renv auto-activates via .Rprofile).
-# xcmsVis is pulled from GitHub so the lockfile records the remote and
-# is restorable on another machine.
+#
+# Run with the project's R (renv auto-activates via .Rprofile):
+#
+#   Rscript renv-setup.R
+#
+# Installs everything declared in DESCRIPTION -- Imports + Suggests and the
+# Remotes (github::stanstrup/commonMZ) -- so it stays in sync with DESCRIPTION
+# and never drifts out of a hand-maintained package list. Use this (rather than
+# renv::restore()) after upgrading R to a new version: it picks the Bioconductor
+# release that matches the running R, then re-snapshots renv.lock to match.
 
 options(
   renv.config.pak.enabled = FALSE,
   Ncpus = max(1L, parallel::detectCores() - 1L)
 )
 
-# CRAN packages: app framework, async, UI, plotting, data wrangling.
-cran_pkgs <- c(
-  "shiny", "bslib", "mirai", "promises",
-  "plotly", "DT", "htmlwidgets",
-  "RColorBrewer",
-  "dplyr", "tibble", "magrittr", "purrr", "rlang"
-)
+# Install the project's declared dependencies and its Remotes from DESCRIPTION
+# (Imports incl. commonMZ + InterpretMSSpectrum; the RforMassSpectrometry stack).
+renv::install(dependencies = TRUE, prompt = FALSE)
 
-# Bioconductor packages: the RforMassSpectrometry stack + real test data.
-bioc_pkgs <- paste0("bioc::", c(
-  "Spectra", "MsExperiment", "xcms", "MsCoreUtils", "ProtGenerics",
-  "MsDataHub", "msdata", "faahKO"
-))
+# The Bioconductor experiment-data packages are only referenced indirectly in
+# tests (skip_if_not_installed + system.file), so renv's code scan misses them;
+# install them explicitly so the real-data tests run rather than skip.
+renv::install(c("bioc::msdata", "bioc::faahKO"), prompt = FALSE)
 
-# xcmsVis from GitHub -> lockfile records the github remote (restorable elsewhere).
-github_pkgs <- "github::stanstrup/xcmsVis"
-
-renv::install(c(cran_pkgs, bioc_pkgs, github_pkgs), prompt = FALSE)
-
-# Snapshot everything actually used into renv.lock.
+# Snapshot the installed library into renv.lock.
 renv::snapshot(prompt = FALSE)
 
 cat("\n=== renv setup complete ===\n")

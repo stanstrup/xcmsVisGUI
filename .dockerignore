@@ -1,9 +1,6 @@
 # Keep the build context small — only the package source is needed.
 .git
 .github
-renv/library
-renv/staging
-renv/sandbox
 docs
 data-raw
 vignettes/articles/figures

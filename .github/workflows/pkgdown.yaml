@@ -1,6 +1,6 @@
 # Build the pkgdown site and deploy it to the gh-pages branch. Standard r-lib
-# workflow (usethis::use_pkgdown_github_pages), with renv's autoloader disabled
-# so the r-lib/pak steps resolve deps from DESCRIPTION (see R-CMD-check.yaml).
+# workflow (usethis::use_pkgdown_github_pages); dependencies resolve from
+# DESCRIPTION (see R-CMD-check.yaml).
 on:
   push:
     branches: [main, master]
@@ -20,7 +20,6 @@ jobs:
       group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
-      RENV_CONFIG_AUTOLOADER_ENABLED: false
     steps:
       - uses: actions/checkout@v5
 

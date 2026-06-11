@@ -4,8 +4,9 @@
 .RData
 .Ruserdata
 
-# renv: keep renv.lock, activate.R, settings.json tracked; ignore the library.
-# (renv/.gitignore already excludes renv/library etc.)
+# renv was retired; ignore any leftover local renv artifacts
+/renv/
+/renv.lock
 
 # Transient outputs / logs / scratch launchers
 *.out

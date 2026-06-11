@@ -9,12 +9,8 @@
 #
 # Based on the Bioconductor image so the RforMassSpectrometry stack
 # (Spectra/MsExperiment/xcms/mzR) and its system libraries (e.g. netCDF for CDF)
-# are available. Match the tag to the Bioconductor release the lockfile targets.
+# are available. Pick a Bioconductor release that carries the package's deps.
 FROM bioconductor/bioconductor_docker:RELEASE_3_21
-
-# This repo is renv-managed; disable the autoloader so dependencies install into
-# the image's default library instead of the (image-absent) project renv library.
-ENV RENV_CONFIG_AUTOLOADER_ENABLED=false
 
 WORKDIR /srv/xcmsVisGUI
 COPY . /srv/xcmsVisGUI

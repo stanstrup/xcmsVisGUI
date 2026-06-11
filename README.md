@@ -11,20 +11,13 @@ peak picking, grouping or alignment.
 
 ## Install
 
-xcmsVisGUI depends on Bioconductor packages and on the GitHub-only
-[commonMZ](https://github.com/stanstrup/commonMZ), so install with a tool that
-resolves both. The easiest is [pak](https://pak.r-lib.org/):
+Installing the package pulls in every dependency automatically — including the
+Bioconductor packages (Spectra, xcms, mzR, …) and the GitHub-only
+[commonMZ](https://github.com/stanstrup/commonMZ). Point at the Bioconductor
+repositories first (via BiocManager) so those resolve:
 
 ```r
-# install.packages("pak")
-pak::pak("stanstrup/xcmsVisGUI")
-```
-
-Or with **remotes** + **BiocManager** (point at the Bioconductor repos first so the
-Bioc dependencies resolve):
-
-```r
-# install.packages(c("remotes", "BiocManager"))
+install.packages(c("remotes", "BiocManager"))
 options(repos = BiocManager::repositories())
 remotes::install_github("stanstrup/xcmsVisGUI")
 ```
@@ -53,7 +46,7 @@ Full guides live on the [package website](https://stanstrup.github.io/xcmsVisGUI
 - [MS map](https://stanstrup.github.io/xcmsVisGUI/articles/ms_map.html)
 - [Precursors](https://stanstrup.github.io/xcmsVisGUI/articles/precursors.html)
 - [Developer guide](https://stanstrup.github.io/xcmsVisGUI/articles/developer.html)
-  — status, running from a clone, tests, renv, and the project layout
+  — status, running from a clone, tests, and the project layout
 
 ## Deploy with Docker
 

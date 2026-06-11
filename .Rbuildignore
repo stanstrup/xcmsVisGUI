@@ -1,7 +1,4 @@
-^renv$
-^renv\.lock$
 ^run\.R$
-^\.Rprofile$
 ^\.github$
 ^\.git$
 ^.*\.md$
@@ -10,7 +7,7 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^\.claude$
-^renv-setup\.R$
+^tools$
 ^_pkgdown\.yml$
 ^docs$
 ^pkgdown$

@@ -4,7 +4,7 @@
 # small-molecule file, opens the Spectrum tab at the given scan, ticks
 # "Annotate adducts / fragments", and screenshots the overlay.
 #
-#   Rscript -e "source('renv/activate.R'); source('tools/shoot_annot.R')" <mzML-path> <scan>
+#   Rscript -e "source('tools/shoot_annot.R')" <mzML-path> <scan>
 #
 # Use a file with annotatable spectra (adducts / in-source fragments / isotopes);
 # a centroided small-molecule LC-MS run works best.

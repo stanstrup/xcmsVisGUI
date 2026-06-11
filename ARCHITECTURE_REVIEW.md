@@ -275,7 +275,8 @@ decisions don’t get re-litigated.
   `R CMD check` passes Status: OK. Real-data tests skip when
   `msdata`/`faahKO` are absent.
 - **CI** — GitHub Actions `R-CMD-check.yaml` (full suite incl. real
-  data) + `pkgdown.yaml`; renv autoloader disabled in CI.
+  data) + `pkgdown.yaml`; dependencies provisioned from `DESCRIPTION`
+  via `r-lib/actions/setup-r-dependencies`.
 - **pkgdown site** with a screenshot-driven usage guide
   (`vignettes/articles/usage.Rmd`, chromote-captured figures via
   `data-raw/capture-screenshots.R`). Replaced the hand-written

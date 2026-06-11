@@ -224,7 +224,7 @@
 <li>
 <strong>Test suite → testthat (edition 3)</strong> in <code>tests/testthat/</code>; <code>R CMD check</code> passes Status: OK. Real-data tests skip when <code>msdata</code>/<code>faahKO</code> are absent.</li>
 <li>
-<strong>CI</strong> — GitHub Actions <code>R-CMD-check.yaml</code> (full suite incl. real data) + <code>pkgdown.yaml</code>; renv autoloader disabled in CI.</li>
+<strong>CI</strong> — GitHub Actions <code>R-CMD-check.yaml</code> (full suite incl. real data) + <code>pkgdown.yaml</code>; dependencies provisioned from <code>DESCRIPTION</code> via <code>r-lib/actions/setup-r-dependencies</code>.</li>
 <li>
 <strong>pkgdown site</strong> with a screenshot-driven usage guide (<code>vignettes/articles/usage.Rmd</code>, chromote-captured figures via <code>data-raw/capture-screenshots.R</code>). Replaced the hand-written <code>USER_GUIDE.md</code>.</li>
 <li>

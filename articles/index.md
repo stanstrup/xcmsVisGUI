@@ -36,5 +36,4 @@
 - [Developer
   guide](https://stanstrup.github.io/xcmsVisGUI/articles/developer.md):
 
-  Status, running from a clone, tests, the renv lockfile, and the
-  project layout.
+  Status, running from a clone, tests, and the project layout.

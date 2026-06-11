@@ -11,9 +11,9 @@
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Developer guide">
-<meta name="description" content="Status, running from a clone, tests, the renv lockfile, and the project layout.
+<meta name="description" content="Status, running from a clone, tests, and the project layout.
 ">
-<meta property="og:description" content="Status, running from a clone, tests, the renv lockfile, and the project layout.
+<meta property="og:description" content="Status, running from a clone, tests, and the project layout.
 ">
 </head>
 <body>
@@ -101,14 +101,24 @@ R.</p>
 <div class="section level2">
 <h2 id="run-from-a-clone">Run from a clone<a class="anchor" aria-label="anchor" href="#run-from-a-clone"></a>
 </h2>
-<p>This is an R package; the app is the exported
-<code><a href="../reference/run_app.html">run_app()</a></code>.</p>
+<p>This is an R package; the app is the exported <code><a href="../reference/run_app.html">run_app()</a></code>.
+From a fresh clone, install the dependencies once into your normal R
+library, then launch:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># dev (from a clone, no install needed):</span></span>
-<span><span class="co"># Rscript run.R           # = pkgload::load_all() + run_app(launch.browser = TRUE)</span></span>
+<code class="sourceCode R"><span><span class="co"># install the dependencies (Imports + Suggests + the commonMZ GitHub remote):</span></span>
+<span><span class="co"># install.packages(c("remotes", "BiocManager"))</span></span>
+<span><span class="co"># options(repos = BiocManager::repositories())   # so the Bioconductor deps resolve</span></span>
+<span><span class="co"># remotes::install_deps(dependencies = TRUE)</span></span>
 <span></span>
-<span><span class="co"># or installed:</span></span>
-<span><span class="fu">xcmsVisGUI</span><span class="fu">::</span><span class="fu"><a href="../reference/run_app.html">run_app</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<span><span class="co"># then launch from source (load_all live-reloads your edits):</span></span>
+<span><span class="co"># Rscript run.R           # = pkgload::load_all() + run_app(launch.browser = TRUE)</span></span></code></pre></div>
+<p><code>BiocManager</code> is needed so the Bioconductor dependencies
+(Spectra, xcms, mzR, …) resolve; <code>remotes</code> follows the
+<code>Remotes:</code> field to install <code>commonMZ</code> from
+GitHub. There’s no renv to set up — <code>DESCRIPTION</code> is the
+single source of truth for dependencies (the same way users install the
+package, and the same way CI provisions via
+<code>r-lib/actions/setup-r-dependencies</code>).</p>
 </div>
 <div class="section level2">
 <h2 id="tests">Tests<a class="anchor" aria-label="anchor" href="#tests"></a>
@@ -124,30 +134,12 @@ Bioconductor packages and skip if absent. CI runs
 (<code>.github/workflows/R-CMD-check.yaml</code>).</p>
 </div>
 <div class="section level2">
-<h2 id="dependencies-reproducibility-renv">Dependencies &amp; reproducibility (renv)<a class="anchor" aria-label="anchor" href="#dependencies-reproducibility-renv"></a>
-</h2>
-<p>Dependencies are pinned with <a href="https://rstudio.github.io/renv/" class="external-link"><code>renv</code></a>
-(<code>renv.lock</code>), with Bioconductor support configured.</p>
-<p>For <strong>first-time setup, or after upgrading R to a new
-version</strong>, run the one-shot installer — it installs everything
-declared in <code>DESCRIPTION</code> (Imports + Suggests and the
-<code>commonMZ</code> GitHub remote), picks the Bioconductor release
-that matches your R, and re-snapshots <code>renv.lock</code>:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Rscript renv-setup.R</span></span></code></pre></div>
-<p>To reproduce the exact pinned versions from the lockfile on the
-<strong>same</strong> R version, use <code>renv::restore()</code>. (renv
-libraries are R-version-specific, so an R upgrade needs a fresh install
-via <code>renv-setup.R</code> rather than <code>restore()</code>.)</p>
-</div>
-<div class="section level2">
 <h2 id="regenerating-the-documentation-screenshots">Regenerating the documentation screenshots<a class="anchor" aria-label="anchor" href="#regenerating-the-documentation-screenshots"></a>
 </h2>
 <p>The article screenshots are captured headlessly with <a href="https://rstudio.github.io/chromote/" class="external-link"><code>chromote</code></a>
 against a running app (<code>run_app(port = 7799)</code>):</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># source("renv/activate.R")</span></span>
-<span><span class="co"># source("tools/shoot.R")                              # TIC + Filters (faahKO)</span></span>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># source("tools/shoot.R")                              # TIC + Filters (faahKO)</span></span>
 <span><span class="co"># source("tools/shoot_annot.R")  # args: &lt;mzML-path&gt; &lt;scan&gt;  -&gt; annotation.png</span></span></code></pre></div>
 <p>They are saved at 1440x900 into
 <code>vignettes/articles/figures/</code>.</p>

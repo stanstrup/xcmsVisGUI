@@ -27,15 +27,26 @@ the raw ggplot object (`.rds`) for later tweaking in R.
 
 This is an R package; the app is the exported
 [`run_app()`](https://stanstrup.github.io/xcmsVisGUI/reference/run_app.md).
+From a fresh clone, install the dependencies once into your normal R
+library, then launch:
 
 ``` r
 
-# dev (from a clone, no install needed):
-# Rscript run.R           # = pkgload::load_all() + run_app(launch.browser = TRUE)
+# install the dependencies (Imports + Suggests + the commonMZ GitHub remote):
+# install.packages(c("remotes", "BiocManager"))
+# options(repos = BiocManager::repositories())   # so the Bioconductor deps resolve
+# remotes::install_deps(dependencies = TRUE)
 
-# or installed:
-xcmsVisGUI::run_app()
+# then launch from source (load_all live-reloads your edits):
+# Rscript run.R           # = pkgload::load_all() + run_app(launch.browser = TRUE)
 ```
+
+`BiocManager` is needed so the Bioconductor dependencies (Spectra, xcms,
+mzR, …) resolve; `remotes` follows the `Remotes:` field to install
+`commonMZ` from GitHub. There’s no renv to set up — `DESCRIPTION` is the
+single source of truth for dependencies (the same way users install the
+package, and the same way CI provisions via
+`r-lib/actions/setup-r-dependencies`).
 
 ## Tests
 
@@ -50,26 +61,6 @@ select the same spectra. Real-data tests use the `msdata` / `faahKO`
 Bioconductor packages and skip if absent. CI runs `R CMD check` on
 push/PR (`.github/workflows/R-CMD-check.yaml`).
 
-## Dependencies & reproducibility (renv)
-
-Dependencies are pinned with [`renv`](https://rstudio.github.io/renv/)
-(`renv.lock`), with Bioconductor support configured.
-
-For **first-time setup, or after upgrading R to a new version**, run the
-one-shot installer — it installs everything declared in `DESCRIPTION`
-(Imports + Suggests and the `commonMZ` GitHub remote), picks the
-Bioconductor release that matches your R, and re-snapshots `renv.lock`:
-
-``` r
-
-# Rscript renv-setup.R
-```
-
-To reproduce the exact pinned versions from the lockfile on the **same**
-R version, use `renv::restore()`. (renv libraries are
-R-version-specific, so an R upgrade needs a fresh install via
-`renv-setup.R` rather than `restore()`.)
-
 ## Regenerating the documentation screenshots
 
 The article screenshots are captured headlessly with
@@ -78,7 +69,6 @@ The article screenshots are captured headlessly with
 
 ``` r
 
-# source("renv/activate.R")
 # source("tools/shoot.R")                              # TIC + Filters (faahKO)
 # source("tools/shoot_annot.R")  # args: <mzML-path> <scan>  -> annotation.png
 ```

@@ -4,25 +4,34 @@
 #
 #   Rscript renv-setup.R
 #
-# Installs everything declared in DESCRIPTION -- Imports + Suggests and the
-# Remotes (github::stanstrup/commonMZ) -- so it stays in sync with DESCRIPTION
-# and never drifts out of a hand-maintained package list. Use this (rather than
-# renv::restore()) after upgrading R to a new version: it picks the Bioconductor
-# release that matches the running R, then re-snapshots renv.lock to match.
+# Installs the DEPENDENCIES declared in DESCRIPTION (Imports + Suggests) plus the
+# GitHub remote (commonMZ) -- NOT xcmsVisGUI itself, which is this project and
+# isn't on any repository. Reading DESCRIPTION keeps it in sync automatically.
+# renv routes each package to CRAN or Bioconductor (the `biocViews` field marks
+# this a Bioconductor project) and picks the Bioc release matching the running R,
+# so this also provisions a fresh library after an R upgrade.
 
 options(
+  repos = c(CRAN = "https://cloud.r-project.org"),  # ensure a CRAN mirror is set
   renv.config.pak.enabled = FALSE,
   Ncpus = max(1L, parallel::detectCores() - 1L)
 )
 
-# Install the project's declared dependencies and its Remotes from DESCRIPTION
-# (Imports incl. commonMZ + InterpretMSSpectrum; the RforMassSpectrometry stack).
-renv::install(dependencies = TRUE, prompt = FALSE)
+# Parse a comma-separated DESCRIPTION field into bare package names.
+desc_field <- function(field) {
+  v <- read.dcf("DESCRIPTION", fields = field)[, field]
+  if (is.na(v)) return(character())
+  p <- trimws(gsub("\\s*\\(.*?\\)", "", strsplit(v, ",")[[1]]))  # drop version notes
+  p[nzchar(p)]
+}
 
-# The Bioconductor experiment-data packages are only referenced indirectly in
-# tests (skip_if_not_installed + system.file), so renv's code scan misses them;
-# install them explicitly so the real-data tests run rather than skip.
-renv::install(c("bioc::msdata", "bioc::faahKO"), prompt = FALSE)
+# Everything declared, minus: R itself, base/recommended packages (ship with R),
+# and commonMZ (installed from its GitHub remote below).
+base_pkgs <- rownames(installed.packages(priority = c("base", "recommended")))
+pkgs <- setdiff(unique(c(desc_field("Imports"), desc_field("Suggests"))),
+                c("R", base_pkgs, "commonMZ"))
+
+renv::install(c(pkgs, "github::stanstrup/commonMZ"), prompt = FALSE)
 
 # Snapshot the installed library into renv.lock.
 renv::snapshot(prompt = FALSE)

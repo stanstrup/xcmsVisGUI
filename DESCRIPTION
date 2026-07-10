@@ -16,6 +16,7 @@ Imports:
     shiny,
     bslib,
     plotly,
+    htmlwidgets,
     DT,
     mirai,
     RColorBrewer,
@@ -45,6 +46,7 @@ Suggests:
     testthat (>= 3.0.0),
     withr,
     svglite,
+    rmarkdown,
     msdata,
     faahKO
 Remotes:

@@ -34,11 +34,11 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Jan Stanstrup \email{stanstrup@gmail.com}
+\strong{Maintainer}: Jan Stanstrup \email{stanstrup@gmail.com} [copyright holder]
 
 Authors:
 \itemize{
-  \item Jan Stanstrup \email{stanstrup@gmail.com}
+  \item Jan Stanstrup \email{stanstrup@gmail.com} [copyright holder]
 }
 
 }

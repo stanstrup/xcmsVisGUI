@@ -49,7 +49,7 @@ mod_plot_eic_ui <- function(id) {
   )
 }
 
-#' @importFrom DT renderDT datatable
+#' @importFrom DT renderDT datatable dataTableProxy replaceData
 #' @importFrom dplyr bind_rows left_join
 #' @importFrom tibble tibble
 #' @importFrom ggplot2 ggplot aes geom_line geom_point scale_color_manual labs theme_bw facet_wrap
@@ -60,27 +60,48 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
     ns <- session$ns
 
     # --- Target table: enabled as a checkbox, other columns editable --------
-    output$targets <- renderDT({
+    # The column set is the SAME when empty, so the proxy below can always
+    # replaceData() into the table (no branch that renders different columns).
+    targets_disp <- reactive({
       tg <- rv$eic_targets
-      if (nrow(tg) == 0) return(datatable(tg[, c("label","mz")], rownames = FALSE,
-                                              options = list(dom = "t")))
       check <- vapply(seq_len(nrow(tg)), function(i) as.character(tags$input(
         type = "checkbox", checked = if (isTRUE(tg$enabled[i])) "checked" else NULL,
         onclick = sprintf(
           "Shiny.setInputValue('%s', {row: %d, checked: this.checked}, {priority:'event'})",
           ns("toggle"), i))), character(1))
-      disp <- data.frame(` ` = check, label = tg$label, mz = tg$mz, tol = tg$tol,
-                         unit = tg$unit, rt_min = tg$rt_min, rt_max = tg$rt_max,
-                         check.names = FALSE, stringsAsFactors = FALSE)
-      # Round only the DISPLAY (DT render) — the stored target m/z keeps full
-      # precision, so editing a cell doesn't truncate it.
-      datatable(
-        disp, escape = FALSE, rownames = FALSE, selection = "multiple",
+      data.frame(` ` = check, label = tg$label, mz = tg$mz, tol = tg$tol,
+                 unit = tg$unit, rt_min = tg$rt_min, rt_max = tg$rt_max,
+                 check.names = FALSE, stringsAsFactors = FALSE)
+    })
+
+    # Rendered ONCE (isolate) — every later update goes through the proxy, so the
+    # output never re-runs and the table never flashes its "recalculating" grey.
+    # Round only the DISPLAY (formatRound is a rowCallback, so it survives
+    # replaceData) — the stored target m/z keeps full precision, and editing a
+    # cell doesn't truncate it.
+    output$targets <- renderDT({
+      isolate(datatable(
+        targets_disp(), escape = FALSE, rownames = FALSE, selection = "multiple",
         editable = list(target = "cell", columns = 1:6),   # all but the checkbox
         options = list(dom = "t", paging = FALSE, ordering = FALSE,
+                       language = list(emptyTable = "No targets yet."),
                        columnDefs = list(list(className = "dt-center", targets = "_all")))) %>%
-        DT::formatRound("mz", 4) %>% DT::formatRound(c("rt_min", "rt_max"), 3)
+        DT::formatRound("mz", 4) %>% DT::formatRound(c("rt_min", "rt_max"), 3))
     })
+    targets_proxy <- dataTableProxy("targets")
+    push_targets <- function() replaceData(targets_proxy, targets_disp(),
+                                           rownames = FALSE, resetPaging = FALSE)
+
+    # Redraw ONLY when rows are added or removed — the checkbox `onclick` carries
+    # its row index, so those have to be regenerated. Ticking a box must NOT
+    # redraw: the browser already flipped it, and the redraw is what greyed the
+    # whole table out on every single click.
+    last_nrow <- reactiveVal(NULL)
+    observeEvent(targets_disp(), {
+      if (identical(nrow(targets_disp()), last_nrow())) return()
+      last_nrow(nrow(targets_disp()))
+      push_targets()
+    }, ignoreInit = TRUE)
 
     observeEvent(input$toggle, {
       i <- input$toggle$row
@@ -97,6 +118,10 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       rv$eic_targets[[col]][info$row] <-
         if (col %in% c("mz","tol","rt_min","rt_max")) suppressWarnings(as.numeric(val))
         else as.character(val)
+      # DT's server-side editing leaves the raw <input> in the cell and keeps the
+      # old value internally — the server has to push the parsed value back. Row
+      # count is unchanged, so the observer above won't do it for us.
+      push_targets()
     })
 
     observeEvent(input$add, {

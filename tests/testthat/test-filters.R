@@ -3,6 +3,11 @@
 # apply_filters_spectra (Spectra path: Spectrum/MS map/Precursors) must select
 # the SAME spectra for the same filter. That is what "filters apply everywhere"
 # rests on, and is otherwise only kept true by discipline.
+#
+# The one deliberate exception is `centroid`: peak-picking is spectrum-level, so
+# apply_filters_spectra applies it and apply_filters (chromatograms) does not.
+# The equivalence battery therefore pins centroid = "off" — it is about which
+# SPECTRA get selected. Centroiding is covered on its own below.
 
 skip_if_not_installed("msdata")
 
@@ -27,7 +32,7 @@ test_that("apply_filters and apply_filters_spectra select identical spectra", {
   rts <- Spectra::rtime(raw)
   rt_lo <- as.numeric(stats::quantile(rts, 0.3))
   rt_hi <- as.numeric(stats::quantile(rts, 0.7))
-  f <- function(...) modifyList(empty_filter(), list(...))
+  f <- function(...) modifyList(empty_filter(), list(centroid = "off", ...))
   # NB: assign spectrum_id_rules directly, never via modifyList — modifyList
   # recurses into the existing empty list() and, the rule list being unnamed,
   # would silently merge it back to list() (no filter). The app sets it directly.
@@ -78,4 +83,72 @@ test_that("filters reach the extraction path", {
   fl$spectrum_id_rules <- list(list(mode = "exclude", text = tok))
   sp3 <- apply_filters_spectra(raw, fl)
   expect_equal(length(sp3), length(raw) - 1)
+})
+
+# --- profile mode ------------------------------------------------------------
+
+test_that("spec_mode_label reads the per-spectrum centroided counts", {
+  expect_equal(spec_mode_label(0, 5), "centroid")
+  expect_equal(spec_mode_label(5, 0), "profile")
+  expect_equal(spec_mode_label(2, 3), "mixed")
+  expect_true(is.na(spec_mode_label(0, 0)))    # nothing declared (CDF)
+})
+
+test_that("profile detection is per MS level, so mixed files keep their centroids", {
+  # MS3TMT11.mzML is the mixed case this design exists for: profile MS1 +
+  # already-centroided MS2/MS3. Peak-picking the whole file would gut the MS2s.
+  p <- msdata_mzml()
+  raw <- get_spectra(p)
+  cen <- Spectra::centroided(raw)
+  skip_if_not(any(cen) && any(!cen), "test file is not mixed-mode")
+
+  prof_lv <- profile_ms_levels(raw)
+  expect_true(is_profile_spectra(raw))
+  # exactly the levels that carry non-centroided spectra
+  expect_setequal(prof_lv, unique(Spectra::msLevel(raw)[!cen]))
+  expect_false(any(prof_lv %in% Spectra::msLevel(raw)[cen & !is.na(cen)]))
+
+  # The centroided levels must come through peak-for-peak untouched.
+  f_auto <- modifyList(empty_filter(), list(ms_level = NA_integer_, centroid = "auto"))
+  npk <- function(sp) vapply(as.list(Spectra::peaksData(sp)), nrow, integer(1))
+  keep <- which(cen)
+  expect_equal(npk(apply_filters_spectra(raw, f_auto)[keep]), npk(raw[keep]))
+
+  # ...while the profile level really is reduced to centroids.
+  pr <- which(!cen)
+  expect_lt(sum(npk(apply_filters_spectra(raw, f_auto)[pr])), sum(npk(raw[pr])))
+})
+
+test_that("the centroid policy is honoured: off leaves profile spectra raw", {
+  p <- msdata_mzml()
+  raw <- get_spectra(p)
+  skip_if_not(any(!Spectra::centroided(raw)), "test file has no profile spectra")
+  pr <- which(!Spectra::centroided(raw))
+  f <- function(mode) modifyList(empty_filter(),
+                                 list(ms_level = NA_integer_, centroid = mode))
+  npeaks <- function(mode) sum(vapply(
+    as.list(Spectra::peaksData(apply_filters_spectra(raw, f(mode))[pr])),
+    nrow, integer(1)))
+  raw_n <- sum(vapply(as.list(Spectra::peaksData(raw[pr])), nrow, integer(1)))
+
+  expect_equal(npeaks("off"), raw_n)      # untouched
+  expect_lt(npeaks("auto"), raw_n)        # picked
+  expect_lt(npeaks("on"), raw_n)          # forced
+})
+
+test_that("extract_spectrum reports whether its peaks are still profile", {
+  p <- msdata_mzml()
+  raw <- get_spectra(p)
+  pr <- which(!Spectra::centroided(raw))
+  skip_if_not(length(pr) > 0, "test file has no profile spectra")
+  lv <- Spectra::msLevel(raw)[pr[1]]
+  rt <- Spectra::rtime(raw)[pr[1]]
+  f <- function(mode) modifyList(empty_filter(),
+                                 list(ms_level = lv, centroid = mode))
+
+  d_off  <- extract_spectrum(p, rt = rt, f = f("off"))
+  d_auto <- extract_spectrum(p, rt = rt, f = f("auto"))
+  expect_true(all(d_off$profile))     # raw trace -> the plot draws a line
+  expect_false(any(d_auto$profile))   # picked    -> the plot draws sticks
+  expect_lt(nrow(d_auto), nrow(d_off))
 })

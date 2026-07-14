@@ -20,6 +20,8 @@ read_ms_header <- function(path) {
     chg <- if ("precursorCharge" %in% colnames(h))
       sort(unique(h$precursorCharge[is.finite(h$precursorCharge) & h$precursorCharge != 0]))
       else integer(0)
+    # mzML records profile-vs-centroid per spectrum; CDF and some writers don't.
+    cen <- if ("centroided" %in% colnames(h)) as.logical(h$centroided) else NA
     # all-NA retention times (a CDF edge) make min/max return Inf/-Inf, which would
     # leak into the filter range hint — keep non-finite as NA.
     finite_or_na <- function(v) if (is.finite(v)) v else NA_real_
@@ -31,7 +33,12 @@ read_ms_header <- function(path) {
       mz_max     = if (length(mzs)) max(mzs) else NA_real_,
       ms_levels  = paste(sort(unique(h$msLevel)), collapse = ", "),
       polarities = paste(sort(unique(h$polarity)), collapse = ", "),
-      charges    = paste(chg, collapse = ", ")
+      charges    = paste(chg, collapse = ", "),
+      # Raw counts, not a label: this runs in a mirai worker that has only mzR and
+      # this function (shipped by value), so it cannot call spec_mode_label() —
+      # the main process turns these into the displayed mode.
+      n_centroid = sum(cen, na.rm = TRUE),
+      n_profile  = sum(!cen, na.rm = TRUE)
     ))
   }, error = function(e) list(error = conditionMessage(e)))
   out$path <- path
@@ -90,20 +97,27 @@ get_spectra <- function(path) {
 }
 
 #' Extract a single spectrum at a retention time OR a scan (acquisition) number.
-#' The global filter `f` is applied (intensity/m/z/polarity/charge/spectrumId);
-#' ms_level and the rt/scan selection come from the Spectrum tab controls.
+#' The global filter `f` is applied (intensity/m/z/polarity/charge/spectrumId and
+#' the profile-mode centroiding policy); ms_level and the rt/scan selection come
+#' from the Spectrum tab controls.
+#'
+#' The `profile` column reports whether the returned peaks are still a raw
+#' profile trace (i.e. the file is profile-mode and centroiding was declined) —
+#' the spectrum plot needs it to choose a line over m/z sticks. It is read AFTER
+#' filtering because pickPeaks() flips the spectrum's `centroided` flag.
 #' @importFrom tibble tibble
 #' @noRd
 extract_spectrum <- function(path, rt = NA_real_, scan = NA_integer_, f = list()) {
   sp <- get_spectra(path)
   empty <- tibble(mz = numeric(), intensity = numeric(), rt = numeric(),
-                          scan = integer())
+                          scan = integer(), profile = logical())
   one_to_df <- function(one) {
     if (!length(one)) return(empty)
     mzv <- Spectra::mz(one)[[1]]; iv <- Spectra::intensity(one)[[1]]
     if (!length(mzv)) return(empty)
     a <- tryCatch(Spectra::acquisitionNum(one), error = function(e) NA_integer_)
-    tibble(mz = mzv, intensity = iv, rt = Spectra::rtime(one)[1], scan = a[1])
+    tibble(mz = mzv, intensity = iv, rt = Spectra::rtime(one)[1], scan = a[1],
+           profile = is_profile_spectra(one))
   }
   if (!is.null(scan) && is.finite(scan)) {
     # An explicit acquisition-number pick must resolve against the FULL file: the
@@ -259,6 +273,19 @@ extract_precursors <- function(path) {
   scn <- tryCatch(Spectra::acquisitionNum(sp), error = function(e) rep(NA_integer_, length(sp)))
   idx <- which(ms > 1 & is.finite(pmz) & pmz > 0)
   tibble(rt = rt[idx], precursorMZ = pmz[idx], scan = scn[idx])
+}
+
+#' Spectrum-mode label for the file list, from the per-spectrum centroided counts
+#' read_ms_header() returns. NA when the file declares nothing (CDF, some
+#' writers) — the app then sniffs peak shape at read time (is_profile_spectra).
+#' @noRd
+spec_mode_label <- function(n_profile, n_centroid) {
+  n_profile  <- if (length(n_profile))  as.integer(n_profile)  else 0L
+  n_centroid <- if (length(n_centroid)) as.integer(n_centroid) else 0L
+  if (n_profile > 0 && n_centroid > 0) return("mixed")
+  if (n_profile  > 0) return("profile")
+  if (n_centroid > 0) return("centroid")
+  NA_character_
 }
 
 #' Polarity label from the integer code Spectra uses (0 neg, 1 pos, -1 unknown).

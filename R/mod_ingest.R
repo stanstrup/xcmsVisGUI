@@ -84,6 +84,18 @@ mod_ingest_server <- function(id, rv) {
     queue <- reactiveVal(character())     # file ids waiting to be read
     current <- reactiveVal(NULL)          # file id currently being read
 
+    # Monotonic id counter. Ids must never repeat within a session: they used to
+    # be Sys.time() seconds + the new row's INDEX, and "Clear all" resets that
+    # index — so re-adding within the same second minted the ids all over again,
+    # and a read still in flight from before the clear could write its (stale)
+    # result onto the fresh row. A counter that only ever goes up removes that.
+    file_seq <- 0L
+    next_ids <- function(n) {
+      ids <- paste0("f", file_seq + seq_len(n))
+      file_seq <<- file_seq + n
+      ids
+    }
+
     reader <- ExtendedTask$new(function(path) {
       mirai(
         read_ms_header(path),
@@ -111,8 +123,7 @@ mod_ingest_server <- function(id, rv) {
       paths <- paths[keep]; names <- names[keep]
       if (!length(paths)) return(invisible())
       new_rows <- tibble(
-        id = paste0("f", as.integer(Sys.time()), "_",
-                    seq.int(nrow(rv$files) + 1, length.out = length(paths))),
+        id = next_ids(length(paths)),
         path = paths, name = names, sample_group = "group1",
         include = FALSE, status = "reading", n_spectra = NA_integer_,
         rt_min = NA_real_, rt_max = NA_real_, mz_min = NA_real_, mz_max = NA_real_,
@@ -166,36 +177,43 @@ mod_ingest_server <- function(id, rv) {
     })
 
     # --- Reader finished: update the row, then pump the next --------------
+    # ALWAYS pump(), even when the finished read has no row to write back to.
+    # "Clear all" (or any re-add) while a read is in flight sets current(NULL),
+    # which leaves the result an orphan. Bailing out early here without pumping
+    # stranded every file queued after it: the reader stayed idle, nothing
+    # drained the queue, and the file list sat on the hourglass for ever.
+    # Discard the orphan result, but keep the pump going.
     observeEvent(reader$status(), {
       st <- reader$status()
       if (!st %in% c("success", "error")) return()
       id <- current()
-      if (is.null(id)) return()
-      idx <- which(rv$files$id == id)
+      current(NULL)
+      idx <- if (is.null(id)) integer(0) else which(rv$files$id == id)
 
-      if (st == "error") {
-        rv$files$status[idx] <- "error"
-        rv$files$message[idx] <- "read failed"
-      } else {
-        res <- reader$result()
-        if (!is.null(res$error)) {
+      if (length(idx) == 1) {
+        if (st == "error") {
           rv$files$status[idx] <- "error"
-          rv$files$message[idx] <- res$error
+          rv$files$message[idx] <- "read failed"
         } else {
-          s <- res$summary
-          rv$files$status[idx]    <- "ready"
-          rv$files$n_spectra[idx] <- s$n_spectra
-          rv$files$rt_min[idx]    <- s$rt_min
-          rv$files$rt_max[idx]    <- s$rt_max
-          rv$files$mz_min[idx]    <- s$mz_min
-          rv$files$mz_max[idx]    <- s$mz_max
-          rv$files$ms_levels[idx]  <- s$ms_levels
-          rv$files$polarities[idx] <- polarity_label(s$polarities)
-          rv$files$charges[idx]    <- s$charges %||% NA_character_
-          rv$files$spec_mode[idx]  <- spec_mode_label(s$n_profile, s$n_centroid)
+          res <- reader$result()
+          if (!is.null(res$error)) {
+            rv$files$status[idx] <- "error"
+            rv$files$message[idx] <- res$error
+          } else {
+            s <- res$summary
+            rv$files$status[idx]    <- "ready"
+            rv$files$n_spectra[idx] <- s$n_spectra
+            rv$files$rt_min[idx]    <- s$rt_min
+            rv$files$rt_max[idx]    <- s$rt_max
+            rv$files$mz_min[idx]    <- s$mz_min
+            rv$files$mz_max[idx]    <- s$mz_max
+            rv$files$ms_levels[idx]  <- s$ms_levels
+            rv$files$polarities[idx] <- polarity_label(s$polarities)
+            rv$files$charges[idx]    <- s$charges %||% NA_character_
+            rv$files$spec_mode[idx]  <- spec_mode_label(s$n_profile, s$n_centroid)
+          }
         }
       }
-      current(NULL)
       pump()
     })
 

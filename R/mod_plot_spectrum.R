@@ -158,10 +158,13 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         updateNumericInput(session, "scan", value = max(scans))
     })
 
+    # spectrum_filter(): under the default "auto" policy this view shows the RAW
+    # profile trace (drawn as a line) while the MS map still peak-picks — see
+    # R/fct_filters.R. "Always"/"Never" from the user are honoured as given.
     one_spectrum <- function(path, rt_sec, scan) {
       extract_spectrum(path, rt = rt_sec,
                        scan = if (is.finite(scan)) as.integer(scan) else NA_integer_,
-                       f = rv$filter)
+                       f = spectrum_filter(rv$filter))
     }
 
     spec_df <- reactive({

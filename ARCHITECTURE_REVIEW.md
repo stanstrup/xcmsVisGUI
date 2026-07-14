@@ -310,7 +310,12 @@ materialised until a view actually reads peaks. Measured on a real Orbitrap file
 spectrum 19,720 → 1,369 points; MS map 28.8M → 2.0M rows (690 → 48 MB); the base
 peak's *m/z* is unchanged, so picking costs no mass accuracy.
 
-Three decisions worth keeping:
+Four decisions worth keeping:
+- **`auto` resolves per view.** The MS map must peak-pick (raw is the difference
+  between usable and not); the Spectrum view must not (you opened it to look at the
+  raw data, and one scan is cheap to draw). So the spectrum module reads its filter
+  through `spectrum_filter()`, which maps `auto` → `off`; an explicit `on`/`off` is
+  the user's word and passes through unchanged in both views.
 - **Detect per MS LEVEL, not per file.** Mixed files (profile MS1 + centroided MS2)
   are routine on Thermo DDA — `msdata`'s own `MS3TMT11.mzML` is one. Peak-picking
   such a file wholesale is *destructive*: local-maximum detection over an

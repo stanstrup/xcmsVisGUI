@@ -98,6 +98,20 @@ profile_ms_levels <- function(sp) {
 #' @noRd
 is_profile_spectra <- function(sp) length(profile_ms_levels(sp)) > 0
 
+#' The global filter as the SPECTRUM view should see it.
+#'
+#' Under the default "auto" policy the two spectrum-level views want opposite
+#' things. The MS map MUST peak-pick — tens of millions of raw samples per file
+#' is the difference between usable and not. The spectrum view must NOT: you
+#' opened it to look at the raw data, and one scan of profile is cheap to draw.
+#' So "auto" resolves to "off" here, and the raw trace is drawn as a line.
+#' An explicit "on"/"off" is the user's word and passes through untouched.
+#' @noRd
+spectrum_filter <- function(f) {
+  if (identical(f$centroid %||% "auto", "auto")) f$centroid <- "off"
+  f
+}
+
 #' The MS levels to peak-pick under the filter's `centroid` policy:
 #'   "auto" (default) — the levels detected as profile
 #'   "on"             — every level present (force peak picking)

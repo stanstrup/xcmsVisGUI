@@ -100,13 +100,14 @@ mod_filter_server <- function(id, rv, included) {
                 selectInput(ns("polarity"), "Polarity", width = "100%",
                             choices = c("any", "pos", "neg"), selected = "any"))),
         selectInput(ns("centroid"), "Profile-mode spectra", width = "100%",
-                    choices = c("Centroid if profile (auto)" = "auto",
+                    choices = c("Auto — raw spectrum, picked map" = "auto",
                                 "Always centroid" = "on",
                                 "Never — show raw profile" = "off"),
                     selected = "auto"),
         tags$small(class = "text-muted d-block mb-2",
-                   "Profile scans are peak-picked for the spectrum and MS map ",
-                   "views. Chromatograms always use the raw data."),
+                   "Auto shows profile scans raw in the Spectrum view but ",
+                   "peak-picks them for the MS map (which cannot handle tens of ",
+                   "millions of raw samples). Chromatograms always use the raw data."),
         helpText("Leave a box blank for no limit.")
       )
     })

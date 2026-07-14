@@ -95,20 +95,23 @@ level and centroided at another (a very common Thermo DDA setup: profile MS1,
 centroided MS2).
 
 Left as-is, profile data is awkward to work with: one Orbitrap MS1 scan can be
-~17 000 points, and a whole file ~29 million. So **Profile-mode spectra** in the
-Filters panel defaults to *Centroid if profile (auto)* — profile scans are
-peak-picked before the **Spectrum** and **MS map** views draw them, which makes
-the spectrum a clean stick plot and the map roughly 15× smaller and faster. Only
-the levels that are actually profile are picked, so a mixed file keeps its
-centroided MS2 spectra untouched.
+~17 000 points, and a whole file ~29 million. **Profile-mode spectra** in the
+Filters panel controls what happens about that, and defaults to *Auto*, which
+treats the two views differently because they want opposite things:
 
-Choose *Never — show raw profile* to see the unprocessed trace instead: the
-spectrum view then draws it as a continuous line (not sticks, which is what
-profile data really is) and its title is marked *profile*. Clicking a peak still
-gives you the true peak *m/z* — the click snaps to the apex rather than to
-whichever flank sample you happened to hit. Be aware the MS map will then plot
-every raw sample, which is slow. *Always centroid* forces peak picking even on
-files that claim to be centroided already.
+- The **Spectrum** view shows the scan **raw** — you opened it to look at the
+  data, and one scan is cheap to draw. It is drawn as a continuous **line**, which
+  is what profile data actually is (not sticks), and the title is marked *profile*.
+  Clicking a peak still gives you the true peak *m/z*: the click snaps to the apex
+  rather than to whichever flank sample you happened to hit.
+- The **MS map** **peak-picks** first. It has to: mapping every raw sample means
+  tens of millions of points per file. Only the levels that really are profile get
+  picked, so a mixed file keeps its centroided MS2 spectra untouched.
+
+Override it with *Always centroid* (peak-pick everywhere, including the Spectrum
+view — and even on files that claim to be centroided already) or *Never — show raw
+profile* (peak-pick nowhere; be aware the MS map will then plot every raw sample,
+which is slow).
 
 Chromatograms (TIC / BPC / EIC) are never centroided, whatever this is set to:
 they sum or max intensities across an *m/z* window, which is correct on profile

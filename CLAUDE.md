@@ -96,6 +96,10 @@ Consequences baked into the architecture:
   *lazy* step, so nothing materialises until a view reads peaks. Why it matters: one
   profile Orbitrap MS1 scan is ~17k points and a file ~29M (690 MB) — the MS map was
   unusable and the spectrum drew 17k sticks. Picked: 1.4k / 2M (48 MB).
+  - **`auto` is view-dependent**: the MS map picks (it must), the Spectrum view shows
+    the RAW trace (you opened it to see the data; one scan is cheap). The spectrum
+    module gets its filter through **`spectrum_filter(rv$filter)`**, which maps
+    `auto` → `off`. Explicit `on`/`off` pass through unchanged everywhere.
   - **Detection is per MS LEVEL, not per file** (`profile_ms_levels`). Mixed files
     (profile MS1 + centroided MS2) are the norm on Thermo DDA, and pickPeaks over an
     already-centroided spectrum DROPS every peak whose neighbour is more intense —

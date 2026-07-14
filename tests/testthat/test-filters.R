@@ -136,6 +136,15 @@ test_that("the centroid policy is honoured: off leaves profile spectra raw", {
   expect_lt(npeaks("on"), raw_n)          # forced
 })
 
+test_that("spectrum_filter resolves auto to raw, and passes on/off through", {
+  f <- function(mode) modifyList(empty_filter(), list(centroid = mode))
+  expect_identical(spectrum_filter(f("auto"))$centroid, "off")   # raw in Spectrum
+  expect_identical(spectrum_filter(f("on"))$centroid,   "on")    # user's word
+  expect_identical(spectrum_filter(f("off"))$centroid,  "off")
+  # the MS map path (rv$filter, unmodified) still picks under auto
+  expect_identical(f("auto")$centroid, "auto")
+})
+
 test_that("extract_spectrum reports whether its peaks are still profile", {
   p <- msdata_mzml()
   raw <- get_spectra(p)

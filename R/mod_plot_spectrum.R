@@ -116,7 +116,7 @@ mod_plot_spectrum_ui <- function(id) {
 #' @importFrom dplyr group_by mutate ungroup bind_rows
 #' @importFrom stats setNames
 #' @importFrom plotly event_data renderPlotly
-#' @importFrom ggplot2 ggplot aes geom_linerange geom_vline geom_point geom_text geom_segment scale_color_manual labs theme_classic theme element_blank facet_wrap
+#' @importFrom ggplot2 ggplot aes geom_linerange geom_line geom_vline geom_point geom_text geom_segment scale_color_manual labs theme_classic theme element_blank facet_wrap
 #' @noRd
 mod_plot_spectrum_server <- function(id, rv, included) {
   moduleServer(id, function(input, output, session) {
@@ -310,11 +310,18 @@ mod_plot_spectrum_server <- function(id, rv, included) {
            ghost = isTRUE(input$ann_ghost))
     })
 
+    # Raw profile scans must be drawn as a continuous trace: a stick per detector
+    # sample (~17k of them in one Orbitrap scan) is both unreadable and slow.
+    # Only when EVERY displayed spectrum is profile — a mixed set falls back to
+    # sticks, which are still correct for centroids.
+    is_prof <- function(df) isTRUE(all(df$profile))
+
     plot_gg <- reactive({
       df <- spec_df(); req(nrow(df) > 0)
       df$sample_name <- strip_ext(df$sample_name)   # display label: drop extension
       unit <- rv$settings$time_unit
       col1 <- brewer_qual(1, rv$settings$qual_palette)
+      prof <- is_prof(df)
       if (identical(input$layout, "stacked")) {
         # normalise each file and offset vertically
         df <- group_by(df, sample_name)
@@ -324,9 +331,14 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         df$y0 <- off[df$sample_name] * 1.1
         df$y1 <- df$y0 + df$intensity
         df$.tip <- sprintf("%s\nm/z: %.4f", df$sample_name, df$mz)
-        p <- ggplot(df, aes(x = mz, ymin = y0, ymax = y1,
+        p <- if (prof)
+          ggplot(df, aes(x = mz, y = y1, color = sample_name, text = .tip)) +
+            geom_line(linewidth = 0.3)
+        else
+          ggplot(df, aes(x = mz, ymin = y0, ymax = y1,
                                               color = sample_name, text = .tip)) +
-          geom_linerange(linewidth = 0.4) +
+            geom_linerange(linewidth = 0.4)
+        p <- p +
           scale_color_manual(
             values = brewer_named(unique(df$sample_name), rv$settings$qual_palette)) +
           labs(x = "m/z", y = NULL, color = NULL) +
@@ -343,15 +355,22 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         pmz <- st$precursorMZ[match(df$scan[1], st$scan)]
         if (length(pmz) != 1 || !is.finite(pmz) || pmz <= 0) pmz <- NA_real_
       }
+      tag <- if (prof) "  \u2022  profile" else ""
       ttl <- if (identical(input$layout, "single"))
-        sprintf("%s \u2014 scan %s @ rt %.4g %s%s", df$sample_name[1],
+        sprintf("%s \u2014 scan %s @ rt %.4g %s%s%s", df$sample_name[1],
                 if (is.na(df$scan[1])) "?" else df$scan[1],
                 rt_to_disp(df$rt[1], unit), unit,
-                if (is.finite(pmz)) sprintf("  \u2022  precursor m/z %.4f", pmz) else "")
-      else sprintf("rt %.4g %s \u2014 %d files", rt_to_disp(df$rt[1], unit), unit,
-                   length(unique(df$sample_name)))
-      p <- ggplot(df, aes(x = mz, ymin = 0, ymax = intensity, text = .tip)) +
-        geom_linerange(linewidth = 0.4, color = col1) +
+                if (is.finite(pmz)) sprintf("  \u2022  precursor m/z %.4f", pmz) else "",
+                tag)
+      else sprintf("rt %.4g %s \u2014 %d files%s", rt_to_disp(df$rt[1], unit), unit,
+                   length(unique(df$sample_name)), tag)
+      p <- if (prof)
+        ggplot(df, aes(x = mz, y = intensity, text = .tip)) +
+          geom_line(linewidth = 0.3, color = col1)
+      else
+        ggplot(df, aes(x = mz, ymin = 0, ymax = intensity, text = .tip)) +
+          geom_linerange(linewidth = 0.4, color = col1)
+      p <- p +
         labs(x = "m/z", y = "intensity", title = ttl) +
         theme_classic()
       if (is.finite(pmz))
@@ -377,10 +396,21 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     })
 
     # Click a peak -> set the annotation anchor, or add its m/z to the EIC list.
+    # On a raw profile trace the click lands on whichever detector sample the
+    # cursor was over — typically a flank, not the peak's m/z. Snap to the apex of
+    # the profile peak under the cursor so the EIC target / anchor gets the real
+    # mass. (Centroided spectra need no snapping: the click IS the peak.)
+    snap_to_apex <- function(mz, df) {
+      if (!is_prof(df)) return(mz)
+      near <- df[abs(df$mz - mz) <= PROFILE_SNAP_DA, , drop = FALSE]
+      if (!nrow(near)) return(mz)
+      near$mz[which.max(near$intensity)]
+    }
+
     click <- reactive(event_data("plotly_click", source = "spec"))
     observeEvent(click(), {
       ev <- click(); req(ev, !is.null(ev$x))
-      mz <- ev$x
+      mz <- snap_to_apex(ev$x, spec_df())
       if (isTRUE(input$annotate) && identical(input$click_action, "anchor") &&
           identical(input$layout, "single")) {
         updateNumericInput(session, "anchor_mz", value = round(mz, 4))

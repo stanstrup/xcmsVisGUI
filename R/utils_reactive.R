@@ -23,6 +23,7 @@ make_rv <- function() {
       ms_levels   = character(),
       polarities  = character(),
       charges     = character(),
+      spec_mode   = character(),   # "profile" | "centroid" | "mixed" | NA
       message     = character()
     ),
 

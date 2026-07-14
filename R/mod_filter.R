@@ -99,6 +99,14 @@ mod_filter_server <- function(id, rv, included) {
             div(style = "flex:1",
                 selectInput(ns("polarity"), "Polarity", width = "100%",
                             choices = c("any", "pos", "neg"), selected = "any"))),
+        selectInput(ns("centroid"), "Profile-mode spectra", width = "100%",
+                    choices = c("Centroid if profile (auto)" = "auto",
+                                "Always centroid" = "on",
+                                "Never — show raw profile" = "off"),
+                    selected = "auto"),
+        tags$small(class = "text-muted d-block mb-2",
+                   "Profile scans are peak-picked for the spectrum and MS map ",
+                   "views. Chromatograms always use the raw data."),
         helpText("Leave a box blank for no limit.")
       )
     })
@@ -111,6 +119,7 @@ mod_filter_server <- function(id, rv, included) {
            mz_min = input$mz_min, mz_max = input$mz_max,
            int_min = input$int_min, int_max = input$int_max,
            ms_level = input$ms_level, polarity = input$polarity,
+           centroid = input$centroid,
            spectrum_id_rules = rules)
     }) %>% debounce(600)
 
@@ -125,6 +134,7 @@ mod_filter_server <- function(id, rv, included) {
         removeUI(paste0("#", ns(paste0("id_row_", rid))), immediate = TRUE)
       rule_ids(character())
       updateSelectInput(session, "polarity", selected = "any")
+      updateSelectInput(session, "centroid", selected = "auto")
       updateSelectInput(session, "ms_level",
         selected = if ("1" %in% ranges()$ms_levels) "1" else "all")
     })

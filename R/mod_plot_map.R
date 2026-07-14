@@ -43,7 +43,10 @@ mod_plot_map_ui <- function(id) {
                       min = 0, max = 99, value = 90, step = 1)
         ),
         helpText("Press Plot to (re)render for the included files. 2D map draws ",
-                 "exact centroids; lower the contrast to reveal weaker peaks.")
+                 "exact centroids; lower the contrast to reveal weaker peaks. ",
+                 "Profile-mode files are peak-picked first — set ",
+                 "“Profile-mode spectra” to “Never” in Filters to map every ",
+                 "raw sample instead (slow: tens of millions of points per file).")
       ),
       plotlyOutput(ns("plot_out"), height = "100%")
     )

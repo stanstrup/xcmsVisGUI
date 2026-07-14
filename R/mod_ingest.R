@@ -117,7 +117,8 @@ mod_ingest_server <- function(id, rv) {
         include = FALSE, status = "reading", n_spectra = NA_integer_,
         rt_min = NA_real_, rt_max = NA_real_, mz_min = NA_real_, mz_max = NA_real_,
         ms_levels = NA_character_, polarities = NA_character_,
-        charges = NA_character_, message = NA_character_)
+        charges = NA_character_, spec_mode = NA_character_,
+        message = NA_character_)
       rv$files <- bind_rows(rv$files, new_rows)
       queue(c(queue(), new_rows$id))
       pump()
@@ -191,6 +192,7 @@ mod_ingest_server <- function(id, rv) {
           rv$files$ms_levels[idx]  <- s$ms_levels
           rv$files$polarities[idx] <- polarity_label(s$polarities)
           rv$files$charges[idx]    <- s$charges %||% NA_character_
+          rv$files$spec_mode[idx]  <- spec_mode_label(s$n_profile, s$n_centroid)
         }
       }
       current(NULL)
@@ -211,7 +213,7 @@ mod_ingest_server <- function(id, rv) {
     # caused the list to flash empty and was slow.
     disp_df <- reactive({
       f <- rv$files
-      cols <- c("File", "Group", "St", "MS", "Pol")
+      cols <- c("File", "Group", "St", "MS", "Pol", "Mode")
       if (nrow(f) == 0) {
         empty <- as.data.frame(matrix(character(), 0, length(cols)))
         names(empty) <- cols
@@ -226,9 +228,16 @@ mod_ingest_server <- function(id, rv) {
       # wrap into tall rows nor force the sidebar to scroll.
       fname <- vapply(f$name, function(nm)
         as.character(tags$span(class = "fname", title = nm, nm)), character(1))
+      # Spectrum mode abbreviated to fit the sidebar; full word on hover. Blank
+      # when the file declares nothing (CDF) \u2014 it is then sniffed at read time.
+      mode_cell <- vapply(f$spec_mode, function(m) {
+        if (is.na(m)) return("")
+        as.character(tags$span(title = m, substr(m, 1, 4)))
+      }, character(1))
       data.frame(
         File = fname, Group = f$sample_group,
         St = status_badge, MS = f$ms_levels, Pol = f$polarities,
+        Mode = mode_cell,
         check.names = FALSE, stringsAsFactors = FALSE
       )
     })
@@ -245,11 +254,12 @@ mod_ingest_server <- function(id, rv) {
                        # Fixed widths for the small columns; File (target 0) takes
                        # the remaining space under table-layout:fixed.
                        columnDefs = list(
-                         list(className = "dt-center", targets = c(2, 3, 4)),
+                         list(className = "dt-center", targets = c(2, 3, 4, 5)),
                          list(width = "58px", targets = 1),            # Group
                          list(width = "26px", targets = 2),            # status
                          list(width = "30px", targets = 3),            # MS
-                         list(width = "38px", targets = 4)))           # Pol
+                         list(width = "38px", targets = 4),            # Pol
+                         list(width = "42px", targets = 5)))           # Mode
       ))
     })
     file_proxy <- dataTableProxy("file_table")

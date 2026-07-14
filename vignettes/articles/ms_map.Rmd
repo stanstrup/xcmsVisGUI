@@ -22,6 +22,12 @@ file as you change unrelated settings.
 
 ![2-D MS map](figures/msmap.png){width=100%}
 
+**Profile-mode files are peak-picked first** (the **Profile-mode spectra** filter,
+default *auto*). This matters most here: mapping a profile file raw means tens of
+millions of points — one test file goes from 29 million points (690 MB) to 2 million
+(48 MB) once picked. You can set the filter to *Never* to map every raw sample, but
+expect it to be slow. See [Getting started](getting_started.html#profile-mode-data).
+
 ## 3D views
 
 Switch the view to **3D surface** or **3D points** for a binned surface / scatter

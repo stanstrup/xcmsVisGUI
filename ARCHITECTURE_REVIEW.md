@@ -295,6 +295,45 @@ disambiguation: a *Click → EIC list | → set anchor* toggle reuses the existi
 spectrum-click plumbing. Annotation tolerance reuses the persisted default-tolerance
 setting (no new persisted fields). Re-encodes commonMZ's Latin-1 origin text to UTF-8.
 
+### Profile-mode data (auto-detected; peak-picked for spectrum-level views)
+Raw files may be **centroided** or **profile**. Profile was effectively unusable:
+one Orbitrap MS1 scan is ~17k detector samples (so the Spectrum view drew ~17k m/z
+sticks) and a whole file ~29M points / 690 MB, which the MS map read in full before
+throwing away all but the top 200k *by intensity* — i.e. it kept peak flanks.
+
+**Design.** Profile handling is a **filter field** (`filter$centroid` =
+`auto` (default) / `on` / `off`), not a setting. That puts it in `data_key()` for
+free, so every `bindCache`d extraction invalidates correctly, and it inherits the
+"filters apply everywhere" plumbing. `apply_filters_spectra` peak-picks via
+`Spectra::pickPeaks()`, which is a **lazy** processing step — nothing is
+materialised until a view actually reads peaks. Measured on a real Orbitrap file:
+spectrum 19,720 → 1,369 points; MS map 28.8M → 2.0M rows (690 → 48 MB); the base
+peak's *m/z* is unchanged, so picking costs no mass accuracy.
+
+Three decisions worth keeping:
+- **Detect per MS LEVEL, not per file.** Mixed files (profile MS1 + centroided MS2)
+  are routine on Thermo DDA — `msdata`'s own `MS3TMT11.mzML` is one. Peak-picking
+  such a file wholesale is *destructive*: local-maximum detection over an
+  already-centroided spectrum discards every peak whose neighbour is more intense.
+  So `profile_ms_levels()` resolves the profile levels and hands them to
+  `pickPeaks(msLevel. = …)`, leaving centroided levels bit-for-bit untouched
+  (asserted in `test-filters.R`). Detection prefers the file's own `centroided`
+  flag and falls back to `Spectra::isCentroided()` shape-sniffing when it is absent
+  (CDF); undecidable → treat as centroided, never pick on a guess.
+- **Chromatograms are never centroided.** `apply_filters` (TIC/BPC/EIC) deliberately
+  skips picking: a chromatogram sums/maxes intensity across an m/z window, which is
+  correct on profile samples and reproduces the instrument's own TIC (verified
+  identical with the policy on and off). This is the single, deliberate exception to
+  the apply_filters/apply_filters_spectra equivalence invariant, and the equivalence
+  battery pins `centroid = "off"` accordingly.
+- **Raw profile is drawn as a line, not sticks** — that is what profile data *is* —
+  and peak clicks snap to the apex (`PROFILE_SNAP_DA`) so the m/z sent to the EIC
+  list / annotation anchor is the peak's, not whichever flank sample was hit.
+
+Gotcha: `Spectra::pickPeaks` **must** be namespace-qualified. Attaching xcms brings
+in an MSnbase `pickPeaks` generic that masks ProtGenerics', after which a bare call
+fails to dispatch on a `Spectra` object.
+
 ### xcmsVis — evaluated and declined (for now)
 Re-examined whether to delegate plotting to **xcmsVis** (`gplot*` → ggplot,
 amendable post-hoc with `+ aes()/geom_/scale_`). **Declined for the current

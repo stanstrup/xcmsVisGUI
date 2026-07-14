@@ -31,6 +31,20 @@ optional adduct / isotope / fragment annotation.
 
 The MS level / intensity / spectrum-ID **Filters** apply to which spectrum is shown.
 
+## Profile-mode files
+
+If the file is profile-mode, the spectrum is peak-picked before it is drawn (the
+**Profile-mode spectra** filter, default *auto*) — so you get the stick plot you
+expect rather than ~17 000 detector samples per scan. Set that filter to *Never*
+to inspect the raw trace: it is then drawn as a continuous **line**, which is what
+profile data actually is, and the title is marked *profile*. Clicking a peak on a
+raw profile trace snaps to the peak apex, so the *m/z* you send to the EIC list or
+use as an annotation anchor is the real one and not a flank sample. See
+[Getting started](getting_started.html#profile-mode-data).
+
+Annotation works either way — the annotation engine centroids internally before
+matching — but leaving the default *auto* in place is the sane choice.
+
 ## From spectrum to EIC
 
 **Click a peak** to add its *m/z* to the [EIC](eic.html) target list (the default

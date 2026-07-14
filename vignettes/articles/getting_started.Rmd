@@ -85,6 +85,35 @@ You can constrain retention time, *m/z*, intensity, MS level and polarity. The
 no spectra, the plots show "No spectra match the current filters." rather than an
 error.
 
+### Profile-mode data
+
+Raw files come in two flavours: **centroided** (one point per detected ion) and
+**profile** (every detector sample, so a single peak is tens of points). The app
+reads which one you have from the file itself and shows it in the **Mode** column
+of the file list — `prof`, `cent`, or `mix` for a file that is profile at one MS
+level and centroided at another (a very common Thermo DDA setup: profile MS1,
+centroided MS2).
+
+Left as-is, profile data is awkward to work with: one Orbitrap MS1 scan can be
+~17 000 points, and a whole file ~29 million. So **Profile-mode spectra** in the
+Filters panel defaults to *Centroid if profile (auto)* — profile scans are
+peak-picked before the **Spectrum** and **MS map** views draw them, which makes
+the spectrum a clean stick plot and the map roughly 15× smaller and faster. Only
+the levels that are actually profile are picked, so a mixed file keeps its
+centroided MS2 spectra untouched.
+
+Choose *Never — show raw profile* to see the unprocessed trace instead: the
+spectrum view then draws it as a continuous line (not sticks, which is what
+profile data really is) and its title is marked *profile*. Clicking a peak still
+gives you the true peak *m/z* — the click snaps to the apex rather than to
+whichever flank sample you happened to hit. Be aware the MS map will then plot
+every raw sample, which is slow. *Always centroid* forces peak picking even on
+files that claim to be centroided already.
+
+Chromatograms (TIC / BPC / EIC) are never centroided, whatever this is set to:
+they sum or max intensities across an *m/z* window, which is correct on profile
+samples and reproduces the TIC the instrument recorded.
+
 ## Moving between tabs
 
 The views are linked through clicks, so you rarely retype a number:

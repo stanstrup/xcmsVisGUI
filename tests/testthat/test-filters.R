@@ -145,6 +145,30 @@ test_that("spectrum_filter resolves auto to raw, and passes on/off through", {
   expect_identical(f("auto")$centroid, "auto")
 })
 
+test_that("the profile line survives ggplotly as ONE trace (not shattered per point)", {
+  # Regression: the `text` tooltip is unique per row, so ggplot inferred a group
+  # per row and geom_line became 19,720 single-point "lines" -> plotly drew an
+  # empty plot (axes, title, no data). Only an explicit `group` prevents it.
+  # Assert on the BUILT plotly object: ggplot_build alone cannot see this.
+  df <- tibble::tibble(mz = seq(100, 110, length.out = 200),
+                       intensity = runif(200, 0, 1e5),
+                       sample_name = "s")
+  df$.tip <- sprintf("m/z: %.4f", df$mz)
+  trace_len <- function(g)
+    length(plotly::plotly_build(plotly::ggplotly(g, tooltip = "text",
+                                                 dynamicTicks = TRUE))$x$data[[1]]$x)
+
+  grouped <- ggplot2::ggplot(df, ggplot2::aes(x = mz, y = intensity, text = .tip,
+                                              group = sample_name)) +
+    ggplot2::geom_line(linewidth = 0.3)
+  expect_equal(trace_len(grouped), nrow(df))
+
+  # the ungrouped form is what broke: plotly gets ~2n coords of segment soup
+  ungrouped <- ggplot2::ggplot(df, ggplot2::aes(x = mz, y = intensity, text = .tip)) +
+    ggplot2::geom_line(linewidth = 0.3)
+  expect_gt(trace_len(ungrouped), nrow(df))
+})
+
 test_that("extract_spectrum reports whether its peaks are still profile", {
   p <- msdata_mzml()
   raw <- get_spectra(p)

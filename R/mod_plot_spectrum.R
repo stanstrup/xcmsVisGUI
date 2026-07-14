@@ -317,6 +317,12 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     # sample (~17k of them in one Orbitrap scan) is both unreadable and slow.
     # Only when EVERY displayed spectrum is profile — a mixed set falls back to
     # sticks, which are still correct for centroids.
+    #
+    # The profile geoms MUST set `group` explicitly. ggplot infers the group from
+    # the discrete aesthetics, and our `text` tooltip is unique per row — so an
+    # un-grouped geom_line is split into one single-point "line" per row and draws
+    # NOTHING (the plot comes up empty, axes and all). geom_linerange never showed
+    # this because each stick is its own segment anyway.
     is_prof <- function(df) isTRUE(all(df$profile))
 
     plot_gg <- reactive({
@@ -335,7 +341,8 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         df$y1 <- df$y0 + df$intensity
         df$.tip <- sprintf("%s\nm/z: %.4f", df$sample_name, df$mz)
         p <- if (prof)
-          ggplot(df, aes(x = mz, y = y1, color = sample_name, text = .tip)) +
+          ggplot(df, aes(x = mz, y = y1, color = sample_name, text = .tip,
+                                           group = sample_name)) +
             geom_line(linewidth = 0.3)
         else
           ggplot(df, aes(x = mz, ymin = y0, ymax = y1,
@@ -368,7 +375,8 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       else sprintf("rt %.4g %s \u2014 %d files%s", rt_to_disp(df$rt[1], unit), unit,
                    length(unique(df$sample_name)), tag)
       p <- if (prof)
-        ggplot(df, aes(x = mz, y = intensity, text = .tip)) +
+        ggplot(df, aes(x = mz, y = intensity, text = .tip,
+                                         group = sample_name)) +
           geom_line(linewidth = 0.3, color = col1)
       else
         ggplot(df, aes(x = mz, ymin = 0, ymax = intensity, text = .tip)) +

@@ -74,7 +74,7 @@ Consequences baked into the architecture:
 | file | role |
 |---|---|
 | `R/fct_extract.R` | all data extraction: `read_ms_header` (mzR), `build_msexp`, `chromatogram` helpers, `extract_peaks/_spectrum/_precursors`, `file_scan_table` (cached), `add_scan_numbers`, `bin_peaks` |
-| `R/fct_filters.R` | `apply_filters` (MsExperiment) + `apply_filters_spectra` (Spectra) — keep them consistent; `profile_ms_levels`/`centroid_ms_levels` (profile-mode detection); `combined_ranges` for filter hints |
+| `R/fct_filters.R` | `apply_filters` (MsExperiment) + `apply_filters_spectra` (Spectra, optional `cp` peak-picking) — keep them consistent; `centroid_spec`/`profile_ms_levels`/`centroid_ms_levels` (peak picking); `combined_ranges` for filter hints |
 | `R/fct_palettes.R` | `brewer_qual/seq/colorscale` (ColorBrewer + viridis; `invert` reverses) |
 | `R/fct_export.R` | `save_gg` (png/svg/pdf via ggsave; **rds** = save the ggplot object itself) |
 | `R/fct_cache.R` | `cache_disk_qs2` (qs2 disk store), `app_cache` (layered mem+disk), `clear_disk_cache` |
@@ -90,16 +90,24 @@ Consequences baked into the architecture:
   Plotly click `x` is in the display unit → convert back to seconds for `rv$selection`.
 - **Filters apply everywhere.** Single-file views (spectrum, map) must go through
   `apply_filters_spectra` so intensity/spectrum-id/etc. reach them — don't read raw.
-  The ONE deliberate asymmetry is `filter$centroid` (below): spectrum-level only.
-- **Profile mode** (`filter$centroid` = `auto`/`on`/`off`, default auto):
-  `apply_filters_spectra` peak-picks profile scans via `Spectra::pickPeaks()` — a
-  *lazy* step, so nothing materialises until a view reads peaks. Why it matters: one
-  profile Orbitrap MS1 scan is ~17k points and a file ~29M (690 MB) — the MS map was
-  unusable and the spectrum drew 17k sticks. Picked: 1.4k / 2M (48 MB).
-  - **`auto` is view-dependent**: the MS map picks (it must), the Spectrum view shows
-    the RAW trace (you opened it to see the data; one scan is cheap). The spectrum
-    module gets its filter through **`spectrum_filter(rv$filter)`**, which maps
-    `auto` → `off`. Explicit `on`/`off` pass through unchanged everywhere.
+  Peak picking is the ONE thing that is NOT a filter (below): it is data processing,
+  a separate `cp` arg, so filter == which spectra, cp == how to reduce them.
+- **Profile mode / peak picking** — `centroid_spec(mode, snr, hws, k)`, a per-view
+  processing spec passed as `apply_filters_spectra(sp, f, cp)` / `extract_*(..., cp)`,
+  NOT part of the filter. `apply_filters_spectra` peak-picks profile scans via
+  `Spectra::pickPeaks()` — a *lazy* step, so nothing materialises until a view reads
+  peaks. Why it matters: one profile Orbitrap MS1 scan is ~17k points and a file ~29M
+  (690 MB) — the MS map was unusable and the spectrum drew 17k sticks. Picked: 1.4k /
+  2M (48 MB).
+  - **Owned per view, not global** (user: "it's data processing, not a filter"). Each
+    view that draws peaks has its own **Peak-picking panel** (`centroid_controls_ui` +
+    `read_centroid_spec`, shared in `utils_reactive.R`). Defaults differ: **Spectrum**
+    opens on `off` (raw trace — you came to see the data), **MS map** on `auto` (raw is
+    tens of millions of points there). Modes: `off` / `auto` (pick detected-profile
+    levels) / `on` (force all levels). `cp = NULL` means no picking.
+  - **Exposed pickPeaks knobs**: `snr` (S/N floor), `hws` (half-window for local-max),
+    `k` (m/z refinement = intensity-weighted mean of ±k raw points). Not exposed:
+    `method`/`descending`/`threshold` (niche). Sub-controls show only when picking on.
   - **Detection is per MS LEVEL, not per file** (`profile_ms_levels`). Mixed files
     (profile MS1 + centroided MS2) are the norm on Thermo DDA, and pickPeaks over an
     already-centroided spectrum DROPS every peak whose neighbour is more intense —
@@ -107,9 +115,10 @@ Consequences baked into the architecture:
     Source of truth = the file's `centroided` flag (mzML has it per spectrum; mzR and
     Spectra both expose it), falling back to `Spectra::isCentroided()` peak-shape
     sniffing when absent (CDF). Undecidable → treat as centroided; never pick on a guess.
-  - **Chromatograms are NEVER centroided** (`apply_filters` doesn't pick): TIC/BPC/EIC
+  - **Chromatograms are NEVER centroided** (`apply_filters` takes no `cp`): TIC/BPC/EIC
     sum/max over an m/z window, which is correct on profile samples and reproduces the
-    instrument's TIC. Verified identical with the policy on and off.
+    instrument's TIC. With `cp = NULL` `apply_filters_spectra` is a pure filter and
+    matches `apply_filters` — the equivalence invariant the filter tests rest on.
   - **`Spectra::pickPeaks` must be namespaced** — attaching xcms pulls in an MSnbase
     `pickPeaks` generic that masks ProtGenerics', and a bare call fails to dispatch.
   - Peak-level filters (m/z, intensity) run AFTER picking; an intensity floor applied

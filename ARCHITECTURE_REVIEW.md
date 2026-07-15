@@ -301,21 +301,25 @@ one Orbitrap MS1 scan is ~17k detector samples (so the Spectrum view drew ~17k m
 sticks) and a whole file ~29M points / 690 MB, which the MS map read in full before
 throwing away all but the top 200k *by intensity* — i.e. it kept peak flanks.
 
-**Design.** Profile handling is a **filter field** (`filter$centroid` =
-`auto` (default) / `on` / `off`), not a setting. That puts it in `data_key()` for
-free, so every `bindCache`d extraction invalidates correctly, and it inherits the
-"filters apply everywhere" plumbing. `apply_filters_spectra` peak-picks via
-`Spectra::pickPeaks()`, which is a **lazy** processing step — nothing is
-materialised until a view actually reads peaks. Measured on a real Orbitrap file:
+**Design.** Peak picking is **data processing, owned per view**, not a filter or a
+global setting — the control lives in the Spectrum and MS map panels as a
+`centroid_spec(mode, snr, hws, k)` passed to `apply_filters_spectra(sp, f, cp)` and
+`extract_*(..., cp)`. (It began life as a `filter$centroid` field; moved out when
+the user pointed out it is processing, not spectrum selection — which also made the
+filter-equivalence invariant clean again: `cp = NULL` ⇒ pure filter.)
+`apply_filters_spectra` peak-picks via `Spectra::pickPeaks()`, a **lazy** step —
+nothing materialises until a view reads peaks. Measured on a real Orbitrap file:
 spectrum 19,720 → 1,369 points; MS map 28.8M → 2.0M rows (690 → 48 MB); the base
-peak's *m/z* is unchanged, so picking costs no mass accuracy.
+peak's *m/z* is unchanged, so picking costs no mass accuracy. The exposed knobs are
+pickPeaks' `snr` / `halfWindowSize` / `k` (m/z refinement); `method` / `descending`
+/ `threshold` are left at defaults.
 
 Four decisions worth keeping:
-- **`auto` resolves per view.** The MS map must peak-pick (raw is the difference
-  between usable and not); the Spectrum view must not (you opened it to look at the
-  raw data, and one scan is cheap to draw). So the spectrum module reads its filter
-  through `spectrum_filter()`, which maps `auto` → `off`; an explicit `on`/`off` is
-  the user's word and passes through unchanged in both views.
+- **Per view, with per-view defaults.** The MS map must peak-pick (raw is the
+  difference between usable and not) so it defaults to `auto`; the Spectrum view
+  opens on the raw trace (`off`) because you came to look at the data and one scan is
+  cheap. Each view has its own `centroid_controls_ui` / `read_centroid_spec`
+  (shared, in `utils_reactive.R`); there is no cross-view coupling.
 - **Detect per MS LEVEL, not per file.** Mixed files (profile MS1 + centroided MS2)
   are routine on Thermo DDA — `msdata`'s own `MS3TMT11.mzML` is one. Peak-picking
   such a file wholesale is *destructive*: local-maximum detection over an
@@ -325,12 +329,12 @@ Four decisions worth keeping:
   (asserted in `test-filters.R`). Detection prefers the file's own `centroided`
   flag and falls back to `Spectra::isCentroided()` shape-sniffing when it is absent
   (CDF); undecidable → treat as centroided, never pick on a guess.
-- **Chromatograms are never centroided.** `apply_filters` (TIC/BPC/EIC) deliberately
-  skips picking: a chromatogram sums/maxes intensity across an m/z window, which is
-  correct on profile samples and reproduces the instrument's own TIC (verified
-  identical with the policy on and off). This is the single, deliberate exception to
-  the apply_filters/apply_filters_spectra equivalence invariant, and the equivalence
-  battery pins `centroid = "off"` accordingly.
+- **Chromatograms are never centroided.** `apply_filters` (TIC/BPC/EIC) takes no
+  `cp`: a chromatogram sums/maxes intensity across an m/z window, which is correct on
+  profile samples and reproduces the instrument's own TIC (verified identical with
+  and without picking). Because picking is a separate `cp` arg rather than a filter
+  field, `apply_filters_spectra(sp, f)` with no `cp` is a pure filter and matches
+  `apply_filters` exactly — the equivalence battery just omits `cp`.
 - **Raw profile is drawn as a line, not sticks** — that is what profile data *is* —
   and peak clicks snap to the apex (`PROFILE_SNAP_DA`) so the m/z sent to the EIC
   list / annotation anchor is the peak's, not whichever flank sample was hit.

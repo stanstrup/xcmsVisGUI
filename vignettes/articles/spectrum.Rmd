@@ -34,13 +34,13 @@ The MS level / intensity / spectrum-ID **Filters** apply to which spectrum is sh
 ## Profile-mode files
 
 If the file is profile-mode, this view shows the scan **raw** by default (the
-**Profile-mode spectra** filter, default *Auto*, which peak-picks for the MS map
-but not here). It is drawn as a continuous **line** — which is what profile data
-actually is, rather than a stick per detector sample — and the title is marked
-*profile*. Clicking a peak on a raw profile trace snaps to the peak apex, so the
-*m/z* you send to the EIC list or use as an annotation anchor is the real one and
-not a flank sample. Set the filter to *Always centroid* to peak-pick this view too
-and get a conventional stick plot. See
+**Peak picking** control in this tab's panel, default *Raw*). It is drawn as a
+continuous **line** — which is what profile data actually is, rather than a stick
+per detector sample — and the title is marked *profile*. Clicking a peak on a raw
+profile trace snaps to the peak apex, so the *m/z* you send to the EIC list or use
+as an annotation anchor is the real one and not a flank sample. Set **Peak picking**
+to *Centroid profile scans* for a conventional stick plot; the S/N, half-window and
+*m/z*-refinement settings then appear. See
 [Getting started](getting_started.html#profile-mode-data).
 
 Annotation works either way — the annotation engine centroids internally before

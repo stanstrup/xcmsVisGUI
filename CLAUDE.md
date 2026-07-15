@@ -16,7 +16,10 @@ Scope is **raw visualisation only** — no peak picking / grouping / alignment
 (deferred; see `ARCHITECTURE_REVIEW.md` → "Deferred: preprocessing").
 
 ## Run / test (Windows dev box)
-- R: `C:\Program Files\R\R-4.5.2\bin\Rscript.exe` (not on PATH — call by full path).
+- R: `C:\Program Files\R\R-4.6.0\bin\Rscript.exe` (not on PATH — call by full path).
+  (4.5.0/4.5.2 are also installed; use 4.6.0. Each minor version has its OWN package
+  library under `AppData/Local/R/win-library/<x.y>`, so after switching, deps must be
+  present there — they are for 4.6.0.)
 - **This is now an R package.** `R/` is package code (loaded via the namespace, not
   Shiny-auto-sourced); the app is the exported `run_app()`. Launch headless:
   `Rscript -e "pkgload::load_all('.'); run_app(port=7799, launch.browser=FALSE)"`

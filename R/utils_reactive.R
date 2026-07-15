@@ -136,9 +136,14 @@ finalize_plotly <- function(gg, source, keep_zoom) {
 #' Spectra::pickPeaks() knobs and show only when picking is on. `default_mode`
 #' differs per view: the Spectrum view opens on the raw trace ("off"), the MS map
 #' on auto-detect ("auto") since raw is tens of millions of points there.
+#' `extra_show` is an optional JS expression OR'd into the sub-controls' visibility
+#' condition, so a view that peak-picks for another reason (the Spectrum overlay)
+#' can reveal the same knobs while the mode is still "off".
 #' Pair with read_centroid_spec(input) in the module server.
 #' @noRd
-centroid_controls_ui <- function(ns, default_mode = "off") {
+centroid_controls_ui <- function(ns, default_mode = "off", extra_show = NULL) {
+  cond <- sprintf("input['%s'] != 'off'", ns("cmode"))
+  if (!is.null(extra_show)) cond <- sprintf("(%s) || (%s)", cond, extra_show)
   tagList(
     selectInput(ns("cmode"), "Peak picking", width = "100%",
                 c("Raw — no peak picking" = "off",
@@ -146,7 +151,7 @@ centroid_controls_ui <- function(ns, default_mode = "off") {
                   "Force centroid (all scans)" = "on"),
                 selected = default_mode),
     conditionalPanel(
-      sprintf("input['%s'] != 'off'", ns("cmode")),
+      cond,
       div(class = "d-flex gap-2",
           numericInput(ns("csnr"), "S/N", value = 0, min = 0, step = 1, width = "90px"),
           numericInput(ns("chws"), "Half-window", value = 2, min = 1, step = 1,

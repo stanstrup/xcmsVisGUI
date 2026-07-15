@@ -32,12 +32,6 @@ ISOTOPE_SPACING <- 1.0033548
 # via the annotation "Isotope tol" control.
 ISO_TOL_DA <- 0.015
 
-# Half-window (Da) used to snap a click on a RAW PROFILE spectrum to the apex of
-# the peak under the cursor: the click reports whichever detector sample was hit,
-# which is usually a flank. Wide enough to span a profile peak on a TOF/Orbitrap
-# (they are well under 0.05 Da FWHM), narrow enough not to jump to a neighbour.
-PROFILE_SNAP_DA <- 0.05
-
 # --- Retention-time unit helpers ------------------------------------------
 # Data is always handled internally in SECONDS (xcms/Spectra native). These
 # convert to/from the user-facing display unit (minutes by default).

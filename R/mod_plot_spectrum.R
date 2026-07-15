@@ -42,7 +42,15 @@ mod_plot_spectrum_ui <- function(id) {
 
         # --- peak picking (data processing; profile scans) -----------------
         hr(),
-        centroid_controls_ui(ns, default_mode = "off"),
+        centroid_controls_ui(ns, default_mode = "off",
+                             extra_show = sprintf("input['%s'] == true", ns("coverlay"))),
+        # Raw-mode-only extras: show the individual detector samples, and/or overlay
+        # the centroids (picked with the S/N / half-window / refinement above) on the
+        # profile line so you can see what peak picking would keep.
+        conditionalPanel(
+          sprintf("input['%s'] == 'off'", ns("cmode")),
+          checkboxInput(ns("showpts"), "Show data points (profile)", value = FALSE),
+          checkboxInput(ns("coverlay"), "Overlay centroids", value = FALSE)),
 
         # --- annotation (single view only) ---------------------------------
         conditionalPanel(
@@ -188,6 +196,29 @@ mod_plot_spectrum_server <- function(id, rv, included) {
                              cols = "sample_name", on_error = notify_read_failures)
         }
       })
+    })
+
+    # Centroids to overlay on a raw profile line (single view only). Same
+    # selection as spec_df, but force peak-picking with the panel's S/N /
+    # half-window / refinement, so you see exactly what centroiding keeps on top
+    # of the raw trace. Empty tibble when not applicable (checkbox off, not raw
+    # mode, not single, or the spectrum isn't profile).
+    overlay_df <- reactive({
+      empty <- spec_df()[0, , drop = FALSE]
+      if (!isTRUE(input$coverlay) || !identical(input$cmode, "off") ||
+          !identical(input$layout, "single")) return(empty)
+      d0 <- spec_df()
+      if (!nrow(d0) || !isTRUE(all(d0$profile))) return(empty)
+      unit <- rv$settings$time_unit
+      use_scan <- !is.null(input$scan) && is.finite(input$scan)
+      rt_sec <- if (isTRUE(is.finite(input$rt))) rt_to_sec(input$rt, unit) else NA_real_
+      cp <- read_centroid_spec(input); cp$mode <- "auto"   # overlay always picks
+      f <- cur_row()
+      d <- extract_spectrum(f$path, rt = rt_sec,
+                            scan = if (use_scan) as.integer(input$scan) else NA_integer_,
+                            f = rv$filter, cp = cp)
+      d$sample_name <- f$name
+      d
     })
 
     # --- annotation controls --------------------------------------------------
@@ -387,6 +418,24 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       p <- p +
         labs(x = "m/z", y = "intensity", title = ttl) +
         theme_classic()
+      # Show the individual detector samples on a raw profile line (single view).
+      if (prof && isTRUE(input$showpts) && identical(input$layout, "single"))
+        p <- p + geom_point(data = df, aes(x = mz, y = intensity, text = .tip),
+                            inherit.aes = FALSE, color = col1, size = 0.7)
+      # Overlay the centroids (picked with the panel's settings) as sticks so you
+      # can compare them against the raw profile trace.
+      if (prof && identical(input$layout, "single")) {
+        ov <- overlay_df()
+        if (nrow(ov)) {
+          ov$.tip <- sprintf("centroid\nm/z: %.4f\nint: %.3g", ov$mz, ov$intensity)
+          col2 <- brewer_qual(2, rv$settings$qual_palette)[2]
+          p <- p +
+            geom_linerange(data = ov, aes(x = mz, ymin = 0, ymax = intensity, text = .tip),
+                           inherit.aes = FALSE, color = col2, linewidth = 0.5) +
+            geom_point(data = ov, aes(x = mz, y = intensity, text = .tip),
+                       inherit.aes = FALSE, color = col2, size = 1.1)
+        }
+      }
       if (is.finite(pmz))
         p <- p + geom_vline(xintercept = pmz, linetype = "dashed",
                                      color = "#d62728", linewidth = 0.5)
@@ -410,21 +459,13 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     })
 
     # Click a peak -> set the annotation anchor, or add its m/z to the EIC list.
-    # On a raw profile trace the click lands on whichever detector sample the
-    # cursor was over — typically a flank, not the peak's m/z. Snap to the apex of
-    # the profile peak under the cursor so the EIC target / anchor gets the real
-    # mass. (Centroided spectra need no snapping: the click IS the peak.)
-    snap_to_apex <- function(mz, df) {
-      if (!is_prof(df)) return(mz)
-      near <- df[abs(df$mz - mz) <= PROFILE_SNAP_DA, , drop = FALSE]
-      if (!nrow(near)) return(mz)
-      near$mz[which.max(near$intensity)]
-    }
-
+    # Use the clicked m/z exactly as reported (plotly returns the nearest data
+    # point). We deliberately do NOT snap to a nearby apex: on a profile trace the
+    # user gets exactly the sample they clicked, not some louder neighbour.
     click <- reactive(event_data("plotly_click", source = "spec"))
     observeEvent(click(), {
       ev <- click(); req(ev, !is.null(ev$x))
-      mz <- snap_to_apex(ev$x, spec_df())
+      mz <- ev$x
       if (isTRUE(input$annotate) && identical(input$click_action, "anchor") &&
           identical(input$layout, "single")) {
         updateNumericInput(session, "anchor_mz", value = round(mz, 4))

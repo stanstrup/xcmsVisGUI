@@ -26,6 +26,9 @@ mod_plot_map_ui <- function(id) {
         actionButton(ns("plot"), "Plot", icon = icon("play"), class = "btn-primary"),
         radioButtons(ns("mode"), "View",
                      c("2D map" = "map", "3D surface" = "surface", "3D points" = "points")),
+        # Peak picking (data processing). Defaults to auto: mapping raw profile is
+        # tens of millions of points. Takes effect on the next Plot.
+        centroid_controls_ui(ns, default_mode = "auto"),
         conditionalPanel(
           sprintf("input['%s'] == 'map'", ns("mode")),
           sliderInput(ns("contrast"), "Contrast (intensity percentile = full colour)",
@@ -44,9 +47,8 @@ mod_plot_map_ui <- function(id) {
         ),
         helpText("Press Plot to (re)render for the included files. 2D map draws ",
                  "exact centroids; lower the contrast to reveal weaker peaks. ",
-                 "Profile-mode files are peak-picked first — set ",
-                 "“Profile-mode spectra” to “Never” in Filters to map every ",
-                 "raw sample instead (slow: tens of millions of points per file).")
+                 "Peak-picking settings above take effect on the next Plot; set ",
+                 "them to Raw to map every sample (slow on profile data).")
       ),
       plotlyOutput(ns("plot_out"), height = "100%")
     )
@@ -64,8 +66,9 @@ mod_plot_map_server <- function(id, rv, included) {
     peaks_all <- eventReactive(input$plot, {
       inc <- included()
       validate(need(nrow(inc) > 0, "Add and include at least one file."))
+      cp <- read_centroid_spec(input)
       withProgress(message = "Reading peaks\u2026", value = 0.3, {
-        extract_over_files(inc, function(p) extract_peaks(p, rv$filter),
+        extract_over_files(inc, function(p) extract_peaks(p, rv$filter, cp),
                            cols = "sample_id", scan = TRUE,
                            on_error = notify_read_failures)
       })

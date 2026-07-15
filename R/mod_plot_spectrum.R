@@ -40,6 +40,10 @@ mod_plot_spectrum_ui <- function(id) {
                  "Facet / Stacked compare all included files at the rt. MS level ",
                  "and intensity / spectrum-id filters come from the global filter."),
 
+        # --- peak picking (data processing; profile scans) -----------------
+        hr(),
+        centroid_controls_ui(ns, default_mode = "off"),
+
         # --- annotation (single view only) ---------------------------------
         conditionalPanel(
           single(""),
@@ -158,13 +162,12 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         updateNumericInput(session, "scan", value = max(scans))
     })
 
-    # spectrum_filter(): under the default "auto" policy this view shows the RAW
-    # profile trace (drawn as a line) while the MS map still peak-picks — see
-    # R/fct_filters.R. "Always"/"Never" from the user are honoured as given.
+    # Peak picking is this tab's own control (default off = raw trace, drawn as a
+    # line). The global filter still chooses which spectrum.
     one_spectrum <- function(path, rt_sec, scan) {
       extract_spectrum(path, rt = rt_sec,
                        scan = if (is.finite(scan)) as.integer(scan) else NA_integer_,
-                       f = spectrum_filter(rv$filter))
+                       f = rv$filter, cp = read_centroid_spec(input))
     }
 
     spec_df <- reactive({

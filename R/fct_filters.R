@@ -18,14 +18,14 @@
 #' The global filter as a default list — the single source of truth for its
 #' shape. Used by make_rv() (initial state) and as the base make_filter() fills.
 #' ms_level defaults to 1 (MS1) at startup; everything else is unconstrained.
-#' `centroid` is the profile-mode policy — see should_centroid().
+#' Peak-picking is NOT here — it is data processing, owned per view (Spectrum,
+#' MS map) as a `centroid_spec()`, not a global filter of which spectra to select.
 #' @noRd
 empty_filter <- function() {
   list(rt_min = NA_real_, rt_max = NA_real_,
        mz_min = NA_real_, mz_max = NA_real_,
        ms_level = 1L, polarity = "any",
        int_min = NA_real_, int_max = NA_real_,
-       centroid = "auto",
        spectrum_id_rules = list())
 }
 
@@ -44,7 +44,6 @@ make_filter <- function(inputs, unit) {
   f$ms_level <- if (is.null(inputs$ms_level) || identical(inputs$ms_level, "all"))
                   NA_integer_ else as.integer(inputs$ms_level)
   f$polarity <- if (!is.null(inputs$polarity)) inputs$polarity else "any"
-  f$centroid <- inputs$centroid %||% "auto"
   f$spectrum_id_rules <- inputs$spectrum_id_rules %||% list()
   f
 }
@@ -57,12 +56,36 @@ chrom_ms_level <- function(f) {
   if (!is.null(f$ms_level) && is.finite(f$ms_level)) as.integer(f$ms_level) else 1L
 }
 
-# --- profile mode ------------------------------------------------------------
+# --- profile mode / peak picking ---------------------------------------------
 # Profile spectra carry every detector sample, so one Orbitrap MS1 scan is ~17k
 # points where its centroid list is ~1k. Left raw, the spectrum view draws a
 # stick per sample and the MS map reads ~29M points (460 MB) per file. The fix is
 # Spectra::pickPeaks() — a LAZY processing step, applied when peaks are read, so
 # nothing is materialised until a view actually asks for the data.
+#
+# Peak picking is DATA PROCESSING, not filtering, so it is not part of the global
+# filter. Each view that draws peaks (Spectrum, MS map) owns a `centroid_spec()`
+# from its own panel and passes it to the extraction functions.
+
+#' Centroiding parameters for one view — a small spec passed alongside the filter
+#' to the extraction functions (never part of the filter itself). `mode` is the
+#' policy; `snr` / `hws` / `k` are the exposed Spectra::pickPeaks() knobs.
+#'   mode "off"  — no peak picking (draw the raw profile trace)
+#'        "auto" — pick only the MS levels detected as profile (mixed-file safe)
+#'        "on"   — pick every MS level present (force, even if flagged centroid)
+#'   snr — signal-to-noise threshold (0 = keep every local maximum)
+#'   hws — half-window size in points for local-maximum detection
+#'   k   — m/z refinement: recompute each centroid's m/z as the intensity-weighted
+#'         mean of the +/- k neighbouring raw points (0 = use the apex as-is)
+#' @noRd
+centroid_spec <- function(mode = "off", snr = 0, hws = 2L, k = 0L) {
+  int <- function(v, lo, d) { v <- suppressWarnings(as.integer(v))
+    if (length(v) != 1 || is.na(v) || v < lo) d else v }
+  num <- function(v, lo, d) { v <- suppressWarnings(as.numeric(v))
+    if (length(v) != 1 || is.na(v) || v < lo) d else v }
+  list(mode = if (mode %in% c("off", "auto", "on")) mode else "off",
+       snr = num(snr, 0, 0), hws = int(hws, 1L, 2L), k = int(k, 0L, 0L))
+}
 
 #' Which MS levels of `sp` hold PROFILE spectra (integer(0) = none).
 #'
@@ -98,27 +121,10 @@ profile_ms_levels <- function(sp) {
 #' @noRd
 is_profile_spectra <- function(sp) length(profile_ms_levels(sp)) > 0
 
-#' The global filter as the SPECTRUM view should see it.
-#'
-#' Under the default "auto" policy the two spectrum-level views want opposite
-#' things. The MS map MUST peak-pick — tens of millions of raw samples per file
-#' is the difference between usable and not. The spectrum view must NOT: you
-#' opened it to look at the raw data, and one scan of profile is cheap to draw.
-#' So "auto" resolves to "off" here, and the raw trace is drawn as a line.
-#' An explicit "on"/"off" is the user's word and passes through untouched.
+#' The MS levels to peak-pick under a centroid_spec()'s mode (integer(0) = none).
 #' @noRd
-spectrum_filter <- function(f) {
-  if (identical(f$centroid %||% "auto", "auto")) f$centroid <- "off"
-  f
-}
-
-#' The MS levels to peak-pick under the filter's `centroid` policy:
-#'   "auto" (default) — the levels detected as profile
-#'   "on"             — every level present (force peak picking)
-#'   "off"            — none (show the raw profile trace)
-#' @noRd
-centroid_ms_levels <- function(sp, f) {
-  mode <- f$centroid %||% "auto"
+centroid_ms_levels <- function(sp, cp) {
+  mode <- cp$mode %||% "off"
   if (identical(mode, "off") || !length(sp)) return(integer(0))
   if (identical(mode, "on")) return(sort(unique(Spectra::msLevel(sp))))
   profile_ms_levels(sp)
@@ -164,8 +170,13 @@ apply_filters <- function(x, f) {
 #' `Spectra::` qualification on pickPeaks is REQUIRED, not style: attaching xcms
 #' pulls in an MSnbase `pickPeaks` generic that masks ProtGenerics', and an
 #' unqualified call then fails to dispatch on a Spectra object.
+#'
+#' `cp` is a centroid_spec() (or NULL = no peak picking). It is passed separately
+#' from `f` because peak picking is processing, not spectrum selection — with
+#' `cp = NULL` this is a pure filter and matches apply_filters() (the equivalence
+#' invariant the filter tests rest on).
 #' @noRd
-apply_filters_spectra <- function(sp, f) {
+apply_filters_spectra <- function(sp, f, cp = NULL) {
   if (!is.null(f$ms_level) && is.finite(f$ms_level))
     sp <- Spectra::filterMsLevel(sp, as.integer(f$ms_level))
   if (isTRUE(is.finite(f$rt_min) || is.finite(f$rt_max)))
@@ -176,8 +187,12 @@ apply_filters_spectra <- function(sp, f) {
   if (has_id_rules(f))
     sp <- .filter_spectrumid(sp, f$spectrum_id_rules)
 
-  lv <- centroid_ms_levels(sp, f)
-  if (length(lv)) sp <- Spectra::pickPeaks(sp, msLevel. = lv)
+  if (!is.null(cp)) {
+    lv <- centroid_ms_levels(sp, cp)
+    if (length(lv))
+      sp <- Spectra::pickPeaks(sp, halfWindowSize = cp$hws, snr = cp$snr,
+                               k = cp$k, msLevel. = lv)
+  }
 
   if (isTRUE(is.finite(f$mz_min) || is.finite(f$mz_max)))
     sp <- Spectra::filterMzRange(sp, mz = .flt_mz(f))

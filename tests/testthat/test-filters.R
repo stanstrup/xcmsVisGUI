@@ -4,10 +4,9 @@
 # the SAME spectra for the same filter. That is what "filters apply everywhere"
 # rests on, and is otherwise only kept true by discipline.
 #
-# The one deliberate exception is `centroid`: peak-picking is spectrum-level, so
-# apply_filters_spectra applies it and apply_filters (chromatograms) does not.
-# The equivalence battery therefore pins centroid = "off" — it is about which
-# SPECTRA get selected. Centroiding is covered on its own below.
+# Peak picking is NOT part of the filter — it is a separate centroid_spec()
+# passed to apply_filters_spectra(cp=). With no cp this is a pure filter, so the
+# two paths must agree exactly. Centroiding is covered on its own below.
 
 skip_if_not_installed("msdata")
 
@@ -32,7 +31,7 @@ test_that("apply_filters and apply_filters_spectra select identical spectra", {
   rts <- Spectra::rtime(raw)
   rt_lo <- as.numeric(stats::quantile(rts, 0.3))
   rt_hi <- as.numeric(stats::quantile(rts, 0.7))
-  f <- function(...) modifyList(empty_filter(), list(centroid = "off", ...))
+  f <- function(...) modifyList(empty_filter(), list(...))
   # NB: assign spectrum_id_rules directly, never via modifyList — modifyList
   # recurses into the existing empty list() and, the rule list being unnamed,
   # would silently merge it back to list() (no filter). The app sets it directly.
@@ -109,40 +108,60 @@ test_that("profile detection is per MS level, so mixed files keep their centroid
   expect_false(any(prof_lv %in% Spectra::msLevel(raw)[cen & !is.na(cen)]))
 
   # The centroided levels must come through peak-for-peak untouched.
-  f_auto <- modifyList(empty_filter(), list(ms_level = NA_integer_, centroid = "auto"))
+  base <- modifyList(empty_filter(), list(ms_level = NA_integer_))
   npk <- function(sp) vapply(as.list(Spectra::peaksData(sp)), nrow, integer(1))
   keep <- which(cen)
-  expect_equal(npk(apply_filters_spectra(raw, f_auto)[keep]), npk(raw[keep]))
+  expect_equal(npk(apply_filters_spectra(raw, base, centroid_spec("auto"))[keep]),
+               npk(raw[keep]))
 
   # ...while the profile level really is reduced to centroids.
   pr <- which(!cen)
-  expect_lt(sum(npk(apply_filters_spectra(raw, f_auto)[pr])), sum(npk(raw[pr])))
+  expect_lt(sum(npk(apply_filters_spectra(raw, base, centroid_spec("auto"))[pr])),
+            sum(npk(raw[pr])))
 })
 
-test_that("the centroid policy is honoured: off leaves profile spectra raw", {
+test_that("the centroid_spec mode is honoured: off / NULL leave profile raw", {
   p <- msdata_mzml()
   raw <- get_spectra(p)
   skip_if_not(any(!Spectra::centroided(raw)), "test file has no profile spectra")
   pr <- which(!Spectra::centroided(raw))
-  f <- function(mode) modifyList(empty_filter(),
-                                 list(ms_level = NA_integer_, centroid = mode))
-  npeaks <- function(mode) sum(vapply(
-    as.list(Spectra::peaksData(apply_filters_spectra(raw, f(mode))[pr])),
+  base <- modifyList(empty_filter(), list(ms_level = NA_integer_))
+  npeaks <- function(cp) sum(vapply(
+    as.list(Spectra::peaksData(apply_filters_spectra(raw, base, cp)[pr])),
     nrow, integer(1)))
   raw_n <- sum(vapply(as.list(Spectra::peaksData(raw[pr])), nrow, integer(1)))
 
-  expect_equal(npeaks("off"), raw_n)      # untouched
-  expect_lt(npeaks("auto"), raw_n)        # picked
-  expect_lt(npeaks("on"), raw_n)          # forced
+  expect_equal(npeaks(NULL), raw_n)                     # no processing at all
+  expect_equal(npeaks(centroid_spec("off")), raw_n)     # untouched
+  expect_lt(npeaks(centroid_spec("auto")), raw_n)       # picked
+  expect_lt(npeaks(centroid_spec("on")), raw_n)         # forced
 })
 
-test_that("spectrum_filter resolves auto to raw, and passes on/off through", {
-  f <- function(mode) modifyList(empty_filter(), list(centroid = mode))
-  expect_identical(spectrum_filter(f("auto"))$centroid, "off")   # raw in Spectrum
-  expect_identical(spectrum_filter(f("on"))$centroid,   "on")    # user's word
-  expect_identical(spectrum_filter(f("off"))$centroid,  "off")
-  # the MS map path (rv$filter, unmodified) still picks under auto
-  expect_identical(f("auto")$centroid, "auto")
+test_that("centroid_spec coerces its knobs and they reach pickPeaks", {
+  expect_identical(centroid_spec()$mode, "off")
+  expect_identical(centroid_spec("bogus")$mode, "off")   # unknown -> off
+  s <- centroid_spec("auto", snr = 5, hws = 4, k = 2)
+  expect_equal(s$snr, 5); expect_equal(s$hws, 4L); expect_equal(s$k, 2L)
+  # blanks fall back to the safe defaults, not NA
+  d <- centroid_spec("auto", snr = NA, hws = NA, k = NA)
+  expect_equal(d$snr, 0); expect_equal(d$hws, 2L); expect_equal(d$k, 0L)
+
+  p <- msdata_mzml()
+  raw <- get_spectra(p)
+  pr <- which(!Spectra::centroided(raw))
+  skip_if_not(length(pr) > 0, "test file has no profile spectra")
+  one <- raw[pr[1]]
+  pk <- function(cp) as.list(Spectra::peaksData(
+    apply_filters_spectra(one, empty_filter(), cp)))[[1]]
+
+  # half-window reaches pickPeaks: a wider local-max window keeps fewer centroids
+  expect_lt(nrow(pk(centroid_spec("on", hws = 8))),
+            nrow(pk(centroid_spec("on", hws = 1))))
+  # m/z refinement reaches pickPeaks: same peaks, but refined (moved) m/z values
+  m0 <- pk(centroid_spec("on", k = 0))[, "mz"]
+  m3 <- pk(centroid_spec("on", k = 3))[, "mz"]
+  expect_equal(length(m0), length(m3))
+  expect_false(isTRUE(all.equal(m0, m3)))
 })
 
 test_that("the profile line survives ggplotly as ONE trace (not shattered per point)", {
@@ -176,11 +195,10 @@ test_that("extract_spectrum reports whether its peaks are still profile", {
   skip_if_not(length(pr) > 0, "test file has no profile spectra")
   lv <- Spectra::msLevel(raw)[pr[1]]
   rt <- Spectra::rtime(raw)[pr[1]]
-  f <- function(mode) modifyList(empty_filter(),
-                                 list(ms_level = lv, centroid = mode))
+  base <- modifyList(empty_filter(), list(ms_level = lv))
 
-  d_off  <- extract_spectrum(p, rt = rt, f = f("off"))
-  d_auto <- extract_spectrum(p, rt = rt, f = f("auto"))
+  d_off  <- extract_spectrum(p, rt = rt, f = base, cp = NULL)
+  d_auto <- extract_spectrum(p, rt = rt, f = base, cp = centroid_spec("auto"))
   expect_true(all(d_off$profile))     # raw trace -> the plot draws a line
   expect_false(any(d_auto$profile))   # picked    -> the plot draws sticks
   expect_lt(nrow(d_auto), nrow(d_off))

@@ -15,10 +15,9 @@ test_that("empty_filter / make_filter / chrom_ms_level behave", {
   ef <- empty_filter()
   expect_identical(names(ef),
     c("rt_min","rt_max","mz_min","mz_max","ms_level","polarity","int_min",
-      "int_max","centroid","spectrum_id_rules"))
+      "int_max","spectrum_id_rules"))
   expect_equal(ef$ms_level, 1L)
   expect_identical(ef$spectrum_id_rules, list())
-  expect_identical(ef$centroid, "auto")
   expect_true(is.na(ef$rt_min) && is.na(ef$mz_max))
 
   rules <- list(list(mode = "contains", text = "x"))

@@ -130,6 +130,44 @@ finalize_plotly <- function(gg, source, keep_zoom) {
     register_plotly_events()
 }
 
+#' Shared "Peak picking" panel for the views that draw peaks (Spectrum, MS map).
+#' Peak picking is data PROCESSING, so it lives in each view's own panel, not the
+#' global Filters. The sub-controls (S/N, half-window, m/z refinement) expose the
+#' Spectra::pickPeaks() knobs and show only when picking is on. `default_mode`
+#' differs per view: the Spectrum view opens on the raw trace ("off"), the MS map
+#' on auto-detect ("auto") since raw is tens of millions of points there.
+#' Pair with read_centroid_spec(input) in the module server.
+#' @noRd
+centroid_controls_ui <- function(ns, default_mode = "off") {
+  tagList(
+    selectInput(ns("cmode"), "Peak picking", width = "100%",
+                c("Raw — no peak picking" = "off",
+                  "Centroid profile scans" = "auto",
+                  "Force centroid (all scans)" = "on"),
+                selected = default_mode),
+    conditionalPanel(
+      sprintf("input['%s'] != 'off'", ns("cmode")),
+      div(class = "d-flex gap-2",
+          numericInput(ns("csnr"), "S/N", value = 0, min = 0, step = 1, width = "90px"),
+          numericInput(ns("chws"), "Half-window", value = 2, min = 1, step = 1,
+                       width = "120px")),
+      numericInput(ns("ck"), "m/z refinement (± points, 0 = off)",
+                   value = 0, min = 0, step = 1),
+      tags$small(class = "text-muted d-block",
+                 "Profile scans are peak-picked; already-centroided scans pass ",
+                 "through untouched. Raise S/N to drop noise peaks; set refinement ",
+                 "> 0 to report each centroid's intensity-weighted mean m/z."))
+  )
+}
+
+#' Read the shared peak-picking controls (centroid_controls_ui) into a
+#' centroid_spec(). Call inside the module server.
+#' @noRd
+read_centroid_spec <- function(input) {
+  centroid_spec(mode = input$cmode %||% "off", snr = input$csnr,
+                hws = input$chws, k = input$ck)
+}
+
 #' Wire a plotly click on `source` to `rv$selection` (drives the linked Spectrum
 #' view). `file_id` comes from the click `key` aesthetic; `mz_from(ev)` yields the
 #' m/z (default NA). Call ONCE inside a moduleServer. (The "source not registered"

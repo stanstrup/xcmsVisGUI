@@ -97,17 +97,18 @@ get_spectra <- function(path) {
 }
 
 #' Extract a single spectrum at a retention time OR a scan (acquisition) number.
-#' The global filter `f` is applied (intensity/m/z/polarity/charge/spectrumId and
-#' the profile-mode centroiding policy); ms_level and the rt/scan selection come
-#' from the Spectrum tab controls.
+#' The global filter `f` is applied (intensity/m/z/polarity/charge/spectrumId);
+#' ms_level and the rt/scan selection come from the Spectrum tab controls. `cp` is
+#' the Spectrum tab's centroid_spec() (NULL = draw the raw profile trace).
 #'
 #' The `profile` column reports whether the returned peaks are still a raw
 #' profile trace (i.e. the file is profile-mode and centroiding was declined) —
 #' the spectrum plot needs it to choose a line over m/z sticks. It is read AFTER
-#' filtering because pickPeaks() flips the spectrum's `centroided` flag.
+#' processing because pickPeaks() flips the spectrum's `centroided` flag.
 #' @importFrom tibble tibble
 #' @noRd
-extract_spectrum <- function(path, rt = NA_real_, scan = NA_integer_, f = list()) {
+extract_spectrum <- function(path, rt = NA_real_, scan = NA_integer_, f = list(),
+                             cp = NULL) {
   sp <- get_spectra(path)
   empty <- tibble(mz = numeric(), intensity = numeric(), rt = numeric(),
                           scan = integer(), profile = logical())
@@ -132,24 +133,25 @@ extract_spectrum <- function(path, rt = NA_real_, scan = NA_integer_, f = list()
     pf <- f
     pf$ms_level <- NA_integer_; pf$rt_min <- NA_real_; pf$rt_max <- NA_real_
     pf$polarity <- "any"; pf$spectrum_id_rules <- list()
-    return(one_to_df(apply_filters_spectra(sp[idx], pf)))
+    return(one_to_df(apply_filters_spectra(sp[idx], pf, cp)))
   }
   # rt-based selection: the global filter chooses which spectrum (ms level etc.).
   ff <- f
   ff$rt_min <- NA_real_; ff$rt_max <- NA_real_     # selection drives rt, not filter
-  sp <- apply_filters_spectra(sp, ff)              # ms_level comes from the filter
+  sp <- apply_filters_spectra(sp, ff, cp)          # ms_level comes from the filter
   if (!length(sp)) return(empty)
   rts <- Spectra::rtime(sp)
   one_to_df(sp[which.min(abs(rts - rt))])
 }
 
 #' Extract all peaks (rt, m/z, intensity) from one file as a long tibble (MS map/3D).
-#' Applies the full global filter `f` (incl. intensity / spectrumId / charge).
+#' Applies the full global filter `f` (incl. intensity / spectrumId / charge) and
+#' the MS map tab's centroid_spec() `cp` (NULL = raw profile samples).
 #' @importFrom tibble tibble
 #' @noRd
-extract_peaks <- function(path, f = list()) {
+extract_peaks <- function(path, f = list(), cp = NULL) {
   sp <- get_spectra(path)
-  sp <- apply_filters_spectra(sp, f)
+  sp <- apply_filters_spectra(sp, f, cp)
   if (!length(sp)) return(tibble(rt = numeric(), mz = numeric(), intensity = numeric()))
   rt <- Spectra::rtime(sp)
   # peaksData() is an S4 SimpleList; coerce to a base list so do.call(rbind, ...)

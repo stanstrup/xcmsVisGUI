@@ -94,6 +94,19 @@ There are three modes:
   losses). Its match window is your instrument's mass accuracy at the two peaks,
   so set the tolerance to fit the instrument and raise the minimum intensity to
   drop noise pairs. Isotope-spaced differences are ignored.
+- **Isotope pattern (formula)** — overlays a *theoretical fine isotope pattern* on
+  the spectrum. Unlike the M+1/M+2 labels above (which only assume ¹³C spacing),
+  this resolves the true fine structure (¹³C vs ¹⁵N vs ³⁴S vs ²H …), which needs a
+  formula. Set the anchor peak and its adduct; the neutral mass is inverted and
+  [Rdisop](https://bioconductor.org/packages/Rdisop) lists candidate formulas
+  (with mass error and DBE). Pick a row and its pattern —
+  [enviPat](https://cran.r-project.org/package=enviPat) isotopologues simulated as
+  a profile envelope at the **Resolving power** you set — is drawn (green) over the
+  data, scaled to the anchor. Higher resolving power separates the fine structure;
+  lower merges it, as your instrument would. **From data** estimates the resolving
+  power from the width of the profile peak at the anchor. This is
+  identification-adjacent — it proposes formulas — so treat the candidate list as
+  hypotheses to confirm against the observed isotopes, not as an answer.
 
 ### How annotation reduces the spectrum (what actually gets matched)
 

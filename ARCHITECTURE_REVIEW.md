@@ -343,6 +343,21 @@ Gotcha: `Spectra::pickPeaks` **must** be namespace-qualified. Attaching xcms bri
 in an MSnbase `pickPeaks` generic that masks ProtGenerics', after which a bare call
 fails to dispatch on a `Spectra` object.
 
+### Fine isotope pattern (formula-based) — a deliberate step past "raw only"
+The Spectrum annotation gained an **Isotope pattern (formula)** mode
+(`R/fct_isotope.R`): from the anchor's neutral mass it lists **Rdisop** candidate
+formulas and overlays the chosen formula's **enviPat** fine isotopologue pattern,
+simulated as a profile envelope at a resolving power (typed or estimated from the
+peak width) and scaled to the anchor. This is the one feature that crosses the
+"raw visualisation only" line — it proposes formulas, i.e. it is
+identification-adjacent — and was added knowingly at the user's request. It stays
+narrow: it annotates ONE spectrum against a user-chosen anchor/formula (no feature
+matrices, no across-sample identification), consistent with the anchor-first,
+you-decide philosophy of the rest of the annotation. Engine is pure + unit-tested;
+reuses the commonMZ `adduct_rules` so the ion m/z matches the adduct annotation.
+New deps: enviPat, Rdisop. Related: peak picking is per-view (above), and
+annotation matches real pickPeaks centroids at a Match S/N (transparent pool).
+
 ### xcmsVis — evaluated and declined (for now)
 Re-examined whether to delegate plotting to **xcmsVis** (`gplot*` → ggplot,
 amendable post-hoc with `+ aes()/geom_/scale_`). **Declined for the current

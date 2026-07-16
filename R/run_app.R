@@ -50,10 +50,13 @@ app_server <- function(input, output, session) {
   mod_settings_server("settings", rv)
   mod_ingest_server("ingest", rv)
 
-  # Included, successfully-read files.
+  # Included, successfully-read files, with a unique per-file display label
+  # (disambiguates same-named files from different paths in every plot).
   included <- reactive({
     f <- rv$files
-    f[f$include & f$status == "ready", , drop = FALSE]
+    f <- f[f$include & f$status == "ready", , drop = FALSE]
+    f$disp_name <- unique_display_names(f$name, f$path)
+    f
   })
 
   mod_filter_server("filter", rv, included)
@@ -80,7 +83,7 @@ app_server <- function(input, output, session) {
   meta <- reactive({
     inc <- included()
     tibble(id = inc$id, name = inc$name, path = inc$path,
-           sample_group = inc$sample_group)
+           sample_group = inc$sample_group, disp_name = inc$disp_name)
   })
 
   mod_plot_tic_bpc_server("tic", rv, dataset, meta, data_key)

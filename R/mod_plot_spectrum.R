@@ -179,6 +179,11 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       req(cur_file())
       f <- rv$files[rv$files$id == cur_file(), ]; req(nrow(f) == 1); f
     })
+    # Unique display label for the current file (disambiguates same-named files).
+    cur_disp <- reactive({
+      inc <- included(); v <- inc$disp_name[match(cur_file(), inc$id)]
+      if (length(v) == 1 && !is.na(v)) v else strip_ext(cur_row()$name)
+    })
 
     # A click sets the single-view file + rt (clears scan).
     observeEvent(rv$selection, {
@@ -224,11 +229,13 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       withProgress(message = "Reading spectrum\u2026", value = 0.5, {
         if (identical(input$layout, "single")) {
           f <- cur_row()
-          d <- one_spectrum(f$path, rt_sec, input$scan); d$sample_name <- f$name; d
+          d <- one_spectrum(f$path, rt_sec, input$scan); d$sample_name <- cur_disp(); d
         } else {
           inc <- included(); validate(need(nrow(inc) > 0, "Include at least one file."))
-          extract_over_files(inc, function(p) one_spectrum(p, rt_sec, NA_integer_),
-                             cols = "sample_name", on_error = notify_read_failures)
+          d <- extract_over_files(inc, function(p) one_spectrum(p, rt_sec, NA_integer_),
+                                  cols = "disp_name", on_error = notify_read_failures)
+          if (nrow(d)) d$sample_name <- d$disp_name
+          d
         }
       })
     })
@@ -506,7 +513,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
 
     plot_gg <- reactive({
       df <- spec_df(); req(nrow(df) > 0)
-      df$sample_name <- strip_ext(df$sample_name)   # display label: drop extension
+      # df$sample_name is already the unique display label (disambiguated + stripped)
       unit <- rv$settings$time_unit
       col1 <- brewer_qual(1, rv$settings$qual_palette)
       prof <- is_prof(df)

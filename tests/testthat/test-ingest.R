@@ -59,3 +59,27 @@ test_that("file ids are unique across a Clear all within the same second", {
     drain(session, rv)
   })
 })
+
+test_that("two files with the same basename both load and the list renders", {
+  # Regression: disp_df's vapply over f$name NAMED its result by the basename, so
+  # two same-named files gave duplicate row names and data.frame() errored — the
+  # list broke and the second file never appeared ("same-name files mixed up").
+  p <- msdata_file()
+  dir_a <- file.path(tempdir(), "dupA"); dir_b <- file.path(tempdir(), "dupB")
+  dir.create(dir_a, showWarnings = FALSE); dir.create(dir_b, showWarnings = FALSE)
+  fa <- file.path(dir_a, "same.mzML"); fb <- file.path(dir_b, "same.mzML")
+  file.copy(p, fa, overwrite = TRUE); file.copy(p, fb, overwrite = TRUE)
+  set_daemons(1)
+  rv <- make_rv()
+
+  shiny::testServer(mod_ingest_server, args = list(rv = rv), {
+    session$setInputs(folder = dir_a, add_folder = 1)
+    session$setInputs(folder = dir_b, add_folder = 2)
+    expect_equal(nrow(rv$files), 2L)                 # both distinct paths kept
+    expect_equal(rv$files$name, c("same.mzML", "same.mzML"))
+    expect_length(unique(rv$files$id), 2L)
+    expect_error(disp_df(), NA)                       # the list renders (was error)
+    expect_equal(nrow(disp_df()), 2L)
+    drain(session, rv)
+  })
+})

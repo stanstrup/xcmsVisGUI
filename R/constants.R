@@ -12,6 +12,26 @@ MS_FILE_REGEX <- "\\.(mzML|mzXML|CDF)$"
 # what's on disk).
 strip_ext <- function(x) sub(MS_FILE_REGEX, "", x, ignore.case = TRUE)
 
+#' Unique per-file display labels for plots (legend / colour / facet / title).
+#' The extension-stripped basename, with the PARENT FOLDER appended wherever
+#' basenames collide, so two files with the same name from different paths are
+#' distinguishable (otherwise they share one colour and one facet and look mixed
+#' up). Falls back to an index if the parent folders also collide.
+#' @noRd
+unique_display_names <- function(names, paths) {
+  base <- strip_ext(names)
+  out <- base
+  for (nm in unique(base[duplicated(base)])) {
+    i <- which(base == nm)
+    parent <- basename(dirname(paths[i]))
+    lab <- sprintf("%s (%s)", nm, parent)
+    if (anyDuplicated(lab))
+      lab <- sprintf("%s (%s #%d)", nm, parent, seq_along(i))
+    out[i] <- lab
+  }
+  out
+}
+
 # ColorBrewer qualitative palettes for groups/EIC traces, viridis/sequential for maps.
 QUAL_PALETTES <- c("Set1", "Set2", "Set3", "Dark2", "Paired", "Accent",
                    "Pastel1", "Pastel2")

@@ -11,6 +11,29 @@ test_that("rt unit conversion round-trips", {
   expect_identical(rt_axis_label("sec"), "retention time (s)")
 })
 
+test_that("unique_display_names disambiguates same-named files by folder", {
+  n <- c("same.mzML", "same.mzML", "other.mzML")
+  p <- c("/data/a/same.mzML", "/data/b/same.mzML", "/data/a/other.mzML")
+  expect_identical(unique_display_names(n, p),
+                   c("same (a)", "same (b)", "other"))
+  # extension stripped; unique names pass straight through
+  expect_identical(unique_display_names(c("x.mzML", "y.CDF"), c("/p/x.mzML", "/p/y.CDF")),
+                   c("x", "y"))
+  # same name AND same folder -> index fallback
+  expect_identical(unique_display_names(c("x.mzML", "x.mzML"), c("/d/x.mzML", "/d/x.mzML")),
+                   c("x (d #1)", "x (d #2)"))
+})
+
+test_that("make_filter at defaults equals empty_filter (the no-op-on-open guard)", {
+  # mod_filter skips reassigning rv$filter when the composed filter is unchanged;
+  # that rests on the default-input filter being identical to the initial one, so
+  # opening the Filters section can't invalidate data_key and redraw the TIC.
+  inp <- list(rt_min = NA, rt_max = NA, mz_min = NA, mz_max = NA, int_min = NA,
+              int_max = NA, ms_level = "1", polarity = "any",
+              spectrum_id_rules = list())
+  expect_identical(make_filter(inp, "min"), empty_filter())
+})
+
 test_that("empty_filter / make_filter / chrom_ms_level behave", {
   ef <- empty_filter()
   expect_identical(names(ef),

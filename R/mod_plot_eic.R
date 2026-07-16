@@ -40,6 +40,15 @@ mod_plot_eic_ui <- function(id) {
         selectInput(ns("color_by"), "Color by",
                     c("File" = "sample_name", "Target" = "target",
                       "Sample group" = "sample_group")),
+        selectInput(ns("scale"), "Scale intensity",
+                    c("Raw" = "raw",
+                      "Normalise each trace (÷ own max)" = "trace",
+                      "Normalise per target (÷ target max)" = "target",
+                      "Log10 (y-axis)" = "log")),
+        helpText("Raw = absolute. Per-trace compares peak shapes regardless of ",
+                 "abundance; per-target puts one compound's files on a common 0–1 ",
+                 "scale; log compresses the dynamic range. Tooltips always show the ",
+                 "raw intensity."),
         checkboxInput(ns("points"), "Show data points", value = FALSE),
         checkboxInput(ns("facet"), "Facet by file", value = FALSE),
         helpText("Click a trace to show its spectrum.")
@@ -191,8 +200,9 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
     plot_gg <- reactive({
       df <- eic_df(); req(nrow(df) > 0)
       m <- meta()
-      df$sample_group <- m$sample_group[match(df$sample_id, m$id)]
-      df$sample_name <- strip_ext(df$sample_name)   # display label: drop extension
+      idx <- match(df$sample_id, m$id)
+      df$sample_group <- m$sample_group[idx]
+      df$sample_name <- m$disp_name[idx]   # unique display label (disambiguated)
       cby <- input$color_by
       unit <- rv$settings$time_unit
       df$rt_disp <- rt_to_disp(df$rt, unit)
@@ -201,8 +211,22 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       df$.tip <- sprintf("%s | %s\nscan: %s\nrt: %.4g %s\nint: %.3g",
                          df$target, df$sample_name, ifelse(is.na(df$scan), "?", df$scan),
                          df$rt_disp, unit, df$intensity)
+      # Intensity scaling. `y` is what's plotted; the tooltip keeps the raw
+      # intensity either way. Normalise within a group by dividing by its max
+      # (guarding an all-zero trace); log uses log10(x+1) so the many baseline
+      # zeros survive (a plain log scale would drop them and break the line).
+      norm <- function(v) { mx <- max(v, na.rm = TRUE)
+        if (!is.finite(mx) || mx <= 0) v else v / mx }
+      ylab <- "intensity"
+      df$y <- switch(input$scale %||% "raw",
+        trace  = { ylab <- "intensity (÷ trace max)"
+                   stats::ave(df$intensity, interaction(df$target, df$sample_id), FUN = norm) },
+        target = { ylab <- "intensity (÷ target max)"
+                   stats::ave(df$intensity, df$target, FUN = norm) },
+        log    = { ylab <- "log10(intensity + 1)"; log10(df$intensity + 1) },
+        df$intensity)
       p <- ggplot(df, aes(
-        x = rt_disp, y = intensity, color = .color,
+        x = rt_disp, y = y, color = .color,
         group = interaction(target, sample_id), key = sample_id, text = .tip))
       # when not coloring by target, distinguish targets by line type
       if (cby != "target" && length(unique(df$target)) > 1)
@@ -212,7 +236,7 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       if (isTRUE(input$points)) p <- p + geom_point(size = 0.9)
       p <- p +
         scale_color_manual(values = pal) +
-        labs(x = rt_axis_label(unit), y = "intensity", color = NULL,
+        labs(x = rt_axis_label(unit), y = ylab, color = NULL,
                       linetype = NULL) +
         theme_bw()
       if (isTRUE(input$facet) && length(unique(df$sample_id)) > 1)

@@ -229,6 +229,7 @@ extract_over_files <- function(files_df, extractor, cols = "sample_id",
       if ("sample_id"    %in% cols) d$sample_id    <- files_df$id[i]
       if ("sample_name"  %in% cols) d$sample_name  <- files_df$name[i]
       if ("sample_group" %in% cols) d$sample_group <- files_df$sample_group[i]
+      if ("disp_name"    %in% cols) d$disp_name    <- files_df$disp_name[i]
       if (scan) d$scan <- scan_for_rt(d$rt, file_scan_table(files_df$path[i]))
     }
     d

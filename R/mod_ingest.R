@@ -243,15 +243,20 @@ mod_ingest_server <- function(id, rv) {
         TRUE                  ~ "\u274c"
       )
       # File name truncated to one line (full name on hover) so long names neither
-      # wrap into tall rows nor force the sidebar to scroll.
+      # wrap into tall rows nor force the sidebar to scroll. USE.NAMES = FALSE:
+      # vapply over a character vector otherwise NAMES the result by f$name, and
+      # duplicate names (two files with the same basename) then make data.frame()
+      # below fail with "duplicate/ missing row names" \u2014 the file list breaks and
+      # the second same-named file never appears.
       fname <- vapply(f$name, function(nm)
-        as.character(tags$span(class = "fname", title = nm, nm)), character(1))
+        as.character(tags$span(class = "fname", title = nm, nm)),
+        character(1), USE.NAMES = FALSE)
       # Spectrum mode abbreviated to fit the sidebar; full word on hover. Blank
       # when the file declares nothing (CDF) \u2014 it is then sniffed at read time.
       mode_cell <- vapply(f$spec_mode, function(m) {
         if (is.na(m)) return("")
         as.character(tags$span(title = m, substr(m, 1, 4)))
-      }, character(1))
+      }, character(1), USE.NAMES = FALSE)
       data.frame(
         File = fname, Group = f$sample_group,
         St = status_badge, MS = f$ms_levels, Pol = f$polarities,

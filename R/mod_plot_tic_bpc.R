@@ -56,8 +56,9 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
       # Refresh group labels from current metadata (cheap) so renaming a group
       # recolors without re-extracting.
       m <- meta()
-      df$sample_group <- m$sample_group[match(df$sample_id, m$id)]
-      df$sample_name <- strip_ext(df$sample_name)   # display label: drop extension
+      idx <- match(df$sample_id, m$id)
+      df$sample_group <- m$sample_group[idx]
+      df$sample_name <- m$disp_name[idx]   # unique display label (disambiguated)
       cby <- input$color_by
       lvls <- unique(df[[cby]])
       pal <- brewer_named(lvls, rv$settings$qual_palette)

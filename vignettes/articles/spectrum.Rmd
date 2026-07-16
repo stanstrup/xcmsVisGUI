@@ -115,6 +115,8 @@ There are three modes:
   identification-adjacent — it proposes formulas — so treat the candidate list as
   hypotheses to confirm against the observed isotopes, not as an answer.
 
+![The formula-based fine isotope pattern: the simulated envelope (green) overlaid on the raw profile isotope cluster, zoomed to the anchor](figures/isotope.png){width=100%}
+
   **Metal-complex ions** (e.g. the iron-formate background series `[Fe(HCOO)(CH₃OH)]⁺`
   that leaches from stainless steel) need three things: add the metal(s) to
   **Elements**; choose the **[M]+** / **[M]−** adduct — the peak *is* the ion, its

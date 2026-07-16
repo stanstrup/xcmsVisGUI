@@ -38,6 +38,9 @@ nav <- function(label) js(sprintf(
 # Set a Shiny input directly (for selectize / radio inputs that typeinto can't hit).
 setin <- function(id, val) js(sprintf("Shiny.setInputValue(%s, %s); true",
                                       shQuote(id), if (is.numeric(val)) val else shQuote(val)))
+# Same, but a JS literal + priority 'event' — needed for conditionalPanel widgets
+# (which don't transmit their values until interacted with) and array inputs.
+setev <- function(id, v) js(sprintf("Shiny.setInputValue('%s', %s, {priority:'event'}); true", id, v))
 # Include ALL files: call the DT Shiny binding's selectRows the way the All button
 # does — the instance that carries shinyMethods is on $('#..').data('datatable'),
 # NOT $(el).DataTable(). A synthetic .click() on the button doesn't fire under
@@ -97,6 +100,26 @@ setin("filter-ms_level", "1"); Sys.sleep(1)         # MS1 is the profile level
 typeinto("spec-rt", "")                              # clear any stale rt so the scan drives it
 typeinto("spec-scan", "22413"); setin("spec-scan", 22413)   # a mid profile MS1 scan
 shot("spectrum_profile.png", 6)                      # raw profile line + Peak-picking controls
+
+message("isotope-pattern annotation (fine-structure envelope) ...")
+# stay on Spectrum with MS3TMT11 scan 22413 loaded; turn annotation on and switch
+# Mode to the formula-based isotope pattern.
+click("spec-annotate"); Sys.sleep(2)
+js("(()=>{const e=document.getElementById('spec-ann_mode');if(e&&e.selectize)e.selectize.setValue('iso');return true})()"); Sys.sleep(3)
+click("spec-showpts"); Sys.sleep(1)                  # raw points under the envelope
+# Feed every input the iso reactives read: the conditionalPanel widgets don't
+# transmit until interacted with, and the anchor is server-updated one-way.
+setev("spec-ann_pol", "'pos'"); setev("spec-ann_adduct", "'[M+H]+'")
+setev("spec-ann_unit", "'ppm'"); setev("spec-ann_tol", 30)
+setev("spec-ann_min_int", 0); setev("spec-ann_match_snr", 0)
+setev("spec-anchor_mz", 582.3448)                    # the scan's base peak
+setev("spec-iso_elements", "['C','H','N','O','P','S','F','Cl','Br']")
+setev("spec-iso_valid", "false"); setev("spec-iso_res", 60000)
+for (i in 1:20) { Sys.sleep(1)                        # wait for the candidate table
+  if (isTRUE(js("(()=>{const t=document.getElementById('spec-iso_cands');return t?t.querySelectorAll('tbody tr').length:0})()") > 0)) break }
+Sys.sleep(3)                                          # let the plot settle, then zoom LAST
+js("(()=>{const gd=document.getElementById('spec-plot');if(gd&&window.Plotly)Plotly.relayout(gd,{'xaxis.range':[580.5,586.5],'xaxis.autorange':false,'yaxis.autorange':true});return true})()")
+shot("isotope.png", 2)                                # envelope over the raw profile cluster
 
 message("Precursors ...")
 nav("Precursors"); shot("precursors.png", 8)

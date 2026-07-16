@@ -27,9 +27,16 @@ tol_to_da <- function(mz, tol, unit = "ppm") {
 #' Reduce a (possibly profile-mode) spectrum to centroids: cluster points whose
 #' neighbours are within `mz_gap` and keep each cluster's apex (most intense
 #' point), above a relative-intensity floor. Profile shoulders collapse to one
-#' peak; already-centroided, well-separated peaks each pass through. Used before
-#' findMAIN and the difference network so noise/profile shape don't spawn spurious
-#' annotations. Returns mz/intensity sorted by m/z.
+#' peak; already-centroided, well-separated peaks each pass through. Returns
+#' mz/intensity sorted by m/z.
+#'
+#' NB the app (`mod_plot_spectrum`) now feeds these functions REAL
+#' `Spectra::pickPeaks()` centroids at a user-set Match S/N — that is the visible,
+#' configurable reduction, surfaced as the candidate-peak count. On those
+#' well-separated centroids this clustering is a pass-through, so it survives only
+#' as a safety net for direct callers (tests, synthetic input). It is not a hidden
+#' second reducer: the callers pass `rel_floor = 0`, so the only intensity floor is
+#' the app's Min-intensity control.
 #' @importFrom tibble tibble
 #' @noRd
 centroid_peaks <- function(df, rel_floor = 0, mz_gap = 0.01) {

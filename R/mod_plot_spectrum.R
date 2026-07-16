@@ -71,8 +71,17 @@ mod_plot_spectrum_ui <- function(id) {
                 numericInput(ns("ann_tol"), "\u00b1 tol", value = 10, min = 0,
                              width = "90px"),
                 selectInput(ns("ann_unit"), "unit", c("ppm", "Da"), width = "90px")),
-            numericInput(ns("ann_min_int"), "Min intensity (% of base peak)",
-                         value = 0, min = 0, max = 100, step = 0.5),
+            # Matching runs against real Spectra::pickPeaks() centroids, so what
+            # gets matched is the peaks you'd see centroided — not a hidden
+            # reducer. These two knobs set how aggressively the spectrum is reduced
+            # BEFORE matching; the readout shows how many peaks survive.
+            div(class = "d-flex gap-2",
+                numericInput(ns("ann_match_snr"), "Match S/N", value = 3, min = 0,
+                             step = 0.5, width = "90px"),
+                numericInput(ns("ann_min_int"), "Min int (% base)",
+                             value = 0, min = 0, max = 100, step = 0.5, width = "120px")),
+            tags$small(class = "text-muted d-block mb-1", textOutput(ns("ann_count"),
+                       inline = TRUE)),
             numericInput(ns("ann_top_n"), "Annotate only top N peaks (blank = all)",
                          value = NA, min = 1, step = 1),
             # Isotope controls (all modes): how far off the theoretical spacing a
@@ -243,9 +252,9 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       }
     }, ignoreInit = TRUE)
     # Default the anchor to the base peak when annotation turns on / spectrum changes.
-    observeEvent(list(input$annotate, spec_df()), {
+    observeEvent(list(input$annotate, ann_candidates()), {
       if (isTRUE(input$annotate) && !isTRUE(is.finite(input$anchor_mz))) {
-        df <- spec_df()
+        df <- ann_candidates()
         if (nrow(df)) updateNumericInput(session, "anchor_mz",
                                          value = round(df$mz[which.max(df$intensity)], 4))
       }
@@ -255,6 +264,36 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     ann_floor <- reactive({
       v <- input$ann_min_int
       if (is.null(v) || !is.finite(v) || v < 0) 0 else v / 100
+    })
+    # S/N for the pickPeaks reduction that produces the matching pool.
+    ann_match_snr <- reactive({
+      v <- input$ann_match_snr
+      if (is.null(v) || !is.finite(v) || v < 0) 0 else v
+    })
+
+    # The peak list that annotation matches against: REAL Spectra::pickPeaks()
+    # centroids of the current spectrum (profile levels picked at Match S/N;
+    # already-centroided files pass through), then the intensity floor. This is the
+    # single, transparent reduction — the engine no longer hides a naive reducer of
+    # its own (centroid_peaks() is a no-op on these well-separated centroids). The
+    # count is surfaced so you can see how many peaks feed matching.
+    ann_candidates <- reactive({
+      req(identical(input$layout, "single"))
+      f <- cur_row()
+      unit <- rv$settings$time_unit
+      use_scan <- !is.null(input$scan) && is.finite(input$scan)
+      rt_sec <- if (isTRUE(is.finite(input$rt))) rt_to_sec(input$rt, unit) else NA_real_
+      cp <- centroid_spec("auto", snr = ann_match_snr())
+      d <- extract_spectrum(f$path, rt = rt_sec,
+                            scan = if (use_scan) as.integer(input$scan) else NA_integer_,
+                            f = rv$filter, cp = cp)
+      ann_peaks(d)
+    })
+    output$ann_count <- renderText({
+      req(isTRUE(input$annotate), identical(input$layout, "single"))
+      n <- tryCatch(nrow(ann_candidates()), error = function(e) NA_integer_)
+      if (is.na(n)) "" else
+        sprintf("%d candidate peaks feed matching (S/N ≥ %g).", n, ann_match_snr())
     })
     # Optional cap on how many peaks to annotate (NA = all).
     ann_top <- reactive({
@@ -272,7 +311,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     # findMAIN ranked hypotheses (auto mode). The selected row (default the top,
     # best-scoring one) becomes the anchor -- no manual anchor entry in auto mode.
     ranked <- eventReactive(input$suggest, {
-      df <- ann_peaks(spec_df()); validate(need(nrow(df) > 0, "No spectrum."))
+      df <- ann_candidates(); validate(need(nrow(df) > 0, "No spectrum."))
       ppm <- if (identical(input$ann_unit, "ppm")) input$ann_tol else 5
       withProgress(message = "Ranking molecular-ion hypotheses\u2026", value = 0.5,
                    rank_anchors(df, mode = input$ann_pol, ppm = ppm, rel_floor = 0,
@@ -314,7 +353,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     # The annotation result for the current single spectrum (anchor or diff mode).
     ann_result <- reactive({
       req(isTRUE(input$annotate), identical(input$layout, "single"))
-      df <- ann_peaks(spec_df()); req(nrow(df) > 0)
+      df <- ann_candidates(); req(nrow(df) > 0)
       if (identical(input$ann_mode, "diff")) {
         # diff is O(n^2) over the candidate peaks, so it must cap its INPUT by
         # intensity (top-N, or 30 when blank) -- there's no per-result cap here.

@@ -64,7 +64,8 @@ mod_plot_spectrum_ui <- function(id) {
                          c("\u2192 EIC list" = "eic", "\u2192 set anchor" = "anchor")),
             selectInput(ns("ann_mode"), "Mode",
                         c("Manual anchor" = "manual", "Auto-suggest (findMAIN)" = "auto",
-                          "Difference network" = "diff")),
+                          "Difference network" = "diff",
+                          "Isotope pattern (formula)" = "iso")),
             selectInput(ns("ann_pol"), "Ion mode",
                         c("Positive" = "pos", "Negative" = "neg")),
             div(class = "d-flex gap-2",
@@ -92,7 +93,8 @@ mod_plot_spectrum_ui <- function(id) {
                           value = TRUE),
             # Projection options (manual + auto): isotopes, fragments, max charge.
             conditionalPanel(
-              sprintf("input['%s'] != 'diff'", ns("ann_mode")),
+              sprintf("input['%s'] == 'manual' || input['%s'] == 'auto'",
+                      ns("ann_mode"), ns("ann_mode")),
               # align-items-end: the "Max isotope M+n" label wraps to two lines,
               # so align the input boxes at the bottom to keep them level.
               div(class = "d-flex gap-2 align-items-end",
@@ -102,14 +104,30 @@ mod_plot_spectrum_ui <- function(id) {
                                max = 5, step = 1, width = "110px")),
               checkboxInput(ns("ann_frag"), "In-source fragments", value = TRUE),
               checkboxInput(ns("ann_ghost"), "Show expected-but-absent", value = FALSE)),
-            # Manual-only: the anchor ion. Auto mode drives the anchor from findMAIN.
+            # The anchor ion (manual + isotope modes). Auto drives it from findMAIN.
             conditionalPanel(
-              sprintf("input['%s'] == 'manual'", ns("ann_mode")),
+              sprintf("input['%s'] == 'manual' || input['%s'] == 'iso'",
+                      ns("ann_mode"), ns("ann_mode")),
               div(class = "d-flex gap-2",
                   numericInput(ns("anchor_mz"), "Anchor m/z", value = NA,
                                step = 0.0001),
                   selectInput(ns("ann_adduct"), "is a", choices = NULL,
                               width = "130px"))),
+            # Isotope-pattern mode: candidate formulas for the anchor's neutral
+            # mass, a resolving power, and the simulated fine-structure envelope.
+            conditionalPanel(
+              sprintf("input['%s'] == 'iso'", ns("ann_mode")),
+              div(class = "d-flex gap-2 align-items-end",
+                  numericInput(ns("iso_res"), "Resolving power", value = 70000,
+                               min = 500, step = 5000, width = "140px"),
+                  actionButton(ns("iso_res_est"), "From data",
+                               class = "btn-sm btn-outline-secondary mb-1")),
+              helpText("Enter the anchor peak and its adduct above; pick a candidate ",
+                       "formula below to overlay its theoretical fine isotope pattern ",
+                       "(13C / 15N / 34S / 2H …), simulated at this resolving power and ",
+                       "scaled to the anchor. “From data” estimates R from the ",
+                       "peak width."),
+              DTOutput(ns("iso_cands"))),
             conditionalPanel(
               sprintf("input['%s'] == 'auto'", ns("ann_mode")),
               actionButton(ns("suggest"), "Suggest molecular ion",
@@ -351,8 +369,10 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     iso_dec <- reactive(isTRUE(input$ann_iso_dec))
 
     # The annotation result for the current single spectrum (anchor or diff mode).
+    # Isotope-pattern mode is drawn separately (iso_overlay), so bail out here.
     ann_result <- reactive({
       req(isTRUE(input$annotate), identical(input$layout, "single"))
+      if (identical(input$ann_mode, "iso")) return(NULL)
       df <- ann_candidates(); req(nrow(df) > 0)
       if (identical(input$ann_mode, "diff")) {
         # diff is O(n^2) over the candidate peaks, so it must cap its INPUT by
@@ -384,6 +404,64 @@ mod_plot_spectrum_server <- function(id, rv, included) {
                            iso_tol = iso_tol(), iso_decreasing = iso_dec())
       list(mode = "anchor", M = a$M, table = cap_matched(a$table, ann_top()),
            ghost = isTRUE(input$ann_ghost))
+    })
+
+    # --- isotope-pattern mode (fine structure via enviPat / Rdisop) -----------
+    # Neutral mass from the anchor ion + adduct (same inversion as manual mode).
+    iso_neutral <- reactive({
+      req(identical(input$ann_mode, "iso"), is.finite(input$anchor_mz),
+          isTRUE(input$ann_adduct %in% quasi_adducts(input$ann_pol)))
+      rule <- adduct_rules(input$ann_pol)
+      rule <- rule[rule$name == input$ann_adduct, , drop = FALSE]
+      req(nrow(rule) == 1)
+      list(M = neutral_mass(input$anchor_mz, rule), rule = rule)
+    })
+    # Candidate formulas for that neutral mass (ppm taken from the ± tol).
+    iso_candidates <- reactive({
+      nm <- iso_neutral()
+      ppm <- if (identical(input$ann_unit, "ppm")) input$ann_tol else 10
+      formula_candidates(nm$M, ppm = ppm)
+    })
+    iso_pick <- reactiveVal(1L)
+    observeEvent(iso_candidates(), iso_pick(1L))                  # reset on new mass
+    observeEvent(input$iso_cands_rows_selected, iso_pick(input$iso_cands_rows_selected))
+    output$iso_cands <- renderDT({
+      fc <- iso_candidates()
+      validate(need(nrow(fc) > 0, "No formula within tolerance (widen ± tol)."))
+      disp <- data.frame(formula = fc$formula, `neutral M` = fc$mass,
+                         `ppm` = fc$ppm_err, DBE = fc$dbe, check.names = FALSE)
+      datatable(disp, rownames = FALSE, selection = "single",
+                options = list(dom = "t", paging = FALSE, ordering = TRUE,
+                               scrollX = TRUE, scrollY = "220px", scrollCollapse = TRUE)) %>%
+        DT::formatRound("neutral M", 4) %>% DT::formatRound("ppm", 2)
+    })
+    # Estimate resolving power from the raw profile peak at the anchor.
+    observeEvent(input$iso_res_est, {
+      d <- spec_df(); req(nrow(d) > 0, is.finite(input$anchor_mz))
+      r <- estimate_resolution(d, input$anchor_mz)
+      if (isTRUE(is.finite(r))) updateNumericInput(session, "iso_res", value = round(r))
+      else showNotification("Couldn't estimate R (need a resolved profile peak).",
+                            type = "warning", duration = 3)
+    })
+    iso_res <- reactive({
+      v <- input$iso_res
+      if (is.null(v) || !is.finite(v) || v <= 0) 70000 else v
+    })
+    # Simulated fine-structure envelope for the picked formula, scaled to the
+    # observed intensity at the anchor peak.
+    iso_overlay <- reactive({
+      req(isTRUE(input$annotate), identical(input$ann_mode, "iso"),
+          identical(input$layout, "single"))
+      fc <- iso_candidates(); req(nrow(fc) > 0)
+      pick <- min(iso_pick(), nrow(fc))
+      pat <- isotope_pattern(fc$formula[pick], iso_neutral()$rule)
+      req(nrow(pat) > 0)
+      env <- isotope_profile(pat, iso_res()); req(nrow(env) > 0)
+      d <- spec_df()
+      scale <- if (nrow(d)) d$intensity[which.min(abs(d$mz - input$anchor_mz))] else 1
+      env$intensity <- env$intensity * scale
+      env$formula <- fc$formula[pick]
+      env
     })
 
     # Raw profile scans must be drawn as a continuous trace: a stick per detector
@@ -484,6 +562,17 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       if (identical(input$layout, "single") && isTRUE(input$annotate)) {
         ar <- tryCatch(ann_result(), error = function(e) NULL)
         if (!is.null(ar)) p <- annotate_layers(p, ar, df, rv$settings$qual_palette)
+      }
+      # isotope-pattern overlay: the simulated theoretical envelope (single view)
+      if (identical(input$layout, "single") && isTRUE(input$annotate) &&
+          identical(input$ann_mode, "iso")) {
+        ov <- tryCatch(iso_overlay(), error = function(e) NULL)
+        if (!is.null(ov) && nrow(ov)) {
+          ov$.tip <- sprintf("%s (theoretical)\nm/z %.4f", ov$formula, ov$mz)
+          p <- p + geom_line(data = ov, aes(x = mz, y = intensity, text = .tip,
+                                            group = 1), inherit.aes = FALSE,
+                             color = "#1b9e77", linewidth = 0.6)
+        }
       }
       p
     })

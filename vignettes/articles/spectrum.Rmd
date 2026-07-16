@@ -45,6 +45,8 @@ raw line — then a click can land on the true centroid. **Show data points** ov
 the individual detector samples. See
 [Getting started](getting_started.html#profile-mode-data).
 
+![A profile-mode scan drawn as a line, with the Peak-picking panel](figures/spectrum_profile.png){width=100%}
+
 Annotation works whether you view the spectrum raw or centroided — see
 *How annotation reduces the spectrum* below for exactly what it matches against.
 

@@ -121,6 +121,8 @@ already centroided. The Spectrum tab also offers **Raw + centroids overlay**, wh
 draws the raw profile line *and* the picked centroids (sticks) on top, so you can
 see exactly what peak picking keeps.
 
+![A profile scan shown as a line, with the per-view Peak-picking control](figures/spectrum_profile.png){width=100%}
+
 When picking is on, three settings appear:
 
 - **S/N** — signal-to-noise floor; raise it to drop noise peaks (0 keeps every

@@ -42,7 +42,7 @@ formula_candidates <- function(mass, ppm = 5,
 }
 
 #' Multiply every element count in a Hill-style formula by `n` (for multimer
-#' adducts, [nM+X]). "C8H10N4O2" * 2 -> "C16H20N8O4". n = 1 returns it unchanged.
+#' adducts such as 2M+X). "C8H10N4O2" * 2 -> "C16H20N8O4"; n = 1 is unchanged.
 #' @noRd
 scale_formula <- function(formula, n = 1L) {
   if (n <= 1L) return(formula)

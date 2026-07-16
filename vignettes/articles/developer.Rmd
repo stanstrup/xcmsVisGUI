@@ -71,23 +71,39 @@ The suite covers the pure helpers and the key invariant that `apply_filters`
 Real-data tests use the `msdata` / `faahKO` Bioconductor packages and skip if
 absent. CI runs `R CMD check` on push/PR (`.github/workflows/R-CMD-check.yaml`).
 
-## Regenerating the documentation screenshots
+## Regenerating the documentation figures
 
-The article screenshots are captured headlessly with
+The figures are captured headlessly with
 [`chromote`](https://rstudio.github.io/chromote/) against a running app. Start the
-app on port 7799, then run the capture script in a second process:
+app on port 7799, then run a capture script in a second process:
 
 ```{r, eval = FALSE, echo = TRUE}
-# terminal 1 — serve the app on the port the script expects:
+# terminal 1 — serve the app on the port the scripts expect:
 # Rscript -e "pkgload::load_all('.'); run_app(port = 7799, launch.browser = FALSE)"
 
-# terminal 2 — drive it and write the PNGs:
-# Rscript data-raw/capture-screenshots.R
+# terminal 2 — full-UI PNG screenshots (sidebar + plot) at 1440x900:
+# Rscript data-raw/capture-screenshots.R      # -> vignettes/articles/figures/*.png
+
+# ...or crisp vector SVGs of the PLOT only (no sidebar):
+# Rscript data-raw/capture-plots-svg.R        # -> vignettes/articles/figures/svg/*.svg
 ```
 
-They are saved at 1440x900 into `vignettes/articles/figures/`. Chrome only captures
-raster images (PNG), so the UI screenshots are PNG; individual plots can instead be
-exported as SVG from each view's **Save** button if a vector figure is wanted.
+Two scripts because Chrome's screenshot is **raster only** — good for the full UI,
+but not vector. For SVG, `capture-plots-svg.R` calls plotly's own
+`Plotly.toImage(format = "svg")` on each plot's graph div, which is true vector for
+the line/scatter plots (TIC, EIC, spectra, precursors). The 2-D MS map draws with
+scattergl (WebGL) for speed, so its "SVG" embeds a raster image for the points — use
+the PNG for that one, or export from a non-gl view. Both scripts include files by
+driving the DataTable Shiny binding directly (`$('#..').data('datatable')
+.shinyMethods.selectRows`), since a synthetic click on the All button doesn't fire
+under chromote.
+
+The formula-based isotope-pattern overlay is **not** auto-captured: switching that
+annotation mode programmatically fights Shiny's conditionalPanel input transmission
+and output suspension (the candidate table computes 0 despite the engine returning
+matches). Capture it by hand if needed — Spectrum → Annotate → Mode: *Isotope
+pattern (formula)* → pick a formula — or export just that plot via its **Save**
+button.
 
 ## Project layout
 

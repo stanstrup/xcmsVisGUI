@@ -111,18 +111,20 @@ panel. Each view has its own setting, with a sensible default:
   profile get picked, so a mixed file keeps its centroided MS2 spectra untouched.
   (Its setting takes effect on the next **Plot**.)
 
-The third mode, **Force centroid (all scans)**, peak-picks every level, even ones
-the file flags as already centroided.
+**Force centroid (all scans)** peak-picks every level, even ones the file flags as
+already centroided. The Spectrum tab also offers **Raw + centroids overlay**, which
+draws the raw profile line *and* the picked centroids (sticks) on top, so you can
+see exactly what peak picking keeps.
 
-When centroiding is on, three settings appear:
+When picking is on, three settings appear:
 
 - **S/N** — signal-to-noise floor; raise it to drop noise peaks (0 keeps every
   local maximum).
 - **Half-window** — how many points on each side a peak must top to count as a
   local maximum; larger merges closely-spaced peaks.
-- **m/z refinement** — recompute each centroid's *m/z* as the intensity-weighted
-  mean of the ± N neighbouring raw points (0 = use the apex as-is). A small value
-  (2–3) improves mass accuracy on profile data.
+- **m/z accuracy: average ±N points** — replaces each centroid's apex *m/z* with the
+  intensity-weighted mean of its ± N neighbouring raw samples (0 = keep the apex).
+  A small value (2–3) gives sub-sample mass accuracy on profile data.
 
 Chromatograms (TIC / BPC / EIC) are never centroided, whatever this is set to:
 they sum or max intensities across an *m/z* window, which is correct on profile

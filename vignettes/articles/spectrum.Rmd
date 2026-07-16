@@ -99,7 +99,9 @@ There are three modes:
   this resolves the true fine structure (¹³C vs ¹⁵N vs ³⁴S vs ²H …), which needs a
   formula. Set the anchor peak and its adduct; the neutral mass is inverted and
   [Rdisop](https://bioconductor.org/packages/Rdisop) lists candidate formulas
-  (with mass error and DBE). Pick a row and its pattern —
+  (with mass error and DBE) from the **Elements** you select — the default set
+  includes the halogens and alkali metals (Cl, Na, K) common in metabolomics, and
+  more can be added. Pick a row and its pattern —
   [enviPat](https://cran.r-project.org/package=enviPat) isotopologues simulated as
   a profile envelope at the **Resolving power** you set — is drawn (green) over the
   data, scaled to the anchor. Higher resolving power separates the fine structure;

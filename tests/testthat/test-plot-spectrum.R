@@ -38,8 +38,7 @@ test_that("show-points and overlay add the expected profile plot layers", {
     geoms <- function() vapply(plot_gg()$layers, function(l) class(l$geom)[1],
                                character(1))
     session$setInputs(layout = "single", rt = rt_min, scan = NA, annotate = FALSE,
-                      cmode = "off", csnr = 0, chws = 2, ck = 0,
-                      showpts = FALSE, coverlay = FALSE)
+                      cmode = "off", csnr = 0, chws = 2, ck = 0, showpts = FALSE)
     d <- spec_df()
     skip_if_not(isTRUE(all(d$profile)), "selected spectrum is not profile")
     expect_setequal(geoms(), "GeomLine")                     # raw profile is a line
@@ -47,13 +46,14 @@ test_that("show-points and overlay add the expected profile plot layers", {
     session$setInputs(showpts = TRUE)
     expect_true("GeomPoint" %in% geoms())                    # data points added
 
-    session$setInputs(showpts = FALSE, coverlay = TRUE)
+    # "overlay" mode: raw line + centroids drawn on top
+    session$setInputs(showpts = FALSE, cmode = "overlay")
     ov <- overlay_df()
     expect_gt(nrow(ov), 0)
     expect_false(any(ov$profile))                            # overlay is centroided
-    expect_true(all(c("GeomLinerange", "GeomPoint") %in% geoms()))
+    expect_true(all(c("GeomLine", "GeomLinerange", "GeomPoint") %in% geoms()))
 
-    # overlay only applies to the single, raw profile view
+    # overlay only applies in the overlay mode
     session$setInputs(cmode = "auto")
     expect_equal(nrow(overlay_df()), 0)
   }))

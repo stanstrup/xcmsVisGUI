@@ -133,44 +133,48 @@ finalize_plotly <- function(gg, source, keep_zoom) {
 #' Shared "Peak picking" panel for the views that draw peaks (Spectrum, MS map).
 #' Peak picking is data PROCESSING, so it lives in each view's own panel, not the
 #' global Filters. The sub-controls (S/N, half-window, m/z refinement) expose the
-#' Spectra::pickPeaks() knobs and show only when picking is on. `default_mode`
+#' Spectra::pickPeaks() knobs and show for any mode other than raw. `default_mode`
 #' differs per view: the Spectrum view opens on the raw trace ("off"), the MS map
 #' on auto-detect ("auto") since raw is tens of millions of points there.
-#' `extra_show` is an optional JS expression OR'd into the sub-controls' visibility
-#' condition, so a view that peak-picks for another reason (the Spectrum overlay)
-#' can reveal the same knobs while the mode is still "off".
+#' `overlay = TRUE` (Spectrum only) adds a "Raw + centroids overlay" mode that
+#' draws the raw trace AND the picked centroids over it.
 #' Pair with read_centroid_spec(input) in the module server.
 #' @noRd
-centroid_controls_ui <- function(ns, default_mode = "off", extra_show = NULL) {
-  cond <- sprintf("input['%s'] != 'off'", ns("cmode"))
-  if (!is.null(extra_show)) cond <- sprintf("(%s) || (%s)", cond, extra_show)
+centroid_controls_ui <- function(ns, default_mode = "off", overlay = FALSE) {
+  choices <- c("Raw — no peak picking" = "off",
+               "Centroid profile scans" = "auto",
+               "Force centroid (all scans)" = "on")
+  # overlay slots in right after "Raw": it is a raw view with centroids drawn on top.
+  if (isTRUE(overlay))
+    choices <- append(choices, c("Raw + centroids overlay" = "overlay"), after = 1L)
   tagList(
-    selectInput(ns("cmode"), "Peak picking", width = "100%",
-                c("Raw — no peak picking" = "off",
-                  "Centroid profile scans" = "auto",
-                  "Force centroid (all scans)" = "on"),
+    selectInput(ns("cmode"), "Peak picking", width = "100%", choices,
                 selected = default_mode),
     conditionalPanel(
-      cond,
+      sprintf("input['%s'] != 'off'", ns("cmode")),
       div(class = "d-flex gap-2",
           numericInput(ns("csnr"), "S/N", value = 0, min = 0, step = 1, width = "90px"),
           numericInput(ns("chws"), "Half-window", value = 2, min = 1, step = 1,
                        width = "120px")),
-      numericInput(ns("ck"), "m/z refinement (± points, 0 = off)",
-                   value = 0, min = 0, step = 1),
+      numericInput(ns("ck"), "m/z accuracy: average ±N points", value = 0,
+                   min = 0, step = 1),
       tags$small(class = "text-muted d-block",
                  "Profile scans are peak-picked; already-centroided scans pass ",
-                 "through untouched. Raise S/N to drop noise peaks; set refinement ",
-                 "> 0 to report each centroid's intensity-weighted mean m/z."))
+                 "through untouched. S/N drops noise peaks; half-window is the ",
+                 "local-maximum window. m/z accuracy > 0 replaces each peak's apex ",
+                 "m/z with the intensity-weighted mean of its ±N neighbouring ",
+                 "raw samples (sub-sample centroiding); 0 keeps the apex."))
   )
 }
 
 #' Read the shared peak-picking controls (centroid_controls_ui) into a
-#' centroid_spec(). Call inside the module server.
+#' centroid_spec(). The Spectrum "overlay" mode shows the RAW spectrum (with
+#' centroids drawn separately), so it maps to mode "off" for the main extraction.
 #' @noRd
 read_centroid_spec <- function(input) {
-  centroid_spec(mode = input$cmode %||% "off", snr = input$csnr,
-                hws = input$chws, k = input$ck)
+  m <- input$cmode %||% "off"
+  centroid_spec(mode = if (identical(m, "overlay")) "off" else m,
+                snr = input$csnr, hws = input$chws, k = input$ck)
 }
 
 #' Wire a plotly click on `source` to `rv$selection` (drives the linked Spectrum

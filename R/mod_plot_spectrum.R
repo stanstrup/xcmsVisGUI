@@ -41,16 +41,16 @@ mod_plot_spectrum_ui <- function(id) {
                  "and intensity / spectrum-id filters come from the global filter."),
 
         # --- peak picking (data processing; profile scans) -----------------
+        # The "Raw + centroids overlay" mode (in the dropdown) draws the picked
+        # centroids over the raw trace.
         hr(),
-        centroid_controls_ui(ns, default_mode = "off",
-                             extra_show = sprintf("input['%s'] == true", ns("coverlay"))),
-        # Raw-mode-only extras: show the individual detector samples, and/or overlay
-        # the centroids (picked with the S/N / half-window / refinement above) on the
-        # profile line so you can see what peak picking would keep.
+        centroid_controls_ui(ns, default_mode = "off", overlay = TRUE),
+        # Show the individual detector samples on the raw profile line (raw and
+        # overlay modes, where the line is drawn).
         conditionalPanel(
-          sprintf("input['%s'] == 'off'", ns("cmode")),
-          checkboxInput(ns("showpts"), "Show data points (profile)", value = FALSE),
-          checkboxInput(ns("coverlay"), "Overlay centroids", value = FALSE)),
+          sprintf("input['%s'] == 'off' || input['%s'] == 'overlay'",
+                  ns("cmode"), ns("cmode")),
+          checkboxInput(ns("showpts"), "Show data points (profile)", value = FALSE)),
 
         # --- annotation (single view only) ---------------------------------
         conditionalPanel(
@@ -122,11 +122,14 @@ mod_plot_spectrum_ui <- function(id) {
                                min = 500, step = 5000, width = "140px"),
                   actionButton(ns("iso_res_est"), "From data",
                                class = "btn-sm btn-outline-secondary mb-1")),
+              selectInput(ns("iso_elements"), "Elements", multiple = TRUE,
+                          choices = ISO_ELEMENTS_ALL, selected = ISO_ELEMENTS_DEFAULT),
               helpText("Enter the anchor peak and its adduct above; pick a candidate ",
                        "formula below to overlay its theoretical fine isotope pattern ",
                        "(13C / 15N / 34S / 2H …), simulated at this resolving power and ",
-                       "scaled to the anchor. “From data” estimates R from the ",
-                       "peak width."),
+                       "scaled to the anchor. Formulas are generated from the ",
+                       "selected elements (metals/halogens included by default). ",
+                       "“From data” estimates R from the peak width."),
               DTOutput(ns("iso_cands"))),
             conditionalPanel(
               sprintf("input['%s'] == 'auto'", ns("ann_mode")),
@@ -232,7 +235,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     # mode, not single, or the spectrum isn't profile).
     overlay_df <- reactive({
       empty <- spec_df()[0, , drop = FALSE]
-      if (!isTRUE(input$coverlay) || !identical(input$cmode, "off") ||
+      if (!identical(input$cmode, "overlay") ||
           !identical(input$layout, "single")) return(empty)
       d0 <- spec_df()
       if (!nrow(d0) || !isTRUE(all(d0$profile))) return(empty)
@@ -259,16 +262,22 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       q <- quasi_adducts(input$ann_pol)
       updateSelectInput(session, "ann_adduct", choices = q, selected = q[1])
     }, ignoreInit = FALSE)
-    # Auto-detect ion mode from the file's majority polarity when the file changes.
-    observeEvent(cur_file(), {
-      pol <- file_scan_table(cur_row()$path)$polarity
-      pol <- pol[is.finite(pol)]
-      if (length(pol)) {
-        maj <- as.integer(names(sort(table(pol), decreasing = TRUE))[1])
-        if (maj %in% c(0L, 1L))
-          updateSelectInput(session, "ann_pol", selected = if (maj == 1L) "pos" else "neg")
+    # Auto-set the annotation ion mode from the DISPLAYED SCAN's polarity (not the
+    # file majority) — polarity-switching files alternate pos/neg scan to scan, so
+    # the anchor's mode must follow the scan actually on screen. Falls back to the
+    # file majority when the scan carries no polarity (e.g. CDF).
+    observeEvent(spec_df(), {
+      d <- spec_df()
+      st <- file_scan_table(cur_row()$path)
+      pol <- if (nrow(d) && is.finite(d$scan[1]))
+               st$polarity[match(d$scan[1], st$scan)] else NA_integer_
+      if (!isTRUE(is.finite(pol)) || !(pol %in% c(0L, 1L))) {
+        p <- st$polarity[is.finite(st$polarity)]
+        pol <- if (length(p)) as.integer(names(sort(table(p), decreasing = TRUE))[1]) else NA
       }
-    }, ignoreInit = TRUE)
+      if (isTRUE(pol %in% c(0L, 1L)))
+        updateSelectInput(session, "ann_pol", selected = if (pol == 1L) "pos" else "neg")
+    }, ignoreInit = FALSE)
     # Default the anchor to the base peak when annotation turns on / spectrum changes.
     observeEvent(list(input$annotate, ann_candidates()), {
       if (isTRUE(input$annotate) && !isTRUE(is.finite(input$anchor_mz))) {
@@ -416,11 +425,13 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       req(nrow(rule) == 1)
       list(M = neutral_mass(input$anchor_mz, rule), rule = rule)
     })
-    # Candidate formulas for that neutral mass (ppm taken from the ± tol).
+    # Candidate formulas for that neutral mass (ppm from the ± tol; elements from
+    # the selector, defaulting to the common-organic + metal/halogen set).
     iso_candidates <- reactive({
       nm <- iso_neutral()
       ppm <- if (identical(input$ann_unit, "ppm")) input$ann_tol else 10
-      formula_candidates(nm$M, ppm = ppm)
+      els <- input$iso_elements; if (!length(els)) els <- ISO_ELEMENTS_DEFAULT
+      formula_candidates(nm$M, ppm = ppm, elements = els)
     })
     iso_pick <- reactiveVal(1L)
     observeEvent(iso_candidates(), iso_pick(1L))                  # reset on new mass

@@ -23,13 +23,17 @@ in the repository.
 Working: async file ingestion; settings (ColorBrewer/viridis palette, retention-time
 unit, default EIC tolerance, export defaults — persisted across restarts); global
 filters (rt / *m/z* / MS level / polarity / intensity / repeatable spectrum-id
-rules); and all raw-data plot views — TIC/BPC, multi-EIC, click-to-spectrum (+
-scan-list browser), 2D MS map, 3D points/surface, and DDA precursor ions. The
-Spectrum view also does single-spectrum adduct / isotope / in-source-fragment
-annotation (manual anchor, findMAIN auto-suggest, or difference network).
+rules); per-view profile-mode peak picking (`Spectra::pickPeaks`, with S/N /
+half-window / m/z-refinement); and all raw-data plot views — TIC/BPC, multi-EIC
+(with intensity scaling), click-to-spectrum (+ scan-list browser), 2D MS map, 3D
+points/surface, and DDA precursor ions. The Spectrum view also does single-spectrum
+adduct / isotope / in-source-fragment annotation (manual anchor, findMAIN
+auto-suggest, difference network, and formula-based fine isotope patterns via
+Rdisop + enviPat).
 
-Scope is **raw visualisation only** — no peak picking / grouping / alignment
-(deferred; see the architecture doc).
+Scope is **raw visualisation** — profile scans are centroided on the fly for
+display/annotation, but there is no cross-sample peak picking / feature grouping /
+retention-time alignment (deferred; see the architecture doc).
 
 Extraction results are cached to disk (qs2), so re-opening the app with the same
 files + filter is instant. Figures export as png/svg/pdf, or as the raw ggplot
@@ -70,15 +74,20 @@ absent. CI runs `R CMD check` on push/PR (`.github/workflows/R-CMD-check.yaml`).
 ## Regenerating the documentation screenshots
 
 The article screenshots are captured headlessly with
-[`chromote`](https://rstudio.github.io/chromote/) against a running app
-(`run_app(port = 7799)`):
+[`chromote`](https://rstudio.github.io/chromote/) against a running app. Start the
+app on port 7799, then run the capture script in a second process:
 
 ```{r, eval = FALSE, echo = TRUE}
-# source("tools/shoot.R")                              # TIC + Filters (faahKO)
-# source("tools/shoot_annot.R")  # args: <mzML-path> <scan>  -> annotation.png
+# terminal 1 — serve the app on the port the script expects:
+# Rscript -e "pkgload::load_all('.'); run_app(port = 7799, launch.browser = FALSE)"
+
+# terminal 2 — drive it and write the PNGs:
+# Rscript data-raw/capture-screenshots.R
 ```
 
-They are saved at 1440x900 into `vignettes/articles/figures/`.
+They are saved at 1440x900 into `vignettes/articles/figures/`. Chrome only captures
+raster images (PNG), so the UI screenshots are PNG; individual plots can instead be
+exported as SVG from each view's **Save** button if a vector figure is wanted.
 
 ## Project layout
 
@@ -101,13 +110,14 @@ R/
   mod_plot_precursors.R# DDA precursor-ion map
   mod_export.R         # reusable png/svg/pdf/rds export modal
   fct_extract.R        # data extraction (summaries, chromatograms, peaks, spectra)
-  fct_filters.R        # compose filter state into Spectra/xcms calls
+  fct_filters.R        # compose filter state into Spectra/xcms calls; profile peak-picking
   fct_annotate.R       # the single-spectrum annotation engine (pure, testable)
+  fct_isotope.R        # fine isotope-pattern engine: Rdisop formulas + enviPat envelope
   fct_export.R         # ggsave-based export (+ rds = the ggplot object itself)
   fct_palettes.R       # ColorBrewer / viridis helpers
   fct_cache.R          # layered mem+disk (qs2) cache backing bindCache, persistent across restarts
   fct_settings_store.R # persist settings to the per-user config dir
-  utils_reactive.R     # central reactive state (rv) + plotly/zoom helpers
+  utils_reactive.R     # central reactive state (rv) + plotly/zoom + peak-picking UI helpers
 tests/testthat/        # unit + real-data tests
-tools/                 # screenshot-capture scripts (chromote)
+data-raw/              # throwaway scripts, incl. capture-screenshots.R (chromote)
 ```

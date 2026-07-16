@@ -43,8 +43,8 @@ to *Centroid profile scans* for a conventional stick plot; the S/N, half-window 
 *m/z*-refinement settings then appear. See
 [Getting started](getting_started.html#profile-mode-data).
 
-Annotation works either way — the annotation engine centroids internally before
-matching — but leaving the default *auto* in place is the sane choice.
+Annotation works whether you view the spectrum raw or centroided — see
+*How annotation reduces the spectrum* below for exactly what it matches against.
 
 ## From spectrum to EIC
 
@@ -95,8 +95,31 @@ There are three modes:
   so set the tolerance to fit the instrument and raise the minimum intensity to
   drop noise pairs. Isotope-spaced differences are ignored.
 
-The **± tol** is the adduct/fragment match window (ppm or Da); **Min intensity**
-drops peaks below that fraction of the base peak before matching; **Max charge**
+### How annotation reduces the spectrum (what actually gets matched)
+
+Matching a raw profile scan directly would be meaningless — every one of its ~17 000
+detector samples is a non-zero point that could coincide with *some* adduct or mass
+difference. So annotation never matches the raw trace. It matches a **centroid
+list**, produced transparently and under your control:
+
+1. **Peak picking.** The scan is peak-picked with `Spectra::pickPeaks()` at the
+   **Match S/N** you set (profile levels are picked; a file that is already
+   centroided passes through). This is the *same* engine as the tab's Peak-picking
+   control — not a separate hidden reducer.
+2. **Intensity floor.** **Min intensity** then drops centroids below that fraction
+   of the base peak.
+3. The panel shows a live **"N candidate peaks feed matching"** readout, so the size
+   of the pool being matched is never a mystery — raise Match S/N or Min intensity
+   until it is sane for your data.
+
+Only then are adducts/fragments projected and matched within **± tol**. Two
+assumptions remain, both deliberate: isotope satellites are removed before adduct
+matching (an M+1 is never labelled an adduct — see **Isotope tol** below), and the
+`findMAIN` auto mode additionally ranks only the 200 most intense centroids. Nothing
+else is silently dropped.
+
+The **± tol** is the adduct/fragment match window (ppm or Da); **Match S/N** and
+**Min intensity** set the candidate pool as above; **Max charge**
 limits the charge states projected; **Annotate only top N peaks** keeps the N most
 intense *annotated* peaks. **Isotope tol (mDa)** is a separate, usually wider
 window for the isotope spacing (MS2 isotope centroids drift off the theoretical

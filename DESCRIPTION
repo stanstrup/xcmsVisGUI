@@ -37,6 +37,8 @@ Imports:
     mzR,
     commonMZ,
     InterpretMSSpectrum,
+    enviPat,
+    Rdisop,
     grDevices,
     stats,
     tools,

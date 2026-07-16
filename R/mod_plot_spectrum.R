@@ -457,7 +457,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     iso_pick <- reactiveVal(1L)
     observeEvent(iso_candidates(), iso_pick(1L))                  # reset on new mass
     observeEvent(input$iso_cands_rows_selected, iso_pick(input$iso_cands_rows_selected))
-    output$iso_cands <- renderDT({
+    output$iso_cands <- renderDT(server = FALSE, {
       fc <- iso_candidates()
       validate(need(nrow(fc) > 0, "No formula within tolerance (widen ± tol)."))
       # `ok` marks organically-valid formulas (a ✓) so metal/exotic ones — shown
@@ -470,6 +470,9 @@ mod_plot_spectrum_server <- function(id, rv, included) {
                                scrollX = TRUE, scrollY = "220px", scrollCollapse = TRUE)) %>%
         DT::formatRound("mass", 4) %>% DT::formatRound("ppm", 2)
     })
+    # Compute even while the iso panel is hidden so the table is ready the instant
+    # the user switches into isotope mode (the candidate list is tiny — ≤25 rows).
+    outputOptions(output, "iso_cands", suspendWhenHidden = FALSE)
     # Estimate resolving power from the raw profile peak at the anchor.
     observeEvent(input$iso_res_est, {
       d <- spec_df(); req(nrow(d) > 0, is.finite(input$anchor_mz))

@@ -114,8 +114,15 @@ mod_filter_server <- function(id, rv, included) {
            spectrum_id_rules = rules)
     }) %>% debounce(600)
 
+    # Only write rv$filter when the composed filter actually CHANGES. The filter
+    # controls (uiOutput) render lazily the first time the Filters section is
+    # opened; that render initialises the inputs and fires this observer with a
+    # filter equal to the current one. Reassigning an equal value would still
+    # invalidate data_key() and needlessly re-extract every chromatogram — the
+    # "TIC redraws when I open Filters" symptom. Skip the no-op assignment.
     observeEvent(filter_inputs(), {
-      rv$filter <- make_filter(filter_inputs(), rv$settings$time_unit)
+      f <- make_filter(filter_inputs(), rv$settings$time_unit)
+      if (!identical(rv$filter, f)) rv$filter <- f
     }, ignoreNULL = FALSE)
 
     observeEvent(input$reset, {

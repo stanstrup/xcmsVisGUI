@@ -40,6 +40,16 @@ tolerance/unit for new targets come from [Settings](getting_started.html#setting
 
 - **Color by** — *File*, *Target*, or *Sample group*. When not colouring by target,
   multiple targets are distinguished by line type.
+- **Scale intensity** — how the y-axis is scaled:
+    - *Raw* — absolute intensity.
+    - *Normalise each trace (÷ own max)* — every EIC peaks at 1, so you compare
+      peak **shapes** / co-elution regardless of abundance.
+    - *Normalise per target (÷ target max)* — a compound's traces across files share
+      one 0–1 scale, so their **relative abundances** are comparable.
+    - *Log10 (y-axis)* — `log10(intensity + 1)`, compressing the dynamic range so
+      weak traces are visible (the +1 keeps the many baseline zeros).
+
+  The tooltip always shows the raw intensity, whatever the scale.
 - **Show data points** — overlay scan points.
 - **Facet by file** — one panel per file instead of a single overlay.
 

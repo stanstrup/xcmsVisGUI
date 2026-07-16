@@ -31,10 +31,45 @@ test_that("ppm error is measured against the query mass, not self", {
   expect_gt(abs(h$ppm_err), 5)                     # ~ -12 ppm, not 0
 })
 
+test_that("the default element set is organic-only; metals are opt-in", {
+  expect_false(any(c("Na", "K", "Fe", "Ni", "Al") %in% ISO_ELEMENTS_DEFAULT))
+  expect_true(all(c("Na", "K", "Fe", "Cr", "Ni", "Mn", "Al", "Si") %in% ISO_ELEMENTS_ALL))
+})
+
 test_that("formula_candidates can include metals when asked", {
-  fc <- formula_candidates(133.9655, ppm = 30, elements = ISO_ELEMENTS_DEFAULT)
+  fc <- formula_candidates(133.9655, ppm = 30,
+                           elements = c(ISO_ELEMENTS_DEFAULT, "Na", "K", "Fe"))
   expect_gt(nrow(fc), 0)
-  expect_true(any(grepl("Na|K|Cl", fc$formula)))   # metal/halogen species appear
+  expect_true(any(grepl("Na|K|Fe", fc$formula)))   # metal species appear when added
+})
+
+test_that("the intrinsic-charge [M]+ ion type resolves an iron-complex ion", {
+  # m/z 132.9582 is the iron-formate background ion [Fe(HCOO)(CH3OH)]+ = FeC2H5O3+
+  # (the charge is Fe's oxidation state, not a proton). As [M]+ the neutral
+  # atom-sum mass is m/z + one electron, and Rdisop must then return the Fe
+  # formula — but only with metals enabled and the validity filter off (Fe gives a
+  # fractional DBE that Rdisop flags "invalid").
+  expect_true("[M]+" %in% anchor_adducts("pos"))
+  expect_true("[M]−" %in% anchor_adducts("neg"))
+  expect_false("[M]+" %in% quasi_adducts("pos"))     # kept out of findMAIN
+
+  rule <- anchor_adduct_rules("pos")
+  rule <- rule[rule$name == "[M]+", ]
+  M <- neutral_mass(132.9582, rule)
+  expect_equal(M, 132.9582 + 0.000548579909, tolerance = 1e-6)  # + one electron
+
+  fc <- formula_candidates(M, ppm = 8, elements = c(ISO_ELEMENTS_DEFAULT, "Fe"),
+                           valid_only = FALSE, min_dbe = -Inf)
+  fe <- fc[grepl("Fe", fc$formula), ]
+  expect_gt(nrow(fe), 0)
+  expect_lt(min(abs(fe$ppm_err)), 1)                 # FeC2H5O3 within ~0.5 ppm
+  expect_false(all(fc$valid))                        # the Fe formula is "invalid"
+
+  # the isotope pattern renders for that ion type (base peak = m/z - electron)
+  fe1 <- fe$formula[which.min(abs(fe$ppm_err))]
+  pat <- isotope_pattern(fe1, rule)
+  expect_gt(nrow(pat), 1)
+  expect_equal(pat$mz[which.max(pat$abundance)], 132.9582, tolerance = 2e-3)
 })
 
 test_that("scale_formula multiplies element counts", {

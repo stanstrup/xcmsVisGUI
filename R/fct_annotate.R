@@ -80,6 +80,44 @@ quasi_adducts <- function(mode = c("pos", "neg")) {
   r$name[r$quasi == 1]
 }
 
+# Electron mass (Da). commonMZ's protonation massdiffs already fold this in (a
+# proton is H minus an electron); the intrinsic-charge ion types below need it
+# on its own.
+.ELECTRON <- 0.000548579909
+
+#' INTRINSIC-CHARGE ion types: the peak IS the ion, its charge coming from the
+#' species itself — a metal in a + oxidation state (e.g. the iron-formate cluster
+#' [Fe(HCOO)(CH3OH)]+ = FeC2H5O3+), or a permanent charge — NOT from adducting a
+#' proton/sodium. So m/z = (atom-sum mass - z*electron)/z, i.e. the neutral
+#' atom-sum mass is m/z*z + z*electron. Modelled as a rule with massdiff = -z*e so
+#' the shared neutral_mass()/adduct_mz() arithmetic yields exactly that. quasi = 0
+#' keeps them out of quasi_adducts(), so findMAIN is unaffected.
+#' @importFrom tibble tibble
+#' @noRd
+ion_type_rules <- function(mode = c("pos", "neg")) {
+  mode <- match.arg(mode)
+  if (identical(mode, "pos"))
+    tibble(name = "[M]+", nmol = 1, charge = 1, massdiff = -.ELECTRON, quasi = 0)
+  else
+    tibble(name = "[M]−", nmol = 1, charge = -1, massdiff = .ELECTRON, quasi = 0)
+}
+
+#' Adduct rules PLUS the intrinsic-charge ion types — the full set an anchor may
+#' be. Used for anchor lookup (annotate_anchor, the isotope mode); projection
+#' (project_ions) deliberately still uses adduct_rules() only.
+#' @noRd
+anchor_adduct_rules <- function(mode = c("pos", "neg")) {
+  mode <- match.arg(mode)
+  rbind(adduct_rules(mode), ion_type_rules(mode))
+}
+
+#' Anchor choices for the "is a" selector: the quasi-molecular adducts plus the
+#' intrinsic-charge ion types.
+#' @noRd
+anchor_adducts <- function(mode = c("pos", "neg")) {
+  c(quasi_adducts(mode), ion_type_rules(mode)$name)
+}
+
 #' Neutral mass M implied by an observed ion m/z under one adduct rule:
 #'   M = (m/z * abs(charge) - massdiff) / nmol.   `rule` is a one-row rule table.
 #' @noRd
@@ -166,7 +204,7 @@ annotate_anchor <- function(spec_df, anchor_mz, adduct = NULL, mode = c("pos", "
                             max_charge = Inf, iso_tol = ISO_TOL_DA,
                             iso_decreasing = TRUE) {
   mode <- match.arg(mode)
-  rules <- adduct_rules(mode)
+  rules <- anchor_adduct_rules(mode)   # adducts + intrinsic-charge [M]+/[M]-
   if (is.null(adduct)) adduct <- quasi_adducts(mode)[1]
   rule <- rules[rules$name == adduct, , drop = FALSE]
   if (!nrow(rule)) stop("Unknown adduct: ", adduct)

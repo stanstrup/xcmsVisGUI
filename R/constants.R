@@ -32,14 +32,17 @@ ISOTOPE_SPACING <- 1.0033548
 # via the annotation "Isotope tol" control.
 ISO_TOL_DA <- 0.015
 
-# Elements offered for isotope-pattern formula generation (Rdisop). The default
-# is the common organic set plus the halogens/alkali metals routine in
-# metabolomics; the full list adds the transition metals and metalloids for
-# metal-containing species. User-selectable in the Spectrum isotope panel.
-ISO_ELEMENTS_DEFAULT <- c("C", "H", "N", "O", "P", "S", "Cl", "Na", "K")
+# Elements offered for isotope-pattern formula generation (Rdisop). The DEFAULT is
+# only the elements common in organic molecules (CHNOPS + the halogens), so normal
+# formula generation stays clean. The full list adds the metals/metalloids — the
+# alkali/alkaline-earth adduct metals, and the stainless-steel + contaminant metals
+# (Fe, Cr, Ni, Mn, Al, Si, …) behind background cluster ions such as iron formate
+# (see compare_thermo_vs_thermolab/contaminant_id.qmd). Select those explicitly
+# when chasing a metal-complex ion; they are deliberately NOT in the default.
+ISO_ELEMENTS_DEFAULT <- c("C", "H", "N", "O", "P", "S", "F", "Cl", "Br")
 ISO_ELEMENTS_ALL <- c("C", "H", "N", "O", "P", "S", "F", "Cl", "Br", "I",
-                      "Na", "K", "Ca", "Mg", "Fe", "Cu", "Zn", "Mn", "Se",
-                      "B", "Si", "As")
+                      "Na", "K", "Ca", "Mg", "Al", "Si", "Fe", "Cr", "Ni",
+                      "Mn", "Cu", "Zn", "Co", "Se", "B", "As", "Ba", "Sr", "Ti")
 
 # --- Retention-time unit helpers ------------------------------------------
 # Data is always handled internally in SECONDS (xcms/Spectra native). These

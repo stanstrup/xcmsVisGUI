@@ -124,12 +124,17 @@ mod_plot_spectrum_ui <- function(id) {
                                class = "btn-sm btn-outline-secondary mb-1")),
               selectInput(ns("iso_elements"), "Elements", multiple = TRUE,
                           choices = ISO_ELEMENTS_ALL, selected = ISO_ELEMENTS_DEFAULT),
+              checkboxInput(ns("iso_valid"), "Chemically valid only (hide metal / exotic)",
+                            value = FALSE),
               helpText("Enter the anchor peak and its adduct above; pick a candidate ",
                        "formula below to overlay its theoretical fine isotope pattern ",
                        "(13C / 15N / 34S / 2H …), simulated at this resolving power and ",
-                       "scaled to the anchor. Formulas are generated from the ",
-                       "selected elements (metals/halogens included by default). ",
-                       "“From data” estimates R from the peak width."),
+                       "scaled to the anchor. Formulas come from the selected Elements ",
+                       "(organic elements by default). For a metal-complex ion (e.g. an ",
+                       "iron-formate background ion) add the metal to Elements, choose ",
+                       "the ", tags$b("[M]+"), " adduct — the peak IS the ion, charged ",
+                       "by the metal — and leave “valid only” off. “From data” estimates ",
+                       "R from the peak width."),
               DTOutput(ns("iso_cands"))),
             conditionalPanel(
               sprintf("input['%s'] == 'auto'", ns("ann_mode")),
@@ -158,7 +163,7 @@ mod_plot_spectrum_ui <- function(id) {
 #' @importFrom dplyr group_by mutate ungroup bind_rows
 #' @importFrom stats setNames
 #' @importFrom plotly event_data renderPlotly
-#' @importFrom ggplot2 ggplot aes geom_linerange geom_line geom_vline geom_point geom_text geom_segment scale_color_manual labs theme_classic theme element_blank facet_wrap
+#' @importFrom ggplot2 ggplot aes geom_linerange geom_line geom_area geom_vline geom_point geom_text geom_segment scale_color_manual labs theme_classic theme element_blank facet_wrap
 #' @noRd
 mod_plot_spectrum_server <- function(id, rv, included) {
   moduleServer(id, function(input, output, session) {
@@ -257,9 +262,11 @@ mod_plot_spectrum_server <- function(id, rv, included) {
                  updateNumericInput(session, "ann_tol", value = rv$settings$default_tol))
     observeEvent(rv$settings$default_tol_unit,
                  updateSelectInput(session, "ann_unit", selected = rv$settings$default_tol_unit))
-    # Adduct choices follow the ion mode (commonMZ quasi-molecular adducts).
+    # Adduct choices follow the ion mode: the quasi-molecular adducts plus the
+    # intrinsic-charge ion types ([M]+/[M]-) for metal complexes / permanent-charge
+    # ions. Default to the protonation adduct.
     observeEvent(input$ann_pol, {
-      q <- quasi_adducts(input$ann_pol)
+      q <- anchor_adducts(input$ann_pol)
       updateSelectInput(session, "ann_adduct", choices = q, selected = q[1])
     }, ignoreInit = FALSE)
     # Auto-set the annotation ion mode from the DISPLAYED SCAN's polarity (not the
@@ -400,7 +407,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         anchor <- r$adductmz[pick]; adduct <- r$adducthyp[pick]
       } else {
         req(is.finite(input$anchor_mz),
-            isTRUE(input$ann_adduct %in% quasi_adducts(input$ann_pol)))
+            isTRUE(input$ann_adduct %in% anchor_adducts(input$ann_pol)))
         anchor <- input$anchor_mz; adduct <- input$ann_adduct
       }
       niso <- suppressWarnings(as.integer(input$ann_niso))
@@ -419,19 +426,26 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     # Neutral mass from the anchor ion + adduct (same inversion as manual mode).
     iso_neutral <- reactive({
       req(identical(input$ann_mode, "iso"), is.finite(input$anchor_mz),
-          isTRUE(input$ann_adduct %in% quasi_adducts(input$ann_pol)))
-      rule <- adduct_rules(input$ann_pol)
+          isTRUE(input$ann_adduct %in% anchor_adducts(input$ann_pol)))
+      rule <- anchor_adduct_rules(input$ann_pol)
       rule <- rule[rule$name == input$ann_adduct, , drop = FALSE]
       req(nrow(rule) == 1)
+      # For [M+H]+ etc. this is the true neutral mass; for the intrinsic-charge
+      # [M]+/[M]- it is the neutral atom-sum mass (m/z + electron) — either way the
+      # mass to decompose into an elemental formula.
       list(M = neutral_mass(input$anchor_mz, rule), rule = rule)
     })
-    # Candidate formulas for that neutral mass (ppm from the ± tol; elements from
-    # the selector, defaulting to the common-organic + metal/halogen set).
+    # Candidate formulas for that mass (ppm from the ± tol; elements from the
+    # selector). "Chemically valid only" prunes to organically-valid formulas
+    # (non-negative integer DBE); leave it OFF for metal complexes, whose valences
+    # make Rdisop flag them invalid with fractional DBE.
     iso_candidates <- reactive({
       nm <- iso_neutral()
       ppm <- if (identical(input$ann_unit, "ppm")) input$ann_tol else 10
       els <- input$iso_elements; if (!length(els)) els <- ISO_ELEMENTS_DEFAULT
-      formula_candidates(nm$M, ppm = ppm, elements = els)
+      vo <- isTRUE(input$iso_valid)
+      formula_candidates(nm$M, ppm = ppm, elements = els,
+                         valid_only = vo, min_dbe = if (vo) 0 else -Inf)
     })
     iso_pick <- reactiveVal(1L)
     observeEvent(iso_candidates(), iso_pick(1L))                  # reset on new mass
@@ -439,12 +453,15 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     output$iso_cands <- renderDT({
       fc <- iso_candidates()
       validate(need(nrow(fc) > 0, "No formula within tolerance (widen ± tol)."))
-      disp <- data.frame(formula = fc$formula, `neutral M` = fc$mass,
-                         `ppm` = fc$ppm_err, DBE = fc$dbe, check.names = FALSE)
+      # `ok` marks organically-valid formulas (a ✓) so metal/exotic ones — shown
+      # when "valid only" is off — are visibly distinguished rather than hidden.
+      disp <- data.frame(formula = fc$formula, mass = fc$mass,
+                         `ppm` = fc$ppm_err, DBE = fc$dbe,
+                         ok = ifelse(fc$valid, "✓", ""), check.names = FALSE)
       datatable(disp, rownames = FALSE, selection = "single",
                 options = list(dom = "t", paging = FALSE, ordering = TRUE,
                                scrollX = TRUE, scrollY = "220px", scrollCollapse = TRUE)) %>%
-        DT::formatRound("neutral M", 4) %>% DT::formatRound("ppm", 2)
+        DT::formatRound("mass", 4) %>% DT::formatRound("ppm", 2)
     })
     # Estimate resolving power from the raw profile peak at the anchor.
     observeEvent(input$iso_res_est, {
@@ -580,9 +597,15 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         ov <- tryCatch(iso_overlay(), error = function(e) NULL)
         if (!is.null(ov) && nrow(ov)) {
           ov$.tip <- sprintf("%s (theoretical)\nm/z %.4f", ov$formula, ov$mz)
-          p <- p + geom_line(data = ov, aes(x = mz, y = intensity, text = .tip,
-                                            group = 1), inherit.aes = FALSE,
-                             color = "#1b9e77", linewidth = 0.6)
+          # Translucent filled envelope + a thin outline, so the raw peaks show
+          # THROUGH the theoretical pattern and you can judge the overlap. Kept
+          # thinner than the raw trace on purpose.
+          p <- p +
+            geom_area(data = ov, aes(x = mz, y = intensity, text = .tip, group = 1),
+                      inherit.aes = FALSE, fill = "#1b9e77", alpha = 0.3) +
+            geom_line(data = ov, aes(x = mz, y = intensity, text = .tip, group = 1),
+                      inherit.aes = FALSE, color = "#1b9e77", linewidth = 0.3,
+                      alpha = 0.9)
         }
       }
       p

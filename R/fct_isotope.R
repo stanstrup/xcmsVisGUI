@@ -31,9 +31,12 @@ formula_candidates <- function(mass, ppm = 5,
                           elements = Rdisop::initializeElements(elements)),
     error = function(e) NULL)
   if (is.null(mol) || !length(mol$formula)) return(empty)
+  # Compute the error against the QUERY mass BEFORE building the tibble: inside
+  # tibble() the `mass = mol$exactmass` column would shadow the `mass` argument,
+  # making every ppm (exactmass - exactmass) = 0.
+  ppm_err <- (mol$exactmass - mass) / mass * 1e6
   out <- tibble(
-    formula = mol$formula, mass = mol$exactmass,
-    ppm_err = (mol$exactmass - mass) / mass * 1e6,
+    formula = mol$formula, mass = mol$exactmass, ppm_err = ppm_err,
     dbe = mol$DBE, valid = tolower(mol$valid) == "valid")
   if (isTRUE(valid_only)) out <- out[out$valid, , drop = FALSE]
   if (is.finite(min_dbe)) out <- out[is.finite(out$dbe) & out$dbe >= min_dbe, , drop = FALSE]

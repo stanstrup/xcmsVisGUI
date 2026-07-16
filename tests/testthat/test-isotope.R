@@ -19,6 +19,24 @@ test_that("formula_candidates proposes the right formula and honours filters", {
   expect_equal(nrow(formula_candidates(-1)), 0L)   # bad mass -> empty
 })
 
+test_that("ppm error is measured against the query mass, not self", {
+  # Regression: `mass = mol$exactmass` inside tibble() shadowed the mass argument,
+  # so every ppm came out (exactmass - exactmass) = 0. Query 12 ppm off the true
+  # caffeine mass -> C8H10N4O2 must report ~-12 ppm, and match the direct formula.
+  q <- CAFFEINE_M * (1 + 12e-6)
+  fc <- formula_candidates(q, ppm = 30)
+  h <- fc[fc$formula == "C8H10N4O2", ]
+  expect_equal(nrow(h), 1L)
+  expect_equal(h$ppm_err, (h$mass - q) / q * 1e6, tolerance = 1e-6)
+  expect_gt(abs(h$ppm_err), 5)                     # ~ -12 ppm, not 0
+})
+
+test_that("formula_candidates can include metals when asked", {
+  fc <- formula_candidates(133.9655, ppm = 30, elements = ISO_ELEMENTS_DEFAULT)
+  expect_gt(nrow(fc), 0)
+  expect_true(any(grepl("Na|K|Cl", fc$formula)))   # metal/halogen species appear
+})
+
 test_that("scale_formula multiplies element counts", {
   expect_equal(scale_formula("C8H10N4O2", 1), "C8H10N4O2")
   expect_equal(scale_formula("C8H10N4O2", 2), "C16H20N8O4")

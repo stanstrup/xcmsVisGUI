@@ -32,6 +32,15 @@ ISOTOPE_SPACING <- 1.0033548
 # via the annotation "Isotope tol" control.
 ISO_TOL_DA <- 0.015
 
+# Elements offered for isotope-pattern formula generation (Rdisop). The default
+# is the common organic set plus the halogens/alkali metals routine in
+# metabolomics; the full list adds the transition metals and metalloids for
+# metal-containing species. User-selectable in the Spectrum isotope panel.
+ISO_ELEMENTS_DEFAULT <- c("C", "H", "N", "O", "P", "S", "Cl", "Na", "K")
+ISO_ELEMENTS_ALL <- c("C", "H", "N", "O", "P", "S", "F", "Cl", "Br", "I",
+                      "Na", "K", "Ca", "Mg", "Fe", "Cu", "Zn", "Mn", "Se",
+                      "B", "Si", "As")
+
 # --- Retention-time unit helpers ------------------------------------------
 # Data is always handled internally in SECONDS (xcms/Spectra native). These
 # convert to/from the user-facing display unit (minutes by default).

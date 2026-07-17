@@ -5,7 +5,8 @@ is **compound identification from raw LC–MS**, and the spine of it is one loop
 *chromatogram → spectrum → are these peaks one compound? → EICs to check co-elution →
 back to the spectrum to annotate.* At each step the voice-over says which question
 you're answering, so the tools land as a workflow rather than a tour. Each shot has
-**[SCREEN]** (what to do) and **[VO]** (voice-over). Times are approximate.
+**[SCREEN]** (what to do) and **[VO]** (voice-over, as bullet beats — read them as
+connected narration, not a list). Times are approximate.
 
 Recording tips: 1440×900 window, browser zoom ~110 % so the sidebar text is legible,
 hide the OS cursor trail, and pause ~1 s after each click so the UI settles on camera.
@@ -39,10 +40,10 @@ where richer small-molecule chemistry helps. Get the public paths in R with
 **[SCREEN]** Title card → cut to the app open on **TIC / BPC** with a file loaded and a
 chromatogram on screen.
 
-**[VO]** "This is xcmsVisGUI — a local app for reading *raw* LC–MS data by eye, before
-any peak picking or alignment. I use it mostly to figure out what a compound actually
-is. There's one loop I run over and over — chromatogram, spectrum, extract the ions,
-back to the spectrum — so let me show you that loop."
+**[VO]**
+- xcmsVisGUI is a local app for reading *raw* LC–MS data by eye — before any peak picking or alignment.
+- I use it mostly to figure out what a compound actually is.
+- There's one loop I run over and over: chromatogram → spectrum → extract the ions → back to the spectrum. Let me show you that loop.
 
 ---
 
@@ -53,25 +54,22 @@ back to the spectrum — so let me show you that loop."
 (b) click **Choose folder…** (native OS folder dialog);
 (c) click **Browse files…**, and separately **drag a file onto it**.
 
-**[VO]** "There are three ways to get files in, and the difference between them matters
-once your files are large. Pasting a path, or picking a folder with *Choose folder…*,
-loads the data **in place — nothing is copied**; a multi-gigabyte file just stays on
-disk where it is, and the app reads it there. The path box also takes a single file, and
-a folder load grabs every MS file in that one folder — it doesn't descend into
-sub-folders, so load `KO` and `WT` as two separate folders. The third way, *Browse
-files…* — or dragging files straight onto it — is the ordinary OS file dialog, and that
-one **copies** everything into a temporary folder first. It's handy for a file or two,
-but for big or many files, paste the path and skip the copy."
+**[VO]**
+- Three ways to get files in — and the difference matters once your files are large.
+- **Paste a path**, or **Choose folder…**, loads the data **in place — nothing is copied**; a multi-gigabyte file just stays on disk and the app reads it there.
+- The path box also takes a **single file**, and a folder load grabs every MS file in *that* folder only — it **doesn't descend into sub-folders**, so load `KO` and `WT` as two separate folders.
+- **Browse files…** — or **dragging files onto it** — is the ordinary OS file dialog, and it **copies** everything into a temp folder first.
+- So: handy for a file or two, but for big or many files, paste the path and skip the copy.
 
 **[SCREEN]** Files read in the background — ⏳ badges flip to ✅. Point at the **MS**,
 **Pol**, and **Mode** (`prof`/`cent`/`mix`) columns. Double-click a **Group** cell to
 rename a group. Click **All**.
 
-**[VO]** "Reading happens in the background, so the interface never blocks. Each row
-tells me the MS levels, the polarity, and whether the file is profile or centroided —
-which decides how the views behave. I set my sample groups right here in the table, and
-click to include a file in the plots. Two files can even share a name from different
-folders — they're kept apart by their parent folder."
+**[VO]**
+- Reading happens in the background, so the interface never blocks.
+- Each row tells me the MS levels, the polarity, and whether the file is **profile or centroided** — which decides how the views behave.
+- I set my sample groups right here in the table, and click a row to include that file in the plots.
+- Two files can even share a name from different folders — they're kept apart by their parent folder.
 
 ---
 
@@ -81,26 +79,27 @@ folders — they're kept apart by their parent folder."
 = *Sample group*. Then **click a peak** on the trace. Switch to **Spectrum** — it's
 loaded at that scan.
 
-**[VO]** "I start at the chromatogram just to get oriented — where the run is busy. Then
-the core move: I click a peak, and the mass spectrum at that exact scan is waiting on the
-Spectrum tab. Everything in the app is linked like this — a click always takes me to the
-data underneath."
+**[VO]**
+- I start at the chromatogram just to get oriented — where the run is busy.
+- Then the core move: I **click a peak**, and the mass spectrum at that exact scan is waiting on the Spectrum tab.
+- Everything here is linked like that — a click always takes me to the data underneath.
 
 **[SCREEN]** Spectrum shows a **profile** scan as a line (title "… • profile"); tick
 **Show data points (profile)**. Open **Peak picking** → **Raw + centroids overlay**, zoom
 one cluster; show **S/N / Half-window / m/z accuracy**; then **Centroid profile scans**.
 
-**[VO]** "If it's profile data it's drawn as a line — thousands of detector samples per
-peak, which I can even show as points. To work with masses I centroid it, and because
-that's *data processing* it lives right here, per view, not in a global filter. I overlay
-the centroids to see what picking keeps, then switch to a clean stick spectrum. Now I'm
-looking at a handful of mass peaks around my compound."
+**[VO]**
+- Profile data is drawn as a **line** — thousands of detector samples per peak, which I can even show as points.
+- To work with masses I **centroid** it — and because that's *data processing*, it lives right here, per view, not in a global filter.
+- I **overlay** the centroids first to see exactly what picking keeps, then switch to a clean **stick spectrum**.
+- Now I'm looking at a handful of mass peaks around my compound.
 
 **[SCREEN]** Click **Scan list**; in the modal filter by MS level / precursor-m/z /
 polarity, click a row to jump to that scan; close the modal.
 
-**[VO]** "And if I don't have a peak to click my way to, every scan's metadata is one
-table away — filter by MS level, polarity or precursor mass and jump straight to it."
+**[VO]**
+- And if I don't have a peak to click my way to, every scan's metadata is one table away —
+- filter by MS level, polarity or precursor mass, and jump straight to it.
 
 ---
 
@@ -111,29 +110,27 @@ several peaks** in the cluster — the base peak, a neighbour a couple of Da awa
 suspected adduct further out (click, click, click). Switch to the **EIC** tab: the
 targets are populated. The overlaid EICs render.
 
-**[VO]** "Here's the question a single spectrum can't answer: I see several peaks, but do
-they belong to *one* compound — a molecular ion with its adducts, isotopes and in-source
-fragments — or are they different things that just happen to co-elute? A spectrum is one
-slice in time; to tell them apart I need their *chromatograms*. So I click each peak into
-the EIC list, and pull them out."
+**[VO]**
+- Here's the question a single spectrum can't answer: I see several peaks — but do they belong to **one** compound (a molecular ion with its adducts, isotopes and fragments), or are they different things that just happen to co-elute?
+- A spectrum is one slice in time; to tell them apart I need their **chromatograms**.
+- So I click each peak into the **EIC list** and pull them out.
 
 **[SCREEN]** Set **Scale intensity** = *Normalise each trace*. Point at the peaks that
 rise and fall together versus one that peaks at a different time or with a different
 shape.
 
-**[VO]** "Normalising each trace to its own height throws away abundance and shows me pure
-*shape*. And now it's obvious: these three rise and fall together, at the same retention
-time, same profile — that's one compound. But this one peaks slightly earlier — different
-shape, different apex — so it's a separate species that was just sitting under the same
-scan. That co-elution test is the difference between annotating a real adduct series and
-chasing a coincidence."
+**[VO]**
+- Normalising each trace to its own height throws away abundance and shows me pure **shape**.
+- Now it's obvious: these three **rise and fall together**, same retention time, same profile — that's one compound.
+- But this one peaks slightly earlier, different shape — a **separate species** that was just sitting under the same scan.
+- That co-elution test is the difference between annotating a real adduct series and chasing a coincidence.
 
 **[SCREEN]** *(Optional, faahKO)* Load faahKO, paste *m/z* `335.1`, set **Color by group**
 and **Scale** = *Normalise per target*.
 
-**[VO]** "The same view answers a different question too — across many samples, is my
-compound more abundant in one group? Here's 335 in the FAAH knockouts versus wild-type,
-clearly up where the biology says it should be."
+**[VO]**
+- The same view answers a different question too — across many samples, is my compound more abundant in one group?
+- Here's 335 in the FAAH knockouts versus wild-type, clearly up where the biology says it should be.
 
 ---
 
@@ -144,19 +141,17 @@ mode** auto-set from the scan polarity; leave **Manual anchor** (base peak defau
 Labelled adduct / fragment / isotope peaks appear; show the *"N candidate peaks feed
 matching"* readout.
 
-**[VO]** "Now that I know which peaks belong together, I annotate them. I anchor on the
-molecular-ion candidate and the app projects the common adducts and in-source fragments,
-labelling the ones actually present — and it only considers the co-eluting set I just
-confirmed. The ion mode follows the scan, and matching runs against real centroids at a
-signal-to-noise I control, with a readout of how many peaks feed it, so nothing is
-hidden."
+**[VO]**
+- Now that I know which peaks belong together, I annotate them.
+- I anchor on the molecular-ion candidate; the app projects the common adducts and in-source fragments and labels the ones actually present — only over the co-eluting set I just confirmed.
+- The ion mode follows the scan, and matching runs against **real centroids** at a signal-to-noise I control — with a readout of how many peaks feed it, so nothing is hidden.
 
 **[SCREEN]** **Mode** → **Auto-suggest (findMAIN)** → **Suggest molecular ion** → click a
 ranked row. Then **Difference network** → show peak-pair Δ labels.
 
-**[VO]** "If I'm unsure which peak is the molecule, findMAIN ranks the hypotheses. Or I
-drop the anchor and annotate the *differences* between peaks directly, to catch a neutral
-loss or an adduct relationship I hadn't assumed."
+**[VO]**
+- If I'm unsure which peak is the molecule, **findMAIN** ranks the hypotheses for me.
+- Or I drop the anchor entirely and annotate the **differences** between peaks — to catch a neutral loss or an adduct relationship I hadn't assumed.
 
 ---
 
@@ -166,19 +161,19 @@ loss or an adduct relationship I hadn't assumed."
 candidate-formula table (formula, mass, ppm, DBE, ✓). Pick a row → the translucent green
 **envelope** overlays the raw cluster. Adjust **Resolving power**; click **From data**.
 
-**[VO]** "With the right ion and its neutral mass, I want a *formula*. The app decomposes
-the mass into candidates, then — the payoff on high-res data — overlays the *fine* isotope
-pattern for each: the true carbon-13, nitrogen-15, sulfur-34 structure, simulated at my
-instrument's resolving power. The envelope is translucent, so I can see the raw peaks
-underneath and judge the fit. That's how a mass becomes a confident formula."
+**[VO]**
+- With the right ion and its neutral mass, I want a **formula**.
+- The app decomposes the mass into candidates, then — the payoff on high-res data — overlays the **fine** isotope pattern for each: the true ¹³C, ¹⁵N, ³⁴S structure, simulated at my instrument's resolving power.
+- The envelope is **translucent**, so I can see the raw peaks underneath and judge the fit.
+- That's how a mass becomes a confident formula.
 
 **[SCREEN]** Add **Fe** to **Elements**, choose **[M]+**, turn **off** *Chemically valid
 only*; show an iron-formate formula at low ppm (131.9504 / 132.9582).
 
-**[VO]** "And half of identification is ruling out contaminants. These are iron-formate
-clusters leaching from steel tubing, carrying an intrinsic charge from the metal's
-oxidation state — add iron, pick the metal-ion type, relax the organic-only rule, and the
-background ion names itself."
+**[VO]**
+- Half of identification is ruling out **contaminants**.
+- These are iron-formate clusters leaching from steel tubing, carrying an intrinsic charge from the metal's oxidation state.
+- Add iron, pick the metal-ion type, relax the organic-only rule — and the background ion names itself.
 
 ---
 
@@ -188,10 +183,10 @@ background ion names itself."
 **Peak picking = Centroid profile scans** on by default. Switch to **3D surface**,
 **Plot**, rotate. Click a pixel → Spectrum loads that scan.
 
-**[VO]** "Sometimes I zoom out from one peak and survey the neighbourhood — co-eluting
-isomers, an adduct series marching across m/z, a contaminant ladder. The map plots exact
-centroids over mass and time; I lower the contrast for the weak stuff, or rotate a 3-D
-surface. And, as everywhere, click a point to read the spectrum underneath."
+**[VO]**
+- Sometimes I zoom out from one peak and survey the neighbourhood — co-eluting isomers, an adduct series marching across m/z, a contaminant ladder.
+- The map plots exact centroids over mass and time; I lower the contrast for the weak stuff, or rotate a 3-D surface.
+- And, as everywhere, click a point to read the spectrum underneath.
 
 ---
 
@@ -200,9 +195,9 @@ surface. And, as everywhere, click a point to read the spectrum underneath."
 **[SCREEN]** With MS3TMT11 (DDA) included, **Precursors**. Show the rt × precursor-m/z
 scatter; click a point → its MS2 loads on Spectrum.
 
-**[VO]** "For the structural layer of an ID I need fragmentation. The Precursors map shows
-exactly what the instrument fragmented and when — click a precursor and I'm reading its
-MS2, ready to annotate it the same way."
+**[VO]**
+- For the structural layer of an ID I need **fragmentation**.
+- The Precursors map shows exactly what the instrument fragmented and when — click a precursor and I'm reading its MS2, ready to annotate it the same way.
 
 ---
 
@@ -211,14 +206,15 @@ MS2, ready to annotate it the same way."
 **[SCREEN]** **Filters**: set an rt window and MS level, add a spectrum-ID rule; a plot
 updates. **Settings**: switch the time unit and palette; show it applied.
 
-**[VO]** "Two housekeeping notes. Global filters — retention time, m/z, intensity, MS
-level, polarity, even spectrum-ID rules — narrow *every* view at once. And settings like
-the time unit, palette and export defaults persist across restarts."
+**[VO]**
+- Two housekeeping notes.
+- **Global filters** — retention time, m/z, intensity, MS level, polarity, even spectrum-ID rules — narrow *every* view at once.
+- And **settings** like the time unit, palette and export defaults persist across restarts.
 
 **[SCREEN]** **Save** on a plot → export dialog (png / svg / pdf / rds).
 
-**[VO]** "When I've made the case, every plot exports to a publication image — or the raw
-ggplot object, to keep tweaking in R."
+**[VO]**
+- When I've made the case, every plot exports to a publication image — or the raw ggplot object, to keep tweaking in R.
 
 ---
 
@@ -226,9 +222,10 @@ ggplot object, to keep tweaking in R."
 
 **[SCREEN]** Zoom out to the full app; end card with the repo URL.
 
-**[VO]** "That's the loop — chromatogram, spectrum, extract the ions to prove they belong
-together, then annotate to a formula and a structure. Raw LC–MS, one click at a time.
-It's on GitHub, and the article guides cover every panel."
+**[VO]**
+- That's the loop — chromatogram, spectrum, extract the ions to prove they belong together, then annotate to a formula and a structure.
+- Raw LC–MS, one click at a time.
+- It's on GitHub, and the article guides cover every panel.
 
 ---
 

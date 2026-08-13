@@ -575,8 +575,9 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         theme_classic()
       # Show the individual detector samples on a raw profile line (single view).
       if (prof && isTRUE(input$showpts) && identical(input$layout, "single"))
-        p <- p + geom_point(data = df, aes(x = mz, y = intensity, text = .tip),
-                            inherit.aes = FALSE, color = col1, size = 0.7)
+        p <- with_plotly_aes(
+          p + geom_point(data = df, aes(x = mz, y = intensity, text = .tip),
+                         inherit.aes = FALSE, color = col1, size = 0.7))
       # Overlay the centroids (picked with the panel's settings) as sticks so you
       # can compare them against the raw profile trace.
       if (prof && identical(input$layout, "single")) {
@@ -584,11 +585,11 @@ mod_plot_spectrum_server <- function(id, rv, included) {
         if (nrow(ov)) {
           ov$.tip <- sprintf("centroid\nm/z: %.4f\nint: %.3g", ov$mz, ov$intensity)
           col2 <- brewer_qual(2, rv$settings$qual_palette)[2]
-          p <- p +
+          p <- with_plotly_aes(p +
             geom_linerange(data = ov, aes(x = mz, ymin = 0, ymax = intensity, text = .tip),
                            inherit.aes = FALSE, color = col2, linewidth = 0.5) +
             geom_point(data = ov, aes(x = mz, y = intensity, text = .tip),
-                       inherit.aes = FALSE, color = col2, size = 1.1)
+                       inherit.aes = FALSE, color = col2, size = 1.1))
         }
       }
       if (is.finite(pmz))
@@ -599,7 +600,8 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       # overlay annotations (single view only)
       if (identical(input$layout, "single") && isTRUE(input$annotate)) {
         ar <- tryCatch(ann_result(), error = function(e) NULL)
-        if (!is.null(ar)) p <- annotate_layers(p, ar, df, rv$settings$qual_palette)
+        if (!is.null(ar))
+          p <- with_plotly_aes(annotate_layers(p, ar, df, rv$settings$qual_palette))
       }
       # isotope-pattern overlay: the simulated theoretical envelope (single view)
       if (identical(input$layout, "single") && isTRUE(input$annotate) &&
@@ -610,12 +612,12 @@ mod_plot_spectrum_server <- function(id, rv, included) {
           # Translucent filled envelope + a thin outline, so the raw peaks show
           # THROUGH the theoretical pattern and you can judge the overlap. Kept
           # thinner than the raw trace on purpose.
-          p <- p +
+          p <- with_plotly_aes(p +
             geom_area(data = ov, aes(x = mz, y = intensity, text = .tip, group = 1),
                       inherit.aes = FALSE, fill = "#1b9e77", alpha = 0.3) +
             geom_line(data = ov, aes(x = mz, y = intensity, text = .tip, group = 1),
                       inherit.aes = FALSE, color = "#1b9e77", linewidth = 0.3,
-                      alpha = 0.9)
+                      alpha = 0.9))
         }
       }
       p

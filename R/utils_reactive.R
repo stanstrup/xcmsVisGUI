@@ -130,6 +130,35 @@ finalize_plotly <- function(gg, source, keep_zoom) {
     register_plotly_events()
 }
 
+#' The aesthetics we pass through ggplot2 purely for plotly's benefit: `text`
+#' becomes the tooltip and `key` carries the file id into click events. ggplot2
+#' knows neither.
+#' @noRd
+.PLOTLY_ONLY_AES <- c("text", "key")
+
+#' Evaluate plot-building code, muffling ONLY the "Ignoring unknown aesthetics"
+#' warning for the plotly-only aesthetics above.
+#'
+#' ggplot2 checks a layer's own mapping against the geom's known aesthetics and
+#' warns at layer-construction time, so any `geom_*(data = ..., aes(text = ...))`
+#' emits one. It is telling us something we already know and rely on: `text` is
+#' inert in ggplot2 and read later by ggplotly(). A plot-level `aes()` is not
+#' checked, which is why only the extra layers warn.
+#'
+#' Deliberately narrow — a warning naming any OTHER unknown aesthetic is a real
+#' typo and still surfaces, as does every non-aesthetic warning.
+#' @noRd
+with_plotly_aes <- function(expr) {
+  withCallingHandlers(expr, warning = function(w) {
+    m <- conditionMessage(w)
+    if (!grepl("^Ignoring unknown aesthetics", m)) return()
+    named <- strsplit(sub("^[^:]*:", "", m), ",| and ")[[1]]
+    named <- trimws(named); named <- named[nzchar(named)]
+    if (length(named) && all(named %in% .PLOTLY_ONLY_AES))
+      invokeRestart("muffleWarning")
+  })
+}
+
 #' Shared "Peak picking" panel for the views that draw peaks (Spectrum, MS map).
 #' Peak picking is data PROCESSING, so it lives in each view's own panel, not the
 #' global Filters. The sub-controls (S/N, half-window, m/z refinement) expose the

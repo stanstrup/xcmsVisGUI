@@ -161,3 +161,19 @@ test_that("settings persistence round-trips on the allow-list", {
   expect_equal(s$default_tol, 20)
   expect_null(s$bogus)
 })
+
+test_that("with_plotly_aes mutes only the plotly-only unknown aesthetics", {
+  # `text`/`key` are meaningless to ggplot2 but are exactly what ggplotly reads,
+  # so their layer-level "Ignoring unknown aesthetics" warning is expected noise.
+  d <- data.frame(x = 1:3, y = 1:3, t = letters[1:3])
+  expect_silent(with_plotly_aes(
+    ggplot2::geom_line(data = d, ggplot2::aes(x = x, y = y, text = t))))
+  expect_silent(with_plotly_aes(
+    ggplot2::geom_point(data = d, ggplot2::aes(x = x, y = y, text = t, key = t))))
+  # a genuinely unknown aesthetic is a typo and must still be reported
+  expect_warning(with_plotly_aes(
+    ggplot2::geom_line(data = d, ggplot2::aes(x = x, y = y, txt = t))),
+    "unknown aesthetics")
+  # and non-aesthetic warnings pass straight through
+  expect_warning(with_plotly_aes(warning("something else")), "something else")
+})

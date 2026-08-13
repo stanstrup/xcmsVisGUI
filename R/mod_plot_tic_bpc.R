@@ -26,7 +26,7 @@ mod_plot_tic_bpc_ui <- function(id) {
   )
 }
 
-#' @importFrom ggplot2 ggplot aes geom_line geom_point scale_color_manual labs theme_bw
+#' @importFrom ggplot2 ggplot aes geom_line geom_point scale_color_manual labs theme_bw theme
 #' @importFrom plotly renderPlotly
 #' @noRd
 mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
@@ -79,7 +79,11 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
                       color = NULL,
                       title = paste0(chrom_label(), " \u2014 ", length(unique(df$sample_id)),
                                      " file(s)")) +
-        theme_bw()
+        theme_bw() +
+        # File names below the plot, not beside it: a right-hand legend of long
+        # file names eats the plot width. ggplotly maps this to a horizontal
+        # legend under the x axis.
+        theme(legend.position = "bottom")
     })
 
     keep_zoom <- zoom_keeper("tic")

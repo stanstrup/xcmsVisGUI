@@ -61,7 +61,7 @@ mod_plot_eic_ui <- function(id) {
 #' @importFrom DT renderDT datatable dataTableProxy replaceData
 #' @importFrom dplyr bind_rows left_join
 #' @importFrom tibble tibble
-#' @importFrom ggplot2 ggplot aes geom_line geom_point scale_color_manual labs theme_bw facet_wrap
+#' @importFrom ggplot2 ggplot aes geom_line geom_point scale_color_manual labs theme_bw theme facet_wrap
 #' @importFrom plotly renderPlotly
 #' @noRd
 mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
@@ -244,7 +244,11 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
         scale_color_manual(values = pal) +
         labs(x = rt_axis_label(unit), y = ylab, color = NULL,
                       linetype = NULL) +
-        theme_bw()
+        theme_bw() +
+        # File names below the plot, not beside it: a right-hand legend of long
+        # file names eats the plot width. ggplotly maps this to a horizontal
+        # legend under the x axis.
+        theme(legend.position = "bottom")
       if (isTRUE(input$facet) && length(unique(df$sample_id)) > 1)
         p <- p + facet_wrap(~ sample_name, ncol = 1, scales = "free_y")
       p

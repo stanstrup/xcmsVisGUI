@@ -63,6 +63,11 @@ Consequences baked into the architecture:
   builds `included` (ticked + ready files), `meta` (id/name/path/group), `data_key`
   (paths + filter), a cached `raw_msexp` (`build_msexp`, keyed on path set) and `dataset`
   (= `apply_filters(raw)`). `run_app()` does runtime setup + `shinyApp` + `runApp`.
+  **`included` is `debounce`d** (`SELECTION_DEBOUNCE_MS`): it is the root of every
+  extraction, and each tick in the file list writes one row of `rv$files$include`,
+  so unticking ten files used to cost ten full re-extracts. shiny's `debounce`
+  emits its first value with no delay, so startup is unaffected. The file table
+  reads `rv$files` directly and still responds instantly.
 - **Package layout (not an app-dir):** what was `global.R` is split into `R/zzz.R`
   (`.onLoad` → SerialParam), `R/constants.R` (constants + rt helpers), `R/daemons.R`
   (`set_daemons`/`setup_runtime`). `R/xcmsVisGUI-package.R` holds the roxygen import
@@ -84,7 +89,7 @@ Consequences baked into the architecture:
 | `R/fct_settings_store.R` | `load_settings`/`save_settings` — persist allow-listed settings as JSON to the per-user config dir |
 | `R/fct_annotate.R` | spectrum annotation engine (pure): `adduct_rules`/`quasi_adducts` (commonMZ dict), `neutral_mass`/`adduct_mz`/`project_ions`, `match_spectrum`, `annotate_anchor` (manual), `rank_anchors` (findMAIN auto), `difference_network`, `centroid_peaks`. Overlaid by `mod_plot_spectrum`'s `annotate_layers`. **Matching pool is real `pickPeaks` centroids** built by the module's `ann_candidates()` at the user's Match S/N (not the raw trace); the engine's `centroid_peaks` is a pass-through on those, and callers pass `rel_floor = 0` (no hidden floor). |
 | `R/fct_isotope.R` | fine isotope-pattern engine (pure): `formula_candidates` (Rdisop from neutral mass), `scale_formula`, `isotope_pattern` (enviPat isotopologues → adduct ion m/z, reusing `adduct_rules`), `isotope_profile` (Gaussian envelope at a resolving power), `estimate_resolution` (from an observed profile peak's FWHM). Wired into `mod_plot_spectrum`'s `ann_mode == "iso"`. Adds enviPat + Rdisop deps. |
-| `R/utils_reactive.R` | `make_rv`, `zoom_keeper`, `centroid_controls_ui`/`read_centroid_spec` (shared Peak-picking panel), helpers |
+| `R/utils_reactive.R` | `make_rv`, `zoom_keeper` (`$apply`/`$ranges`), `with_plotly_aes`, `centroid_controls_ui`/`read_centroid_spec` (shared Peak-picking panel), helpers |
 
 ## Conventions / dogmas
 - **Colours: ColorBrewer / viridis only** (user preference). Qualitative for
@@ -131,6 +136,20 @@ Consequences baked into the architecture:
     from `extract_spectrum`), and snaps peak clicks to the apex (`PROFILE_SNAP_DA`).
 - **Zoom persistence**: use `zoom_keeper(source)` (captures `plotly_relayout`, re-applies
   the range each render) — `uirevision` did NOT hold zoom here. Keep `dynamicTicks=TRUE`.
+  It returns a **list**: `$apply` (pipe the plotly object through it) and `$ranges` (a
+  reactive `list(x=,y=)`). Pass `$ranges` to `mod_export_server(..., zoom=)` so **Save
+  plot saves what you are looking at** — `apply_zoom()` turns it into `coord_cartesian`
+  limits on the ggplot before the preview/ggsave render. `$apply` isolates the range
+  (re-reading it reactively caused an autorange feedback loop); `$ranges` does not,
+  because the export preview *should* follow the zoom.
+- **The plotly-only aesthetics** `text` (tooltip) and `key` (click file id) are unknown
+  to ggplot2. A plot-level `aes()` passes unchecked, but any `geom_*(aes(text=))` warns
+  "Ignoring unknown aesthetics" at layer-construction time. Wrap those layers in
+  `with_plotly_aes()` (`utils_reactive.R`), which mutes that warning **only** for
+  `text`/`key` — a genuinely misspelled aesthetic still surfaces.
+- **Legends of file names go below the plot** (`theme(legend.position = "bottom")` on
+  TIC/EIC): a right-hand legend of long file names eats the plot width. ggplotly maps
+  it to a horizontal legend under the x axis.
 - **Caching**: heavy reactives use `bindCache` keyed on `data_key()` (+ their own inputs).
   `file_scan_table` / `.ms_cache` cache per-file reads in memory. Don't key caches on
   cosmetic inputs (colour, contrast, points) — that breaks zoom and wastes work.

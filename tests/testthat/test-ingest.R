@@ -2,9 +2,10 @@
 # queue, so the invariant that matters is: whatever happens, the queue keeps
 # draining and no row is left stranded on "reading".
 
-skip_if_not_installed("msdata")
-
+# Skipped per test, not for the whole file: the path-selection test below is pure
+# and must still run where msdata is absent.
 msdata_file <- function() {
+  skip_if_not_installed("msdata")
   normalizePath(list.files(system.file("proteomics", package = "msdata"),
                            full.names = TRUE, pattern = "mzML$")[1])
 }
@@ -82,4 +83,54 @@ test_that("two files with the same basename both load and the list renders", {
     expect_equal(nrow(disp_df()), 2L)
     drain(session, rv)
   })
+})
+
+test_that("re-adding a folder names the newly appeared files (not NA)", {
+  # Regression (#2): add a folder, more files land in it, add it again. The
+  # already-loaded paths dedupe away, and add_paths() then named every NEW file
+  # NA — its `names` default, basename(paths), was forced only after `paths` had
+  # been narrowed to the kept subset, so the keep mask indexed off the end.
+  p <- msdata_file()
+  d <- file.path(tempdir(), "readd"); unlink(d, recursive = TRUE)
+  dir.create(d, showWarnings = FALSE)
+  file.copy(p, file.path(d, "first.mzML"), overwrite = TRUE)
+  set_daemons(1)
+  rv <- make_rv()
+
+  shiny::testServer(mod_ingest_server, args = list(rv = rv), {
+    session$setInputs(folder = d, add_folder = 1)
+    expect_identical(rv$files$name, "first.mzML")
+
+    # a second file finishes copying into the same folder; re-add it
+    file.copy(p, file.path(d, "second.mzML"), overwrite = TRUE)
+    session$setInputs(folder = d, add_folder = 2)
+
+    expect_equal(nrow(rv$files), 2L)                       # no duplicate row
+    expect_identical(rv$files$name, c("first.mzML", "second.mzML"))
+    expect_false(anyNA(rv$files$name))                     # was NA for "second"
+    drain(session, rv)
+    expect_true(all(rv$files$status == "ready"))           # and it really reads
+  })
+})
+
+test_that("select_new_paths keeps the names of the files it keeps", {
+  # Regression: this logic lived inline in add_paths(), whose `names` default is
+  # `basename(paths)` — a promise over `paths`. add_paths() rebound `paths` to
+  # the kept subset BEFORE forcing `names`, so the default described only the
+  # kept paths and indexing it with the full-length keep mask returned NA. Every
+  # newly added file came out named NA whenever ANY path deduped away, i.e. on
+  # every re-add of a folder ("duplicates show up as NA").
+  existing <- c("/data/a.mzML", "/data/b.mzML")
+  got <- select_new_paths(c("/data/a.mzML", "/data/b.mzML", "/data/c.mzML"),
+                          basename(c("/data/a.mzML", "/data/b.mzML", "/data/c.mzML")),
+                          existing)
+  expect_identical(got$paths, "/data/c.mzML")
+  expect_identical(got$names, "c.mzML")            # was NA_character_
+
+  # nothing new, nothing loaded yet, and explicit names (the fileInput path)
+  expect_length(select_new_paths("/data/a.mzML", "a.mzML", existing)$paths, 0L)
+  expect_identical(select_new_paths("/d/x.mzML", "x.mzML", character())$names, "x.mzML")
+  expect_identical(
+    select_new_paths(c("/data/a.mzML", "/tmp/up1"), c("a.mzML", "orig.mzML"), existing),
+    list(paths = "/tmp/up1", names = "orig.mzML"))
 })

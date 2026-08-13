@@ -71,6 +71,24 @@ mod_ingest_ui <- function(id) {
   )
 }
 
+#' The files in `paths` that are not already loaded, compared by normalised path
+#' against `existing`, keeping each kept path's display name.
+#'
+#' Pure and standalone on purpose. This used to be inlined in add_paths(), whose
+#' `names` argument defaults to `basename(paths)` — a promise over `paths`. The
+#' inline version rebound `paths` to the kept subset first, so forcing `names`
+#' afterwards described only the KEPT paths, and indexing that short vector with
+#' the full-length keep mask returned NA. Re-adding a folder (where the
+#' already-loaded paths dedupe away) therefore named every genuinely new file NA.
+#' Passing `names` straight through to a function that never rebinds `paths`
+#' removes the trap, and lets the behaviour be tested.
+#' @noRd
+select_new_paths <- function(paths, names, existing) {
+  keep <- !normalizePath(paths, mustWork = FALSE) %in%
+    normalizePath(existing, mustWork = FALSE)
+  list(paths = paths[keep], names = names[keep])
+}
+
 #' @importFrom mirai mirai
 #' @importFrom tibble tibble
 #' @importFrom dplyr bind_rows case_when
@@ -118,13 +136,11 @@ mod_ingest_server <- function(id, rv) {
 
     # --- Add files from any source ----------------------------------------
     add_paths <- function(paths, names = basename(paths)) {
-      keep <- !normalizePath(paths, mustWork = FALSE) %in%
-        normalizePath(rv$files$path, mustWork = FALSE)
-      paths <- paths[keep]; names <- names[keep]
-      if (!length(paths)) return(invisible())
+      new <- select_new_paths(paths, names, rv$files$path)
+      if (!length(new$paths)) return(invisible())
       new_rows <- tibble(
-        id = next_ids(length(paths)),
-        path = paths, name = names, sample_group = "group1",
+        id = next_ids(length(new$paths)),
+        path = new$paths, name = new$names, sample_group = "group1",
         include = FALSE, status = "reading", n_spectra = NA_integer_,
         rt_min = NA_real_, rt_max = NA_real_, mz_min = NA_real_, mz_max = NA_real_,
         ms_levels = NA_character_, polarities = NA_character_,

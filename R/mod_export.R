@@ -20,14 +20,30 @@ preview_dims <- function(w, h, box = c(560, 460)) {
   list(w = round(dw), h = round(dh))
 }
 
+#' Apply a zoom_keeper()$ranges value to a ggplot as coordinate limits. NULL per
+#' axis means "unzoomed", and coord_cartesian() reads NULL limits as the data
+#' range — so a partially zoomed plot needs no special case.
+#' @importFrom ggplot2 coord_cartesian
+#' @noRd
+apply_zoom <- function(p, z) {
+  if (is.null(z) || (is.null(z$x) && is.null(z$y))) return(p)
+  p + coord_cartesian(xlim = z$x, ylim = z$y)
+}
+
 #' @param plot_gg reactive returning the ggplot to save
 #' @param rv app reactive store (for default settings)
 #' @param basename file stem; a string or a reactive returning one
-mod_export_server <- function(id, plot_gg, rv, basename = "plot") {
+#' @param zoom optional `zoom_keeper()$ranges` reactive. Given one, the preview
+#'   and the saved file are clipped to the plot's CURRENT zoom — you save what
+#'   you are looking at, not the full data range.
+mod_export_server <- function(id, plot_gg, rv, basename = "plot", zoom = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
     stem <- function() if (is.function(basename)) basename() else basename
+
+    # The single source of truth for both the preview and the download.
+    plot_out <- reactive(apply_zoom(plot_gg(), if (is.function(zoom)) zoom() else NULL))
 
     observeEvent(input$open, {
       s <- rv$settings
@@ -82,7 +98,7 @@ mod_export_server <- function(id, plot_gg, rv, basename = "plot") {
     # re-render on every keystroke). Rendering the actual ggplot — not the plotly
     # — is what makes the preview faithful to the exported png/svg/pdf.
     pdims <- debounce(reactive(preview_dims(input$width, input$height)), 250)
-    output$preview <- renderPlot(plot_gg(),
+    output$preview <- renderPlot(plot_out(),
                                  width  = function() pdims()$w,
                                  height = function() pdims()$h)
 
@@ -90,7 +106,7 @@ mod_export_server <- function(id, plot_gg, rv, basename = "plot") {
       filename = function() sprintf("%s.%s", stem(), input$format),
       content = function(file) {
         on.exit(removeModal())
-        save_gg(plot_gg(), file, list(
+        save_gg(plot_out(), file, list(
           export_format = input$format, export_width = input$width,
           export_height = input$height, export_units = input$units,
           export_dpi = input$dpi, export_title = stem()))

@@ -75,10 +75,10 @@ mod_plot_precursors_server <- function(id, rv, included) {
         theme_bw()
     })
 
-    keep_zoom <- zoom_keeper("prec")
-    output$plot <- renderPlotly(finalize_plotly(plot_gg(), "prec", keep_zoom))
+    zoom <- zoom_keeper("prec")
+    output$plot <- renderPlotly(finalize_plotly(plot_gg(), "prec", zoom$apply))
     wire_selection("prec", "prec", rv, mz_from = function(ev) ev$y)
 
-    mod_export_server("export", plot_gg, rv, "precursors")
+    mod_export_server("export", plot_gg, rv, "precursors", zoom = zoom$ranges)
   })
 }

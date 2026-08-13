@@ -223,10 +223,15 @@ wire_selection <- function(source, plot, rv, mz_from = function(ev) NA_real_) {
 }
 
 #' Persist 2D zoom across re-renders. Call ONCE inside a moduleServer with the
-#' plot's plotly `source`; it returns a function to pipe a plotly object through.
-#' The stored range is read with isolate() so a user zoom does NOT re-trigger the
+#' plot's plotly `source`. Returns a list:
+#'   `$apply`  — pipe a plotly object through it to re-apply the stored range.
+#'   `$ranges` — a reactive giving `list(x = , y = )` (NULL per axis = unzoomed),
+#'               for consumers that need the numbers rather than a plotly object
+#'               (the export modal, which saves what you're looking at).
+#' `$apply` reads the range with isolate() so a user zoom does NOT re-trigger the
 #' render (that caused an autorange/snap-back feedback loop); it is only re-applied
-#' when the plot re-renders for data/cosmetic reasons. Cleared on double-click.
+#' when the plot re-renders for data/cosmetic reasons. `$ranges` is deliberately
+#' NOT isolated — the export preview should follow the zoom. Cleared on double-click.
 #' @importFrom plotly event_data layout
 #' @noRd
 zoom_keeper <- function(source) {
@@ -253,10 +258,13 @@ zoom_keeper <- function(source) {
   observeEvent(event_data("plotly_doubleclick", source = source), {
     z$x <- NULL; z$y <- NULL
   }, ignoreInit = TRUE)
-  function(p) {
-    zx <- isolate(z$x); zy <- isolate(z$y)
-    if (!is.null(zx)) p <- layout(p, xaxis = list(range = zx, autorange = FALSE))
-    if (!is.null(zy)) p <- layout(p, yaxis = list(range = zy, autorange = FALSE))
-    p
-  }
+  list(
+    apply = function(p) {
+      zx <- isolate(z$x); zy <- isolate(z$y)
+      if (!is.null(zx)) p <- layout(p, xaxis = list(range = zx, autorange = FALSE))
+      if (!is.null(zy)) p <- layout(p, yaxis = list(range = zy, autorange = FALSE))
+      p
+    },
+    ranges = reactive(list(x = z$x, y = z$y))
+  )
 }

@@ -86,11 +86,12 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
         theme(legend.position = "bottom")
     })
 
-    keep_zoom <- zoom_keeper("tic")
-    output$plot <- renderPlotly(finalize_plotly(plot_gg(), "tic", keep_zoom))
+    zoom <- zoom_keeper("tic")
+    output$plot <- renderPlotly(finalize_plotly(plot_gg(), "tic", zoom$apply))
     # Click -> selection that drives the Spectrum tab.
     wire_selection("tic", "tic", rv)
 
-    mod_export_server("export", plot_gg, rv, reactive(tolower(chrom_label())))
+    mod_export_server("export", plot_gg, rv, reactive(tolower(chrom_label())),
+                      zoom = zoom$ranges)
   })
 }

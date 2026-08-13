@@ -74,7 +74,7 @@ mod_plot_map_server <- function(id, rv, included) {
       })
     })
 
-    keep_zoom <- zoom_keeper("map")
+    zoom <- zoom_keeper("map")
     output$plot_out <- renderPlotly({
       if (is.null(input$plot) || input$plot == 0)
         validate("Press \u2018Plot\u2019 to render the MS map for the included file(s).")
@@ -123,7 +123,7 @@ mod_plot_map_server <- function(id, rv, included) {
                                      cmax = cmax, size = 0.1, colorbar = list(title = "int")),
                        hoverinfo = "skip", showlegend = FALSE)
         p %>% layout(xaxis = list(title = rt_axis_label(unit)), yaxis = list(title = "m/z")) %>%
-          keep_zoom() %>%
+          zoom$apply() %>%
           register_plotly_events()
 
       } else if (input$mode == "surface") {
@@ -183,6 +183,8 @@ mod_plot_map_server <- function(id, rv, included) {
         labs(x = rt_axis_label(unit), y = "m/z", color = "int") +
         theme_bw()
     })
-    mod_export_server("export", export_gg, rv, "msmap")
+    # Only the 2D map shares the zoom_keeper axes; the 3D modes carry their own
+    # scene camera (uirevision) and export_gg only renders the 2D map anyway.
+    mod_export_server("export", export_gg, rv, "msmap", zoom = zoom$ranges)
   })
 }

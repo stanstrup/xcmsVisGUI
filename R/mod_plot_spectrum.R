@@ -623,9 +623,9 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       p
     })
 
-    keep_zoom <- zoom_keeper("spec")
+    zoom <- zoom_keeper("spec")
     output$plot <- renderPlotly({
-      p <- finalize_plotly(plot_gg(), "spec", keep_zoom)
+      p <- finalize_plotly(plot_gg(), "spec", zoom$apply)
       # ggplotly drops geom_text `angle`, so rotate the label traces here. Build
       # first: trace `mode` ("text") is only populated after plotly_build().
       if (isTRUE(input$annotate)) p <- text_traces_vertical(plotly::plotly_build(p))
@@ -731,7 +731,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       removeModal()
     })
 
-    mod_export_server("export", plot_gg, rv, "spectrum")
+    mod_export_server("export", plot_gg, rv, "spectrum", zoom = zoom$ranges)
   })
 }
 

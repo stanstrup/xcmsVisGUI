@@ -254,11 +254,11 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       p
     })
 
-    keep_zoom <- zoom_keeper("eic")
-    output$plot <- renderPlotly(finalize_plotly(plot_gg(), "eic", keep_zoom))
+    zoom <- zoom_keeper("eic")
+    output$plot <- renderPlotly(finalize_plotly(plot_gg(), "eic", zoom$apply))
     wire_selection("eic", "eic", rv)
 
-    mod_export_server("export", plot_gg, rv, "eic")
+    mod_export_server("export", plot_gg, rv, "eic", zoom = zoom$ranges)
   })
 }
 

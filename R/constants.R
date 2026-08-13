@@ -64,6 +64,11 @@ ISO_ELEMENTS_ALL <- c("C", "H", "N", "O", "P", "S", "F", "Cl", "Br", "I",
                       "Na", "K", "Ca", "Mg", "Al", "Si", "Fe", "Cr", "Ni",
                       "Mn", "Cu", "Zn", "Co", "Se", "B", "As", "Ba", "Sr", "Ti")
 
+# How long the file selection must settle before the app re-extracts (ms).
+# Ticking files off one by one otherwise triggers a full re-extract per click.
+# Matches the filter panel's own debounce so the two feel alike.
+SELECTION_DEBOUNCE_MS <- 600
+
 # --- Retention-time unit helpers ------------------------------------------
 # Data is always handled internally in SECONDS (xcms/Spectra native). These
 # convert to/from the user-facing display unit (minutes by default).

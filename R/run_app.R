@@ -52,12 +52,21 @@ app_server <- function(input, output, session) {
 
   # Included, successfully-read files, with a unique per-file display label
   # (disambiguates same-named files from different paths in every plot).
-  included <- reactive({
+  #
+  # DEBOUNCED, because this is the root of every extraction: ticking files in the
+  # file list writes rv$files$include one row at a time, and each write would
+  # otherwise re-extract and redraw everything. Deselecting ten files cost ten
+  # full redraws. Settling first collapses a burst of clicks into one pass. The
+  # file table itself is unaffected — it renders from rv$files directly, so the
+  # ticks still respond instantly. shiny's debounce emits its first value with no
+  # delay, so startup is not slowed.
+  included_now <- reactive({
     f <- rv$files
     f <- f[f$include & f$status == "ready", , drop = FALSE]
     f$disp_name <- unique_display_names(f$name, f$path)
     f
   })
+  included <- debounce(included_now, SELECTION_DEBOUNCE_MS)
 
   mod_filter_server("filter", rv, included)
 

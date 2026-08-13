@@ -75,8 +75,14 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       tg <- rv$eic_targets
       check <- vapply(seq_len(nrow(tg)), function(i) as.character(tags$input(
         type = "checkbox", checked = if (isTRUE(tg$enabled[i])) "checked" else NULL,
+        # Ticking the box must ONLY tick the box. DT delegates row selection off
+        # the table, so otherwise one click did two unrelated things: enable the
+        # target AND mark its row for "Remove selected". Note DT binds selection
+        # on MOUSEDOWN (`tbody tr`), not click — stopping propagation in onclick
+        # alone is too late, the row is already selected by then. Hence both.
+        onmousedown = "event.stopPropagation()",
         onclick = sprintf(
-          "Shiny.setInputValue('%s', {row: %d, checked: this.checked}, {priority:'event'})",
+          "event.stopPropagation();Shiny.setInputValue('%s', {row: %d, checked: this.checked}, {priority:'event'})",
           ns("toggle"), i))), character(1))
       data.frame(` ` = check, label = tg$label, mz = tg$mz, tol = tg$tol,
                  unit = tg$unit, rt_min = tg$rt_min, rt_max = tg$rt_max,

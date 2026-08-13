@@ -23,14 +23,17 @@ mod_filter_ui <- function(id) {
   )
 }
 
-# numeric min/max pair on one row, with a range hint
-.minmax <- function(ns, key, label, hint, step) {
+# numeric min/max pair on one row, with a range hint. `vmin`/`vmax` seed the
+# boxes: the panel is re-rendered whenever the included files change (the hints
+# and MS-level choices are data-derived), so the caller passes the CURRENT values
+# back in — otherwise every re-render would blank the user's typed filter.
+.minmax <- function(ns, key, label, hint, step, vmin = NA, vmax = NA) {
   tagList(
     tags$label(class = "control-label", label),
     if (nzchar(hint)) tags$small(class = "text-muted d-block", hint),
     div(class = "d-flex gap-2",
-        numericInput(ns(paste0(key, "_min")), NULL, value = NA, step = step, width = "100%"),
-        numericInput(ns(paste0(key, "_max")), NULL, value = NA, step = step, width = "100%"))
+        numericInput(ns(paste0(key, "_min")), NULL, value = vmin, step = step, width = "100%"),
+        numericInput(ns(paste0(key, "_max")), NULL, value = vmax, step = step, width = "100%"))
   )
 }
 
@@ -77,6 +80,12 @@ mod_filter_server <- function(id, rv, included) {
       combined_ranges(inc)
     })
 
+    # The panel is rebuilt whenever the included files change, because the range
+    # hints and the MS-level choices are read off the data. That rebuild used to
+    # RESET every control \u2014 including files then silently cleared the filter the
+    # user had typed. So each control is re-seeded from its own current value
+    # (isolated: this must not make the panel re-render on every keystroke).
+    keep <- function(id, default = NA) isolate(input[[id]]) %||% default
     output$controls <- renderUI({
       r <- ranges()
       if (is.null(r))
@@ -87,18 +96,24 @@ mod_filter_server <- function(id, rv, included) {
                 rt_to_disp(r$rt[2], unit), unit) else ""
       mz_hint <- if (!is.null(r$mz))
         sprintf("data: %.4f\u2013%.4f", r$mz[1], r$mz[2]) else ""
+      # A previously chosen MS level is kept only while the new file set still
+      # offers it; otherwise fall back to the usual default.
+      ms_now <- keep("ms_level", NULL)
+      ms_sel <- if (!is.null(ms_now) && ms_now %in% c("all", r$ms_levels)) ms_now
+                else if ("1" %in% r$ms_levels) "1" else "all"
       tagList(
-        .minmax(ns, "rt", sprintf("Retention time (%s)", unit), rt_hint, 0.01),
-        .minmax(ns, "mz", "m/z", mz_hint, 0.0001),
-        .minmax(ns, "int", "Intensity", "", 1),
+        .minmax(ns, "rt", sprintf("Retention time (%s)", unit), rt_hint, 0.01,
+                keep("rt_min"), keep("rt_max")),
+        .minmax(ns, "mz", "m/z", mz_hint, 0.0001, keep("mz_min"), keep("mz_max")),
+        .minmax(ns, "int", "Intensity", "", 1, keep("int_min"), keep("int_max")),
         div(class = "d-flex gap-2",
             div(style = "flex:1",
                 selectInput(ns("ms_level"), "MS level", width = "100%",
-                            choices = c("all", r$ms_levels),
-                            selected = if ("1" %in% r$ms_levels) "1" else "all")),
+                            choices = c("all", r$ms_levels), selected = ms_sel)),
             div(style = "flex:1",
                 selectInput(ns("polarity"), "Polarity", width = "100%",
-                            choices = c("any", "pos", "neg"), selected = "any"))),
+                            choices = c("any", "pos", "neg"),
+                            selected = keep("polarity", "any")))),
         helpText("Leave a box blank for no limit.")
       )
     })

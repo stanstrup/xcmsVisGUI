@@ -77,7 +77,7 @@ mod_export_server <- function(id, plot_gg, rv, basename = "plot", zoom = NULL) {
             ),
             conditionalPanel(
               sprintf("input['%s'] == 'rds'", ns("format")),
-              helpText("The ggplot object itself — readRDS() to tweak in R.")
+              helpText("The ggplot object itself \u2014 readRDS() to tweak in R.")
             )
           ),
           # --- preview ------------------------------------------------------

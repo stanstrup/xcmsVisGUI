@@ -171,7 +171,7 @@ with_plotly_aes <- function(expr) {
 #' Pair with read_centroid_spec(input) in the module server.
 #' @noRd
 centroid_controls_ui <- function(ns, default_mode = "off", overlay = FALSE) {
-  choices <- c("Raw — no peak picking" = "off",
+  choices <- c("Raw \u2014 no peak picking" = "off",
                "Centroid profile scans" = "auto",
                "Force centroid (all scans)" = "on")
   # overlay slots in right after "Raw": it is a raw view with centroids drawn on top.
@@ -186,13 +186,13 @@ centroid_controls_ui <- function(ns, default_mode = "off", overlay = FALSE) {
           numericInput(ns("csnr"), "S/N", value = 0, min = 0, step = 1, width = "90px"),
           numericInput(ns("chws"), "Half-window", value = 2, min = 1, step = 1,
                        width = "120px")),
-      numericInput(ns("ck"), "m/z accuracy: average ±N points", value = 0,
+      numericInput(ns("ck"), "m/z accuracy: average \u00b1N points", value = 0,
                    min = 0, step = 1),
       tags$small(class = "text-muted d-block",
                  "Profile scans are peak-picked; already-centroided scans pass ",
                  "through untouched. S/N drops noise peaks; half-window is the ",
                  "local-maximum window. m/z accuracy > 0 replaces each peak's apex ",
-                 "m/z with the intensity-weighted mean of its ±N neighbouring ",
+                 "m/z with the intensity-weighted mean of its \u00b1N neighbouring ",
                  "raw samples (sub-sample centroiding); 0 keeps the apex."))
   )
 }

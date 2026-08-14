@@ -42,11 +42,11 @@ mod_plot_eic_ui <- function(id) {
                       "Sample group" = "sample_group")),
         selectInput(ns("scale"), "Scale intensity",
                     c("Raw" = "raw",
-                      "Normalise each trace (÷ own max)" = "trace",
-                      "Normalise per target (÷ target max)" = "target",
+                      "Normalise each trace (\u00f7 own max)" = "trace",
+                      "Normalise per target (\u00f7 target max)" = "target",
                       "Log10 (y-axis)" = "log")),
         helpText("Raw = absolute. Per-trace compares peak shapes regardless of ",
-                 "abundance; per-target puts one compound's files on a common 0–1 ",
+                 "abundance; per-target puts one compound's files on a common 0\u20131 ",
                  "scale; log compresses the dynamic range. Tooltips always show the ",
                  "raw intensity."),
         checkboxInput(ns("points"), "Show data points", value = FALSE),
@@ -225,9 +225,9 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
         if (!is.finite(mx) || mx <= 0) v else v / mx }
       ylab <- "intensity"
       df$y <- switch(input$scale %||% "raw",
-        trace  = { ylab <- "intensity (÷ trace max)"
+        trace  = { ylab <- "intensity (\u00f7 trace max)"
                    stats::ave(df$intensity, interaction(df$target, df$sample_id), FUN = norm) },
-        target = { ylab <- "intensity (÷ target max)"
+        target = { ylab <- "intensity (\u00f7 target max)"
                    stats::ave(df$intensity, df$target, FUN = norm) },
         log    = { ylab <- "log10(intensity + 1)"; log10(df$intensity + 1) },
         df$intensity)

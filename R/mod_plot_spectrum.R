@@ -128,12 +128,12 @@ mod_plot_spectrum_ui <- function(id) {
                             value = FALSE),
               helpText("Enter the anchor peak and its adduct above; pick a candidate ",
                        "formula below to overlay its theoretical fine isotope pattern ",
-                       "(13C / 15N / 34S / 2H …), simulated at this resolving power and ",
+                       "(13C / 15N / 34S / 2H \u2026), simulated at this resolving power and ",
                        "scaled to the anchor. Formulas come from the selected Elements ",
                        "(organic elements by default). For a metal-complex ion (e.g. an ",
                        "iron-formate background ion) add the metal to Elements, choose ",
-                       "the ", tags$b("[M]+"), " adduct — the peak IS the ion, charged ",
-                       "by the metal — and leave “valid only” off. “From data” estimates ",
+                       "the ", tags$b("[M]+"), " adduct \u2014 the peak IS the ion, charged ",
+                       "by the metal \u2014 and leave \u201cvalid only\u201d off. \u201cFrom data\u201d estimates ",
                        "R from the peak width."),
               DTOutput(ns("iso_cands"))),
             conditionalPanel(
@@ -334,7 +334,7 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       req(isTRUE(input$annotate), identical(input$layout, "single"))
       n <- tryCatch(nrow(ann_candidates()), error = function(e) NA_integer_)
       if (is.na(n)) "" else
-        sprintf("%d candidate peaks feed matching (S/N ≥ %g).", n, ann_match_snr())
+        sprintf("%d candidate peaks feed matching (S/N \u2265 %g).", n, ann_match_snr())
     })
     # Optional cap on how many peaks to annotate (NA = all).
     ann_top <- reactive({
@@ -459,12 +459,12 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     observeEvent(input$iso_cands_rows_selected, iso_pick(input$iso_cands_rows_selected))
     output$iso_cands <- renderDT(server = FALSE, {
       fc <- iso_candidates()
-      validate(need(nrow(fc) > 0, "No formula within tolerance (widen ± tol)."))
+      validate(need(nrow(fc) > 0, "No formula within tolerance (widen \u00b1 tol)."))
       # `ok` marks organically-valid formulas (a ✓) so metal/exotic ones — shown
       # when "valid only" is off — are visibly distinguished rather than hidden.
       disp <- data.frame(formula = fc$formula, mass = fc$mass,
                          `ppm` = fc$ppm_err, DBE = fc$dbe,
-                         ok = ifelse(fc$valid, "✓", ""), check.names = FALSE)
+                         ok = ifelse(fc$valid, "\u2713", ""), check.names = FALSE)
       datatable(disp, rownames = FALSE, selection = "single",
                 options = list(dom = "t", paging = FALSE, ordering = TRUE,
                                scrollX = TRUE, scrollY = "220px", scrollCollapse = TRUE)) %>%

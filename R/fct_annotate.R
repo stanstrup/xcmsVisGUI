@@ -99,7 +99,7 @@ ion_type_rules <- function(mode = c("pos", "neg")) {
   if (identical(mode, "pos"))
     tibble(name = "[M]+", nmol = 1, charge = 1, massdiff = -.ELECTRON, quasi = 0)
   else
-    tibble(name = "[M]−", nmol = 1, charge = -1, massdiff = .ELECTRON, quasi = 0)
+    tibble(name = "[M]\u2212", nmol = 1, charge = -1, massdiff = .ELECTRON, quasi = 0)
 }
 
 #' Adduct rules PLUS the intrinsic-charge ion types — the full set an anchor may

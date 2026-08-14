@@ -87,6 +87,7 @@ notify_read_failures <- function(names) {
 
 #' The plotly events every interactive plot registers (and that the modules
 #' query via `event_data`).
+#' @noRd
 PLOTLY_EVENTS <- c("plotly_click", "plotly_relayout", "plotly_doubleclick")
 
 #' Register the click/relayout/doubleclick events on a plotly object. Used by

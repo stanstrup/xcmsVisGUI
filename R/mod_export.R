@@ -36,6 +36,7 @@ apply_zoom <- function(p, z) {
 #' @param zoom optional `zoom_keeper()$ranges` reactive. Given one, the preview
 #'   and the saved file are clipped to the plot's CURRENT zoom — you save what
 #'   you are looking at, not the full data range.
+#' @noRd
 mod_export_server <- function(id, plot_gg, rv, basename = "plot", zoom = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns

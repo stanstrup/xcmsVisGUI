@@ -624,6 +624,10 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     })
 
     zoom <- zoom_keeper("spec")
+    # Same trap as the EIC scale control: "Stacked" replaces intensity with a
+    # per-file normalised value plus a vertical offset, so a y range pinned in
+    # the single/facet view would hide everything. x (m/z) is unchanged.
+    observeEvent(input$layout, zoom$reset("y"), ignoreInit = TRUE)
     output$plot <- renderPlotly({
       p <- finalize_plotly(plot_gg(), "spec", zoom$apply)
       # ggplotly drops geom_text `angle`, so rotate the label traces here. Build

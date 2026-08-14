@@ -228,10 +228,20 @@ wire_selection <- function(source, plot, rv, mz_from = function(ev) NA_real_) {
 #'   `$ranges` — a reactive giving `list(x = , y = )` (NULL per axis = unzoomed),
 #'               for consumers that need the numbers rather than a plotly object
 #'               (the export modal, which saves what you're looking at).
+#'   `$reset`  — drop the stored range for the named axes. **Call it whenever a
+#'               control changes what an axis MEANS** (see below).
 #' `$apply` reads the range with isolate() so a user zoom does NOT re-trigger the
 #' render (that caused an autorange/snap-back feedback loop); it is only re-applied
 #' when the plot re-renders for data/cosmetic reasons. `$ranges` is deliberately
 #' NOT isolated — the export preview should follow the zoom. Cleared on double-click.
+#'
+#' A pinned range is only meaningful while the axis keeps its units. Switching the
+#' EIC intensity scaling (counts -> 0-1 -> log10) or the spectrum layout (raw
+#' intensity -> stacked/normalised) re-uses the axis for different numbers, and
+#' re-applying the old range then hides the data entirely: with "Facet by file" a
+#' panel stayed pinned at 0-250k while the normalised trace sat under 1.0, so the
+#' peak vanished — while the OTHER panels autoranged and looked fine, because only
+#' the first `yaxis` is tracked. Such controls must `$reset("y")`.
 #' @importFrom plotly event_data layout
 #' @noRd
 zoom_keeper <- function(source) {
@@ -254,10 +264,14 @@ zoom_keeper <- function(source) {
       z$y <- c(e[["yaxis.range[0]"]], e[["yaxis.range[1]"]])
     else if (isTRUE(e[["yaxis.autorange"]])) z$y <- NULL
   }, ignoreInit = TRUE)
+  clear <- function(axes = c("x", "y")) {
+    if ("x" %in% axes) z$x <- NULL
+    if ("y" %in% axes) z$y <- NULL
+    invisible(NULL)
+  }
   # A genuine reset is a double-click -> forget the zoom.
-  observeEvent(event_data("plotly_doubleclick", source = source), {
-    z$x <- NULL; z$y <- NULL
-  }, ignoreInit = TRUE)
+  observeEvent(event_data("plotly_doubleclick", source = source), clear(),
+               ignoreInit = TRUE)
   list(
     apply = function(p) {
       zx <- isolate(z$x); zy <- isolate(z$y)
@@ -265,6 +279,7 @@ zoom_keeper <- function(source) {
       if (!is.null(zy)) p <- layout(p, yaxis = list(range = zy, autorange = FALSE))
       p
     },
-    ranges = reactive(list(x = z$x, y = z$y))
+    ranges = reactive(list(x = z$x, y = z$y)),
+    reset = clear
   )
 }

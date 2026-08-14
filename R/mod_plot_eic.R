@@ -255,6 +255,12 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
     })
 
     zoom <- zoom_keeper("eic")
+    # Scaling and faceting change what the y axis MEANS (counts -> 0-1 -> log10;
+    # one shared panel -> one free_y panel per file), so a y range pinned by an
+    # earlier zoom becomes meaningless. Re-applying it left a faceted panel
+    # showing 0-250k while the normalised trace sat under 1.0 — the peak
+    # disappeared. Drop the y zoom; keep x, the rt window is still what you want.
+    observeEvent(list(input$scale, input$facet), zoom$reset("y"), ignoreInit = TRUE)
     output$plot <- renderPlotly(finalize_plotly(plot_gg(), "eic", zoom$apply))
     wire_selection("eic", "eic", rv)
 

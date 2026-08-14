@@ -1,13 +1,18 @@
 ## TODO
 
-7) Something seems wrong with EIC normlization when you have more than one file
-   — **could not reproduce (2026-08-13).** Checked on 3 faahKO files x 2 targets:
-   extraction/attribution is right (each file+target matches a single-file
-   extraction exactly), "÷ own max" puts every one of the 6 traces at exactly
-   1.0, and "÷ target max" puts the strongest file of each target at 1.0 with
-   the rest below. Needs a concrete example of what looked wrong.
+(empty)
 
 ## Done (2026-08-13)
+
+7) EIC normalization looked wrong with more than one file — the normalisation
+   maths was fine (verified on 3 faahKO files x 2 targets against single-file
+   extractions); the **zoom keeper** was at fault. Repro: raw + facet by file +
+   zoom into a peak, then switch on normalisation. The stored y range is in data
+   units, so re-applying it after the units changed pinned a panel at 0–250k
+   while the normalised trace sat under 1.0 — the peak vanished. Only one panel,
+   because only the first `yaxis` is tracked (facets also have `yaxis2..N`).
+   `zoom_keeper()$reset("y")` is now called from the EIC scale/facet controls and
+   the spectrum layout control; the x (rt) zoom is kept.
 
 1) Move filenames below on the TIC/EIC plots — `theme(legend.position="bottom")`.
 2) Re-adding a dir named the new files NA — `add_paths()`'s `names` default

@@ -136,12 +136,20 @@ Consequences baked into the architecture:
     from `extract_spectrum`), and snaps peak clicks to the apex (`PROFILE_SNAP_DA`).
 - **Zoom persistence**: use `zoom_keeper(source)` (captures `plotly_relayout`, re-applies
   the range each render) — `uirevision` did NOT hold zoom here. Keep `dynamicTicks=TRUE`.
-  It returns a **list**: `$apply` (pipe the plotly object through it) and `$ranges` (a
-  reactive `list(x=,y=)`). Pass `$ranges` to `mod_export_server(..., zoom=)` so **Save
-  plot saves what you are looking at** — `apply_zoom()` turns it into `coord_cartesian`
-  limits on the ggplot before the preview/ggsave render. `$apply` isolates the range
-  (re-reading it reactively caused an autorange feedback loop); `$ranges` does not,
-  because the export preview *should* follow the zoom.
+  It returns a **list**: `$apply` (pipe the plotly object through it), `$ranges` (a
+  reactive `list(x=,y=)`) and `$reset(axes)`. Pass `$ranges` to
+  `mod_export_server(..., zoom=)` so **Save plot saves what you are looking at** —
+  `apply_zoom()` turns it into `coord_cartesian` limits on the ggplot before the
+  preview/ggsave render. `$apply` isolates the range (re-reading it reactively caused
+  an autorange feedback loop); `$ranges` does not, because the export preview *should*
+  follow the zoom.
+  - **A control that changes what an axis MEANS must `$reset("y")`.** The stored range
+    is in data units, so re-applying it after the units change hides the data: the EIC
+    scale dropdown (counts → 0–1 → log10) left a *faceted* panel pinned at 0–250k while
+    the normalised trace sat under 1.0 — the peak vanished, and only that panel, because
+    only the first `yaxis` is tracked (facets also have `yaxis2..N`). Wired on the EIC
+    `scale`/`facet` inputs and the spectrum `layout` input. x (rt / m/z) is unchanged by
+    these, so it is deliberately kept.
 - **The plotly-only aesthetics** `text` (tooltip) and `key` (click file id) are unknown
   to ggplot2. A plot-level `aes()` passes unchecked, but any `geom_*(aes(text=))` warns
   "Ignoring unknown aesthetics" at layer-construction time. Wrap those layers in

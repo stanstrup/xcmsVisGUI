@@ -11,6 +11,18 @@ auto-extracts every file as you change unrelated settings.
 
 2-D MS map
 
+**Profile-mode files are peak-picked first** (the **Peak picking**
+control in this tab’s panel, default *Centroid profile scans*). This is
+the view that needs it: mapping a profile file raw means tens of
+millions of points — one test file goes from 29 million points (690 MB)
+to 2 million (48 MB) once picked. (The
+[Spectrum](https://stanstrup.github.io/xcmsVisGUI/articles/spectrum.md)
+view defaults to raw — it can afford to.) Set it to *Raw* to map every
+sample, but expect it to be slow. The setting, and its S/N / half-window
+/ *m/z*-refinement sub-options, take effect on the next **Plot**. See
+[Getting
+started](https://stanstrup.github.io/xcmsVisGUI/articles/getting_started.html#profile-mode-data).
+
 ## 3D views
 
 Switch the view to **3D surface** or **3D points** for a binned surface

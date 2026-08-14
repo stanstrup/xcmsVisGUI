@@ -46,9 +46,19 @@
 
 <div class="section level2">
 <h2 id="todo">TODO<a class="anchor" aria-label="anchor" href="#todo"></a></h2>
-<ul><li>CommonMZ/CAMERA/??? integration</li>
-<li>xcms objects</li>
-</ul></div>
+<p>(empty)</p>
+</div>
+<div class="section level2">
+<h2 id="done-2026-08-13">Done (2026-08-13)<a class="anchor" aria-label="anchor" href="#done-2026-08-13"></a></h2>
+<ol start="7" style="list-style-type: decimal"><li><p>EIC normalization looked wrong with more than one file — the normalisation maths was fine (verified on 3 faahKO files x 2 targets against single-file extractions); the <strong>zoom keeper</strong> was at fault. Repro: raw + facet by file + zoom into a peak, then switch on normalisation. The stored y range is in data units, so re-applying it after the units changed pinned a panel at 0–250k while the normalised trace sat under 1.0 — the peak vanished. Only one panel, because only the first <code>yaxis</code> is tracked (facets also have <code>yaxis2..N</code>). <code>zoom_keeper()$reset("y")</code> is now called from the EIC scale/facet controls and the spectrum layout control; the x (rt) zoom is kept.</p></li>
+<li><p>Move filenames below on the TIC/EIC plots — <code>theme(legend.position="bottom")</code>.</p></li>
+<li><p>Re-adding a dir named the new files NA — <code>add_paths()</code>’s <code>names</code> default (<code>basename(paths)</code>) was forced only AFTER <code>paths</code> had been narrowed to the new subset, so the keep mask indexed off the end. Reading itself was never broken (it goes by path); only the displayed name was NA. Now <code>select_new_paths()</code>.</p></li>
+<li><p>Adding files cleared the filter — the Filters panel is a <code>renderUI</code> keyed on the included files, and the rebuild reset every control. Values are now re-seeded from the current inputs.</p></li>
+<li><p>Deselecting files redrew per click — <code>included</code> is <code>debounce</code>d.</p></li>
+<li><p>EIC target checkbox also selected the row — DT delegates row selection on <strong>mousedown</strong>, so the checkbox stops propagation on mousedown <em>and</em> click.</p></li>
+<li><p>Saving a plot now uses the current zoom — <code>zoom_keeper()$ranges</code> -&gt; <code>coord_cartesian()</code> on the exported ggplot (preview and file).</p></li>
+<li><p>The <code>Ignoring unknown aesthetics: text</code> warning — <code>with_plotly_aes()</code> mutes it for <code>text</code>/<code>key</code> only; a misspelled aesthetic still warns.</p></li>
+</ol></div>
 <div class="section level2">
 <h2 id="decided--parked">Decided / parked<a class="anchor" aria-label="anchor" href="#decided--parked"></a></h2>
 <ul><li>
@@ -58,7 +68,10 @@
 <h2 id="for-later">For later<a class="anchor" aria-label="anchor" href="#for-later"></a></h2>
 <ul><li>
 <strong>more use of xcmsVIS</strong> — revisit when peak picking lands (see ARCHITECTURE_REVIEW.md “Deferred: preprocessing”): we’d then have XcmsExperiment objects and <code>gplotChromPeaks</code>/<code>gplotFeatureGroups</code> could back dedicated peak views (adding our own <code>key</code> layer on fresh plots is workable).</li>
-</ul></div>
+<li>xcms objects</li>
+<li>integrate with decomposemass –&gt; decomposemass needs API to pass parameters</li>
+<li>
+</li></ul></div>
 
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
@@ -70,7 +83,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

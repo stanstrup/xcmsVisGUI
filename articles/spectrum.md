@@ -27,6 +27,31 @@ A single spectrum
 The MS level / intensity / spectrum-ID **Filters** apply to which
 spectrum is shown.
 
+## Profile-mode files
+
+If the file is profile-mode, this view shows the scan **raw** by default
+(the **Peak picking** control in this tab’s panel, default *Raw*). It is
+drawn as a continuous **line** — which is what profile data actually is,
+rather than a stick per detector sample — and the title is marked
+*profile*. A click returns exactly the *m/z* you clicked (the nearest
+raw sample), which it sends to the EIC list or uses as the annotation
+anchor. Set **Peak picking** to *Centroid profile scans* for a
+conventional stick plot (the S/N, half-window and *m/z*-accuracy
+settings then appear), or **Raw + centroids overlay** to draw the picked
+centroids on top of the raw line — then a click can land on the true
+centroid. **Show data points** overlays the individual detector samples.
+See [Getting
+started](https://stanstrup.github.io/xcmsVisGUI/articles/getting_started.html#profile-mode-data).
+
+![A profile-mode scan drawn as a line, with the Peak-picking
+panel](figures/spectrum_profile.png)
+
+A profile-mode scan drawn as a line, with the Peak-picking panel
+
+Annotation works whether you view the spectrum raw or centroided — see
+*How annotation reduces the spectrum* below for exactly what it matches
+against.
+
 ## From spectrum to EIC
 
 **Click a peak** to add its *m/z* to the
@@ -87,14 +112,77 @@ There are three modes:
   mass accuracy at the two peaks, so set the tolerance to fit the
   instrument and raise the minimum intensity to drop noise pairs.
   Isotope-spaced differences are ignored.
+- **Isotope pattern (formula)** — overlays a *theoretical fine isotope
+  pattern* on the spectrum. Unlike the M+1/M+2 labels above (which only
+  assume ¹³C spacing), this resolves the true fine structure (¹³C vs ¹⁵N
+  vs ³⁴S vs ²H …), which needs a formula. Set the anchor peak and its
+  adduct; the neutral mass is inverted and
+  [Rdisop](https://bioconductor.org/packages/Rdisop) lists candidate
+  formulas (with mass error and DBE) from the **Elements** you select —
+  the default is the organic set (CHNOPS + halogens); add metals when
+  you need them. Pick a row and its pattern —
+  [enviPat](https://cran.r-project.org/package=enviPat) isotopologues
+  simulated as a profile envelope at the **Resolving power** you set —
+  is drawn as a translucent green envelope over the data (so the raw
+  peaks show through), scaled to the anchor. Higher resolving power
+  separates the fine structure; lower merges it, as your instrument
+  would. **From data** estimates the resolving power from the width of
+  the profile peak at the anchor. This is identification-adjacent — it
+  proposes formulas — so treat the candidate list as hypotheses to
+  confirm against the observed isotopes, not as an answer.
 
-The **± tol** is the adduct/fragment match window (ppm or Da); **Min
-intensity** drops peaks below that fraction of the base peak before
-matching; **Max charge** limits the charge states projected; **Annotate
-only top N peaks** keeps the N most intense *annotated* peaks. **Isotope
-tol (mDa)** is a separate, usually wider window for the isotope spacing
-(MS2 isotope centroids drift off the theoretical spacing, and the error
-grows with each M+n step). **Isotopes decrease in intensity** assumes a
+![The formula-based fine isotope pattern: the simulated envelope (green)
+overlaid on the raw profile isotope cluster, zoomed to the
+anchor](figures/isotope.png)
+
+The formula-based fine isotope pattern: the simulated envelope (green)
+overlaid on the raw profile isotope cluster, zoomed to the anchor
+
+**Metal-complex ions** (e.g. the iron-formate background series
+`[Fe(HCOO)(CH₃OH)]⁺` that leaches from stainless steel) need three
+things: add the metal(s) to **Elements**; choose the **\[M\]+** /
+**\[M\]−** adduct — the peak *is* the ion, its charge coming from the
+metal’s oxidation state, not a proton, so the mass is decomposed
+directly; and turn **off** *Chemically valid only*, because a metal’s
+fractional valence makes Rdisop flag the formula “invalid”. A ✓ in the
+table marks the organically-valid formulas. Note that free formula
+generation is only a proposer — for a definitive metal-complex
+assignment you also need the oxidation state and the actual ligand set
+(see the contaminant-ID methodology write-up), which this tool does not
+encode.
+
+### How annotation reduces the spectrum (what actually gets matched)
+
+Matching a raw profile scan directly would be meaningless — every one of
+its ~17 000 detector samples is a non-zero point that could coincide
+with *some* adduct or mass difference. So annotation never matches the
+raw trace. It matches a **centroid list**, produced transparently and
+under your control:
+
+1.  **Peak picking.** The scan is peak-picked with
+    [`Spectra::pickPeaks()`](https://rdrr.io/pkg/Spectra/man/addProcessing.html)
+    at the **Match S/N** you set (profile levels are picked; a file that
+    is already centroided passes through). This is the *same* engine as
+    the tab’s Peak-picking control — not a separate hidden reducer.
+2.  **Intensity floor.** **Min intensity** then drops centroids below
+    that fraction of the base peak.
+3.  The panel shows a live **“N candidate peaks feed matching”**
+    readout, so the size of the pool being matched is never a mystery —
+    raise Match S/N or Min intensity until it is sane for your data.
+
+Only then are adducts/fragments projected and matched within **± tol**.
+Two assumptions remain, both deliberate: isotope satellites are removed
+before adduct matching (an M+1 is never labelled an adduct — see
+**Isotope tol** below), and the `findMAIN` auto mode additionally ranks
+only the 200 most intense centroids. Nothing else is silently dropped.
+
+The **± tol** is the adduct/fragment match window (ppm or Da); **Match
+S/N** and **Min intensity** set the candidate pool as above; **Max
+charge** limits the charge states projected; **Annotate only top N
+peaks** keeps the N most intense *annotated* peaks. **Isotope tol
+(mDa)** is a separate, usually wider window for the isotope spacing (MS2
+isotope centroids drift off the theoretical spacing, and the error grows
+with each M+n step). **Isotopes decrease in intensity** assumes a
 falling envelope (true for most biological samples) — with it on, a
 heavier peak that is *more* intense is treated as a real loss (e.g. −H₂)
 rather than an isotope. Labels are written vertically and multiple hits

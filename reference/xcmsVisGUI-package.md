@@ -34,8 +34,8 @@ Useful links:
 
 ## Author
 
-**Maintainer**: Jan Stanstrup <stanstrup@gmail.com>
+**Maintainer**: Jan Stanstrup <stanstrup@gmail.com> \[copyright holder\]
 
 Authors:
 
-- Jan Stanstrup <stanstrup@gmail.com>
+- Jan Stanstrup <stanstrup@gmail.com> \[copyright holder\]

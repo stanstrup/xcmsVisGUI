@@ -2,9 +2,11 @@
 
 xcmsVisGUI is a local Shiny desktop app for exploring **raw** LC-MS data
 interactively — TIC/BPC, extracted-ion chromatograms, spectra (with
-adduct / isotope / fragment annotation), 2D/3D maps and DDA precursors.
-Scope is **raw visualisation only**: no peak picking, grouping or
-alignment.
+adduct / isotope / fragment annotation, including formula-based fine
+isotope patterns), 2D/3D maps and DDA precursors. It centroids profile
+scans on the fly for display, but its scope is still **raw
+visualisation**: there is no cross-sample peak picking, feature grouping
+or retention-time alignment.
 
 This page covers the cross-cutting basics — launching, loading files,
 filtering, settings and export. Each plot view then has its own guide:
@@ -63,8 +65,11 @@ the UI stays responsive even with many files. **Click a file’s row to
 include it** in the plots (the row highlights); click it again to
 exclude. Files stay loaded either way, so toggling is cheap. **All /
 None / Invert** select in bulk, and double-clicking the **Group** cell
-renames that file’s sample group (used for colouring and faceting). As
-soon as one file is included, the TIC renders:
+renames that file’s sample group (used for colouring and faceting). Two
+files that share a name but come from different folders are both kept,
+and are distinguished in the plots by their parent folder
+(e.g. `sample (plate1)`). As soon as one file is included, the TIC
+renders:
 
 ![The file list (selected rows are included) and the TIC
 overlay](figures/tic.png)
@@ -91,6 +96,63 @@ Matching is a literal substring (so `scan=1` also matches `scan=10`,
 `scan=199`, …). **Reset filters** clears everything. If a filter
 combination matches no spectra, the plots show “No spectra match the
 current filters.” rather than an error.
+
+### Profile-mode data
+
+Raw files come in two flavours: **centroided** (one point per detected
+ion) and **profile** (every detector sample, so a single peak is tens of
+points). The app reads which one you have from the file itself and shows
+it in the **Mode** column of the file list — `prof`, `cent`, or `mix`
+for a file that is profile at one MS level and centroided at another (a
+very common Thermo DDA setup: profile MS1, centroided MS2).
+
+Left as-is, profile data is awkward to work with: one Orbitrap MS1 scan
+can be ~17 000 points, and a whole file ~29 million. Peak-picking
+(centroiding) reduces each profile scan to its peaks. Because it is
+*data processing*, not a filter, the control lives in the right-hand
+panel of the two views that draw peaks — the **Spectrum** and **MS map**
+tabs — under **Peak picking**, not in the Filters panel. Each view has
+its own setting, with a sensible default:
+
+- The **Spectrum** view defaults to **Raw**: you opened it to look at
+  the data, and one scan is cheap. Raw profile is drawn as a continuous
+  **line** (what it actually is, not sticks) and the title is marked
+  *profile*. A click returns exactly the *m/z* you clicked (the nearest
+  raw sample); to click the true peak centroid, switch to **Centroid
+  profile scans** — a conventional stick spectrum — or turn on **Raw +
+  centroids overlay** and click the centroid.
+- The **MS map** defaults to **Centroid profile scans**. It has to:
+  mapping every raw sample is tens of millions of points per file. Only
+  the levels that really are profile get picked, so a mixed file keeps
+  its centroided MS2 spectra untouched. (Its setting takes effect on the
+  next **Plot**.)
+
+**Force centroid (all scans)** peak-picks every level, even ones the
+file flags as already centroided. The Spectrum tab also offers **Raw +
+centroids overlay**, which draws the raw profile line *and* the picked
+centroids (sticks) on top, so you can see exactly what peak picking
+keeps.
+
+![A profile scan shown as a line, with the per-view Peak-picking
+control](figures/spectrum_profile.png)
+
+A profile scan shown as a line, with the per-view Peak-picking control
+
+When picking is on, three settings appear:
+
+- **S/N** — signal-to-noise floor; raise it to drop noise peaks (0 keeps
+  every local maximum).
+- **Half-window** — how many points on each side a peak must top to
+  count as a local maximum; larger merges closely-spaced peaks.
+- **m/z accuracy: average ±N points** — replaces each centroid’s apex
+  *m/z* with the intensity-weighted mean of its ± N neighbouring raw
+  samples (0 = keep the apex). A small value (2–3) gives sub-sample mass
+  accuracy on profile data.
+
+Chromatograms (TIC / BPC / EIC) are never centroided, whatever this is
+set to: they sum or max intensities across an *m/z* window, which is
+correct on profile samples and reproduces the TIC the instrument
+recorded.
 
 ## Moving between tabs
 

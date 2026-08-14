@@ -52,7 +52,7 @@
 </div>
 <div class="section level2">
 <h2 id="run--test-windows-dev-box">Run / test (Windows dev box)<a class="anchor" aria-label="anchor" href="#run--test-windows-dev-box"></a></h2>
-<ul><li>R: <code>C:\Program Files\R\R-4.5.2\bin\Rscript.exe</code> (not on PATH — call by full path).</li>
+<ul><li>R: <code>C:\Program Files\R\R-4.6.0\bin\Rscript.exe</code> (not on PATH — call by full path). (4.5.0/4.5.2 are also installed; use 4.6.0. Each minor version has its OWN package library under <code>AppData/Local/R/win-library/&lt;x.y&gt;</code>, so after switching, deps must be present there — they are for 4.6.0.)</li>
 <li>
 <strong>This is now an R package.</strong> <code>R/</code> is package code (loaded via the namespace, not Shiny-auto-sourced); the app is the exported <code><a href="reference/run_app.html">run_app()</a></code>. Launch headless: <code>Rscript -e "pkgload::load_all('.'); run_app(port=7799, launch.browser=FALSE)"</code> (or <code>Rscript run.R</code>, which load_all’s + launches). Installed: <code><a href="reference/run_app.html">xcmsVisGUI::run_app()</a></code>.</li>
 <li>Tests (testthat, edition 3): <code>Rscript -e "testthat::test_local('.')"</code> (dev, load_all) or <code>R CMD check</code>. Real-data tests (filter-equivalence + extraction smoke) SKIP when msdata/faahKO are absent. <code>tests/testthat/</code> holds them.</li>
@@ -69,7 +69,7 @@
 <div class="section level2">
 <h2 id="architecture--data-flow">Architecture / data flow<a class="anchor" aria-label="anchor" href="#architecture--data-flow"></a></h2>
 <ul><li>
-<code>R/run_app.R</code>: <code>app_ui()</code> builds the bslib <code>page_navbar</code> (sidebar with Files (<code>mod_ingest</code>) + Filters (<code>mod_filter</code>); nav panels = plot modules); <code>app_server()</code> builds <code>included</code> (ticked + ready files), <code>meta</code> (id/name/path/group), <code>data_key</code> (paths + filter), a cached <code>raw_msexp</code> (<code>build_msexp</code>, keyed on path set) and <code>dataset</code> (= <code>apply_filters(raw)</code>). <code><a href="reference/run_app.html">run_app()</a></code> does runtime setup + <code>shinyApp</code> + <code>runApp</code>.</li>
+<code>R/run_app.R</code>: <code>app_ui()</code> builds the bslib <code>page_navbar</code> (sidebar with Files (<code>mod_ingest</code>) + Filters (<code>mod_filter</code>); nav panels = plot modules); <code>app_server()</code> builds <code>included</code> (ticked + ready files), <code>meta</code> (id/name/path/group), <code>data_key</code> (paths + filter), a cached <code>raw_msexp</code> (<code>build_msexp</code>, keyed on path set) and <code>dataset</code> (= <code>apply_filters(raw)</code>). <code><a href="reference/run_app.html">run_app()</a></code> does runtime setup + <code>shinyApp</code> + <code>runApp</code>. <strong><code>included</code> is <code>debounce</code>d</strong> (<code>SELECTION_DEBOUNCE_MS</code>): it is the root of every extraction, and each tick in the file list writes one row of <code>rv$files$include</code>, so unticking ten files used to cost ten full re-extracts. shiny’s <code>debounce</code> emits its first value with no delay, so startup is unaffected. The file table reads <code>rv$files</code> directly and still responds instantly.</li>
 <li>
 <strong>Package layout (not an app-dir):</strong> what was <code>global.R</code> is split into <code>R/zzz.R</code> (<code>.onLoad</code> → SerialParam), <code>R/constants.R</code> (constants + rt helpers), <code>R/daemons.R</code> (<code>set_daemons</code>/<code>setup_runtime</code>). <code>R/xcmsVisGUI-package.R</code> holds the roxygen import declarations; NAMESPACE/<code>man/</code> are roxygen-generated — don’t hand-edit.</li>
 <li>Central reactive state: <code>make_rv()</code> in <code>R/utils_reactive.R</code> (rv<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>f</mi><mi>i</mi><mi>l</mi><mi>e</mi><mi>s</mi><mo>,</mo><mi>r</mi><mi>v</mi></mrow><annotation encoding="application/x-tex">files, rv</annotation></semantics></math>eic_targets, rv<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>s</mi><mi>e</mi><mi>l</mi><mi>e</mi><mi>c</mi><mi>t</mi><mi>i</mi><mi>o</mi><mi>n</mi><mo>,</mo><mi>r</mi><mi>v</mi></mrow><annotation encoding="application/x-tex">selection, rv</annotation></semantics></math>filter, rv$settings). One <code>rv</code> passed to every module.</li>
@@ -84,7 +84,7 @@
 </td>
 </tr><tr><td><code>R/fct_filters.R</code></td>
 <td>
-<code>apply_filters</code> (MsExperiment) + <code>apply_filters_spectra</code> (Spectra) — keep them consistent; <code>combined_ranges</code> for filter hints</td>
+<code>apply_filters</code> (MsExperiment) + <code>apply_filters_spectra</code> (Spectra, optional <code>cp</code> peak-picking) — keep them consistent; <code>centroid_spec</code>/<code>profile_ms_levels</code>/<code>centroid_ms_levels</code> (peak picking); <code>combined_ranges</code> for filter hints</td>
 </tr><tr><td><code>R/fct_palettes.R</code></td>
 <td>
 <code>brewer_qual/seq/colorscale</code> (ColorBrewer + viridis; <code>invert</code> reverses)</td>
@@ -99,11 +99,12 @@
 <td>
 <code>load_settings</code>/<code>save_settings</code> — persist allow-listed settings as JSON to the per-user config dir</td>
 </tr><tr><td><code>R/fct_annotate.R</code></td>
-<td>spectrum annotation engine (pure): <code>adduct_rules</code>/<code>quasi_adducts</code> (commonMZ dict), <code>neutral_mass</code>/<code>adduct_mz</code>/<code>project_ions</code>, <code>match_spectrum</code>, <code>annotate_anchor</code> (manual), <code>rank_anchors</code> (findMAIN auto), <code>difference_network</code>, <code>centroid_peaks</code>. Overlaid by <code>mod_plot_spectrum</code>’s <code>annotate_layers</code>
-</td>
+<td>spectrum annotation engine (pure): <code>adduct_rules</code>/<code>quasi_adducts</code> (commonMZ dict), <code>neutral_mass</code>/<code>adduct_mz</code>/<code>project_ions</code>, <code>match_spectrum</code>, <code>annotate_anchor</code> (manual), <code>rank_anchors</code> (findMAIN auto), <code>difference_network</code>, <code>centroid_peaks</code>. Overlaid by <code>mod_plot_spectrum</code>’s <code>annotate_layers</code>. <strong>Matching pool is real <code>pickPeaks</code> centroids</strong> built by the module’s <code>ann_candidates()</code> at the user’s Match S/N (not the raw trace); the engine’s <code>centroid_peaks</code> is a pass-through on those, and callers pass <code>rel_floor = 0</code> (no hidden floor).</td>
+</tr><tr><td><code>R/fct_isotope.R</code></td>
+<td>fine isotope-pattern engine (pure): <code>formula_candidates</code> (Rdisop from neutral mass), <code>scale_formula</code>, <code>isotope_pattern</code> (enviPat isotopologues → adduct ion m/z, reusing <code>adduct_rules</code>), <code>isotope_profile</code> (Gaussian envelope at a resolving power), <code>estimate_resolution</code> (from an observed profile peak’s FWHM). Wired into <code>mod_plot_spectrum</code>’s <code>ann_mode == "iso"</code>. Adds enviPat + Rdisop deps.</td>
 </tr><tr><td><code>R/utils_reactive.R</code></td>
 <td>
-<code>make_rv</code>, <code>zoom_keeper</code>, helpers</td>
+<code>make_rv</code>, <code>zoom_keeper</code> (<code>$apply</code>/<code>$ranges</code>), <code>with_plotly_aes</code>, <code>centroid_controls_ui</code>/<code>read_centroid_spec</code> (shared Peak-picking panel), helpers</td>
 </tr></tbody></table></div>
 <div class="section level2">
 <h2 id="conventions--dogmas">Conventions / dogmas<a class="anchor" aria-label="anchor" href="#conventions--dogmas"></a></h2>
@@ -112,9 +113,31 @@
 <li>
 <strong>Time: data is always SECONDS internally</strong>; convert at display/input edges with <code>rt_to_disp</code> / <code>rt_to_sec</code> / <code>rt_axis_label</code> (unit = <code>rv$settings$time_unit</code>). Plotly click <code>x</code> is in the display unit → convert back to seconds for <code>rv$selection</code>.</li>
 <li>
-<strong>Filters apply everywhere.</strong> Single-file views (spectrum, map) must go through <code>apply_filters_spectra</code> so intensity/spectrum-id/etc. reach them — don’t read raw.</li>
+<strong>Filters apply everywhere.</strong> Single-file views (spectrum, map) must go through <code>apply_filters_spectra</code> so intensity/spectrum-id/etc. reach them — don’t read raw. Peak picking is the ONE thing that is NOT a filter (below): it is data processing, a separate <code>cp</code> arg, so filter == which spectra, cp == how to reduce them.</li>
 <li>
-<strong>Zoom persistence</strong>: use <code>zoom_keeper(source)</code> (captures <code>plotly_relayout</code>, re-applies the range each render) — <code>uirevision</code> did NOT hold zoom here. Keep <code>dynamicTicks=TRUE</code>.</li>
+<strong>Profile mode / peak picking</strong> — <code>centroid_spec(mode, snr, hws, k)</code>, a per-view processing spec passed as <code>apply_filters_spectra(sp, f, cp)</code> / <code>extract_*(..., cp)</code>, NOT part of the filter. <code>apply_filters_spectra</code> peak-picks profile scans via <code><a href="https://rdrr.io/pkg/Spectra/man/addProcessing.html" class="external-link">Spectra::pickPeaks()</a></code> — a <em>lazy</em> step, so nothing materialises until a view reads peaks. Why it matters: one profile Orbitrap MS1 scan is ~17k points and a file ~29M (690 MB) — the MS map was unusable and the spectrum drew 17k sticks. Picked: 1.4k / 2M (48 MB).
+<ul><li>
+<strong>Owned per view, not global</strong> (user: “it’s data processing, not a filter”). Each view that draws peaks has its own <strong>Peak-picking panel</strong> (<code>centroid_controls_ui</code> + <code>read_centroid_spec</code>, shared in <code>utils_reactive.R</code>). Defaults differ: <strong>Spectrum</strong> opens on <code>off</code> (raw trace — you came to see the data), <strong>MS map</strong> on <code>auto</code> (raw is tens of millions of points there). Modes: <code>off</code> / <code>auto</code> (pick detected-profile levels) / <code>on</code> (force all levels). <code>cp = NULL</code> means no picking.</li>
+<li>
+<strong>Exposed pickPeaks knobs</strong>: <code>snr</code> (S/N floor), <code>hws</code> (half-window for local-max), <code>k</code> (m/z refinement = intensity-weighted mean of ±k raw points). Not exposed: <code>method</code>/<code>descending</code>/<code>threshold</code> (niche). Sub-controls show only when picking on.</li>
+<li>
+<strong>Detection is per MS LEVEL, not per file</strong> (<code>profile_ms_levels</code>). Mixed files (profile MS1 + centroided MS2) are the norm on Thermo DDA, and pickPeaks over an already-centroided spectrum DROPS every peak whose neighbour is more intense — it would gut the MS2s. Hence <code>pickPeaks(msLevel. = &lt;profile levels&gt;)</code>. Source of truth = the file’s <code>centroided</code> flag (mzML has it per spectrum; mzR and Spectra both expose it), falling back to <code><a href="https://rdrr.io/pkg/ProtGenerics/man/protgenerics.html" class="external-link">Spectra::isCentroided()</a></code> peak-shape sniffing when absent (CDF). Undecidable → treat as centroided; never pick on a guess.</li>
+<li>
+<strong>Chromatograms are NEVER centroided</strong> (<code>apply_filters</code> takes no <code>cp</code>): TIC/BPC/EIC sum/max over an m/z window, which is correct on profile samples and reproduces the instrument’s TIC. With <code>cp = NULL</code> <code>apply_filters_spectra</code> is a pure filter and matches <code>apply_filters</code> — the equivalence invariant the filter tests rest on.</li>
+<li>
+<strong><code><a href="https://rdrr.io/pkg/Spectra/man/addProcessing.html" class="external-link">Spectra::pickPeaks</a></code> must be namespaced</strong> — attaching xcms pulls in an MSnbase <code>pickPeaks</code> generic that masks ProtGenerics’, and a bare call fails to dispatch.</li>
+<li>Peak-level filters (m/z, intensity) run AFTER picking; an intensity floor applied to profile samples would clip the flanks off every peak before pickPeaks saw it.</li>
+<li>The spectrum view draws raw profile as a <strong>line</strong>, not sticks (<code>profile</code> column from <code>extract_spectrum</code>), and snaps peak clicks to the apex (<code>PROFILE_SNAP_DA</code>).</li>
+</ul></li>
+<li>
+<strong>Zoom persistence</strong>: use <code>zoom_keeper(source)</code> (captures <code>plotly_relayout</code>, re-applies the range each render) — <code>uirevision</code> did NOT hold zoom here. Keep <code>dynamicTicks=TRUE</code>. It returns a <strong>list</strong>: <code>$apply</code> (pipe the plotly object through it), <code>$ranges</code> (a reactive <code>list(x=,y=)</code>) and <code>$reset(axes)</code>. Pass <code>$ranges</code> to <code>mod_export_server(..., zoom=)</code> so <strong>Save plot saves what you are looking at</strong> — <code>apply_zoom()</code> turns it into <code>coord_cartesian</code> limits on the ggplot before the preview/ggsave render. <code>$apply</code> isolates the range (re-reading it reactively caused an autorange feedback loop); <code>$ranges</code> does not, because the export preview <em>should</em> follow the zoom.
+<ul><li>
+<strong>A control that changes what an axis MEANS must <code>$reset("y")</code>.</strong> The stored range is in data units, so re-applying it after the units change hides the data: the EIC scale dropdown (counts → 0–1 → log10) left a <em>faceted</em> panel pinned at 0–250k while the normalised trace sat under 1.0 — the peak vanished, and only that panel, because only the first <code>yaxis</code> is tracked (facets also have <code>yaxis2..N</code>). Wired on the EIC <code>scale</code>/<code>facet</code> inputs and the spectrum <code>layout</code> input. x (rt / m/z) is unchanged by these, so it is deliberately kept.</li>
+</ul></li>
+<li>
+<strong>The plotly-only aesthetics</strong> <code>text</code> (tooltip) and <code>key</code> (click file id) are unknown to ggplot2. A plot-level <code>aes()</code> passes unchecked, but any <code>geom_*(aes(text=))</code> warns “Ignoring unknown aesthetics” at layer-construction time. Wrap those layers in <code>with_plotly_aes()</code> (<code>utils_reactive.R</code>), which mutes that warning <strong>only</strong> for <code>text</code>/<code>key</code> — a genuinely misspelled aesthetic still surfaces.</li>
+<li>
+<strong>Legends of file names go below the plot</strong> (<code>theme(legend.position = "bottom")</code> on TIC/EIC): a right-hand legend of long file names eats the plot width. ggplotly maps it to a horizontal legend under the x axis.</li>
 <li>
 <strong>Caching</strong>: heavy reactives use <code>bindCache</code> keyed on <code>data_key()</code> (+ their own inputs). <code>file_scan_table</code> / <code>.ms_cache</code> cache per-file reads in memory. Don’t key caches on cosmetic inputs (colour, contrast, points) — that breaks zoom and wastes work. The app-level <code>bindCache</code> store (<code>shinyOptions(cache=)</code> in <code>setup_runtime</code>) is the <strong>layered mem+disk</strong> <code>app_cache()</code> from <code>R/fct_cache.R</code>: in-session hits stay in memory; the <strong>disk</strong> layer (qs2, <code>compress_level=0</code>, under <code>R_user_dir(...,"cache")</code>) persists TIC/EIC tibbles across restarts. <strong>No mtime keying</strong> (files aren’t overwritten in practice). <code>raw_msexp</code> uses the in-memory <code>"session"</code> cache only — the MsExperiment is a file-backed S4 object, not worth disk-serialising. Clear-all resets the disk cache via <code>clear_ms_caches</code> → <code>clear_disk_cache</code>.</li>
 <li>
@@ -152,7 +175,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

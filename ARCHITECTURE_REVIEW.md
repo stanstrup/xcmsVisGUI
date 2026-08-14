@@ -339,6 +339,82 @@ existing spectrum-click plumbing. Annotation tolerance reuses the
 persisted default-tolerance setting (no new persisted fields).
 Re-encodes commonMZ’s Latin-1 origin text to UTF-8.
 
+### Profile-mode data (auto-detected; peak-picked for spectrum-level views)
+
+Raw files may be **centroided** or **profile**. Profile was effectively
+unusable: one Orbitrap MS1 scan is ~17k detector samples (so the
+Spectrum view drew ~17k m/z sticks) and a whole file ~29M points / 690
+MB, which the MS map read in full before throwing away all but the top
+200k *by intensity* — i.e. it kept peak flanks.
+
+**Design.** Peak picking is **data processing, owned per view**, not a
+filter or a global setting — the control lives in the Spectrum and MS
+map panels as a `centroid_spec(mode, snr, hws, k)` passed to
+`apply_filters_spectra(sp, f, cp)` and `extract_*(..., cp)`. (It began
+life as a `filter$centroid` field; moved out when the user pointed out
+it is processing, not spectrum selection — which also made the
+filter-equivalence invariant clean again: `cp = NULL` ⇒ pure filter.)
+`apply_filters_spectra` peak-picks via
+[`Spectra::pickPeaks()`](https://rdrr.io/pkg/Spectra/man/addProcessing.html),
+a **lazy** step — nothing materialises until a view reads peaks.
+Measured on a real Orbitrap file: spectrum 19,720 → 1,369 points; MS map
+28.8M → 2.0M rows (690 → 48 MB); the base peak’s *m/z* is unchanged, so
+picking costs no mass accuracy. The exposed knobs are pickPeaks’ `snr` /
+`halfWindowSize` / `k` (m/z refinement); `method` / `descending` /
+`threshold` are left at defaults.
+
+Four decisions worth keeping: - **Per view, with per-view defaults.**
+The MS map must peak-pick (raw is the difference between usable and not)
+so it defaults to `auto`; the Spectrum view opens on the raw trace
+(`off`) because you came to look at the data and one scan is cheap. Each
+view has its own `centroid_controls_ui` / `read_centroid_spec` (shared,
+in `utils_reactive.R`); there is no cross-view coupling. - **Detect per
+MS LEVEL, not per file.** Mixed files (profile MS1 + centroided MS2) are
+routine on Thermo DDA — `msdata`’s own `MS3TMT11.mzML` is one.
+Peak-picking such a file wholesale is *destructive*: local-maximum
+detection over an already-centroided spectrum discards every peak whose
+neighbour is more intense. So `profile_ms_levels()` resolves the profile
+levels and hands them to `pickPeaks(msLevel. = …)`, leaving centroided
+levels bit-for-bit untouched (asserted in `test-filters.R`). Detection
+prefers the file’s own `centroided` flag and falls back to
+[`Spectra::isCentroided()`](https://rdrr.io/pkg/ProtGenerics/man/protgenerics.html)
+shape-sniffing when it is absent (CDF); undecidable → treat as
+centroided, never pick on a guess. - **Chromatograms are never
+centroided.** `apply_filters` (TIC/BPC/EIC) takes no `cp`: a
+chromatogram sums/maxes intensity across an m/z window, which is correct
+on profile samples and reproduces the instrument’s own TIC (verified
+identical with and without picking). Because picking is a separate `cp`
+arg rather than a filter field, `apply_filters_spectra(sp, f)` with no
+`cp` is a pure filter and matches `apply_filters` exactly — the
+equivalence battery just omits `cp`. - **Raw profile is drawn as a line,
+not sticks** — that is what profile data *is* — and peak clicks snap to
+the apex (`PROFILE_SNAP_DA`) so the m/z sent to the EIC list /
+annotation anchor is the peak’s, not whichever flank sample was hit.
+
+Gotcha:
+[`Spectra::pickPeaks`](https://rdrr.io/pkg/Spectra/man/addProcessing.html)
+**must** be namespace-qualified. Attaching xcms brings in an MSnbase
+`pickPeaks` generic that masks ProtGenerics’, after which a bare call
+fails to dispatch on a `Spectra` object.
+
+### Fine isotope pattern (formula-based) — a deliberate step past “raw only”
+
+The Spectrum annotation gained an **Isotope pattern (formula)** mode
+(`R/fct_isotope.R`): from the anchor’s neutral mass it lists **Rdisop**
+candidate formulas and overlays the chosen formula’s **enviPat** fine
+isotopologue pattern, simulated as a profile envelope at a resolving
+power (typed or estimated from the peak width) and scaled to the anchor.
+This is the one feature that crosses the “raw visualisation only” line —
+it proposes formulas, i.e. it is identification-adjacent — and was added
+knowingly at the user’s request. It stays narrow: it annotates ONE
+spectrum against a user-chosen anchor/formula (no feature matrices, no
+across-sample identification), consistent with the anchor-first,
+you-decide philosophy of the rest of the annotation. Engine is pure +
+unit-tested; reuses the commonMZ `adduct_rules` so the ion m/z matches
+the adduct annotation. New deps: enviPat, Rdisop. Related: peak picking
+is per-view (above), and annotation matches real pickPeaks centroids at
+a Match S/N (transparent pool).
+
 ### xcmsVis — evaluated and declined (for now)
 
 Re-examined whether to delegate plotting to **xcmsVis** (`gplot*` →

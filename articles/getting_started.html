@@ -78,9 +78,12 @@
     
 <p>xcmsVisGUI is a local Shiny desktop app for exploring
 <strong>raw</strong> LC-MS data interactively — TIC/BPC, extracted-ion
-chromatograms, spectra (with adduct / isotope / fragment annotation),
-2D/3D maps and DDA precursors. Scope is <strong>raw visualisation
-only</strong>: no peak picking, grouping or alignment.</p>
+chromatograms, spectra (with adduct / isotope / fragment annotation,
+including formula-based fine isotope patterns), 2D/3D maps and DDA
+precursors. It centroids profile scans on the fly for display, but its
+scope is still <strong>raw visualisation</strong>: there is no
+cross-sample peak picking, feature grouping or retention-time
+alignment.</p>
 <p>This page covers the cross-cutting basics — launching, loading files,
 filtering, settings and export. Each plot view then has its own
 guide:</p>
@@ -145,8 +148,10 @@ row to include it</strong> in the plots (the row highlights); click it
 again to exclude. Files stay loaded either way, so toggling is cheap.
 <strong>All / None / Invert</strong> select in bulk, and double-clicking
 the <strong>Group</strong> cell renames that file’s sample group (used
-for colouring and faceting). As soon as one file is included, the TIC
-renders:</p>
+for colouring and faceting). Two files that share a name but come from
+different folders are both kept, and are distinguished in the plots by
+their parent folder (e.g. <code>sample (plate1)</code>). As soon as one
+file is included, the TIC renders:</p>
 <div class="float">
 <img src="figures/tic.png" style="width:100.0%" alt="The file list (selected rows are included) and the TIC overlay"><div class="figcaption">The file list (selected rows are included) and
 the TIC overlay</div>
@@ -175,6 +180,69 @@ Matching is a literal substring (so <code>scan=1</code> also matches
 filters</strong> clears everything. If a filter combination matches no
 spectra, the plots show “No spectra match the current filters.” rather
 than an error.</p>
+<div class="section level3">
+<h3 id="profile-mode-data">Profile-mode data<a class="anchor" aria-label="anchor" href="#profile-mode-data"></a>
+</h3>
+<p>Raw files come in two flavours: <strong>centroided</strong> (one
+point per detected ion) and <strong>profile</strong> (every detector
+sample, so a single peak is tens of points). The app reads which one you
+have from the file itself and shows it in the <strong>Mode</strong>
+column of the file list — <code>prof</code>, <code>cent</code>, or
+<code>mix</code> for a file that is profile at one MS level and
+centroided at another (a very common Thermo DDA setup: profile MS1,
+centroided MS2).</p>
+<p>Left as-is, profile data is awkward to work with: one Orbitrap MS1
+scan can be ~17 000 points, and a whole file ~29 million. Peak-picking
+(centroiding) reduces each profile scan to its peaks. Because it is
+<em>data processing</em>, not a filter, the control lives in the
+right-hand panel of the two views that draw peaks — the
+<strong>Spectrum</strong> and <strong>MS map</strong> tabs — under
+<strong>Peak picking</strong>, not in the Filters panel. Each view has
+its own setting, with a sensible default:</p>
+<ul>
+<li>The <strong>Spectrum</strong> view defaults to <strong>Raw</strong>:
+you opened it to look at the data, and one scan is cheap. Raw profile is
+drawn as a continuous <strong>line</strong> (what it actually is, not
+sticks) and the title is marked <em>profile</em>. A click returns
+exactly the <em>m/z</em> you clicked (the nearest raw sample); to click
+the true peak centroid, switch to <strong>Centroid profile
+scans</strong> — a conventional stick spectrum — or turn on <strong>Raw
++ centroids overlay</strong> and click the centroid.</li>
+<li>The <strong>MS map</strong> defaults to <strong>Centroid profile
+scans</strong>. It has to: mapping every raw sample is tens of millions
+of points per file. Only the levels that really are profile get picked,
+so a mixed file keeps its centroided MS2 spectra untouched. (Its setting
+takes effect on the next <strong>Plot</strong>.)</li>
+</ul>
+<p><strong>Force centroid (all scans)</strong> peak-picks every level,
+even ones the file flags as already centroided. The Spectrum tab also
+offers <strong>Raw + centroids overlay</strong>, which draws the raw
+profile line <em>and</em> the picked centroids (sticks) on top, so you
+can see exactly what peak picking keeps.</p>
+<div class="float">
+<img src="figures/spectrum_profile.png" style="width:100.0%" alt="A profile scan shown as a line, with the per-view Peak-picking control"><div class="figcaption">A profile scan shown as a line, with the
+per-view Peak-picking control</div>
+</div>
+<p>When picking is on, three settings appear:</p>
+<ul>
+<li>
+<strong>S/N</strong> — signal-to-noise floor; raise it to drop noise
+peaks (0 keeps every local maximum).</li>
+<li>
+<strong>Half-window</strong> — how many points on each side a peak
+must top to count as a local maximum; larger merges closely-spaced
+peaks.</li>
+<li>
+<strong>m/z accuracy: average ±N points</strong> — replaces each
+centroid’s apex <em>m/z</em> with the intensity-weighted mean of its ± N
+neighbouring raw samples (0 = keep the apex). A small value (2–3) gives
+sub-sample mass accuracy on profile data.</li>
+</ul>
+<p>Chromatograms (TIC / BPC / EIC) are never centroided, whatever this
+is set to: they sum or max intensities across an <em>m/z</em> window,
+which is correct on profile samples and reproduces the TIC the
+instrument recorded.</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="moving-between-tabs">Moving between tabs<a class="anchor" aria-label="anchor" href="#moving-between-tabs"></a>
@@ -240,7 +308,7 @@ defaults from Settings. You can also save the raw ggplot object
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

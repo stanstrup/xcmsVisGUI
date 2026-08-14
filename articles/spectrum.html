@@ -103,6 +103,30 @@ retention time.</li>
 to which spectrum is shown.</p>
 </div>
 <div class="section level2">
+<h2 id="profile-mode-files">Profile-mode files<a class="anchor" aria-label="anchor" href="#profile-mode-files"></a>
+</h2>
+<p>If the file is profile-mode, this view shows the scan
+<strong>raw</strong> by default (the <strong>Peak picking</strong>
+control in this tab’s panel, default <em>Raw</em>). It is drawn as a
+continuous <strong>line</strong> — which is what profile data actually
+is, rather than a stick per detector sample — and the title is marked
+<em>profile</em>. A click returns exactly the <em>m/z</em> you clicked
+(the nearest raw sample), which it sends to the EIC list or uses as the
+annotation anchor. Set <strong>Peak picking</strong> to <em>Centroid
+profile scans</em> for a conventional stick plot (the S/N, half-window
+and <em>m/z</em>-accuracy settings then appear), or <strong>Raw +
+centroids overlay</strong> to draw the picked centroids on top of the
+raw line — then a click can land on the true centroid. <strong>Show data
+points</strong> overlays the individual detector samples. See <a href="getting_started.html#profile-mode-data">Getting started</a>.</p>
+<div class="float">
+<img src="figures/spectrum_profile.png" style="width:100.0%" alt="A profile-mode scan drawn as a line, with the Peak-picking panel"><div class="figcaption">A profile-mode scan drawn as a line, with the
+Peak-picking panel</div>
+</div>
+<p>Annotation works whether you view the spectrum raw or centroided —
+see <em>How annotation reduces the spectrum</em> below for exactly what
+it matches against.</p>
+</div>
+<div class="section level2">
 <h2 id="from-spectrum-to-eic">From spectrum to EIC<a class="anchor" aria-label="anchor" href="#from-spectrum-to-eic"></a>
 </h2>
 <p><strong>Click a peak</strong> to add its <em>m/z</em> to the <a href="eic.html">EIC</a> target list (the default click action). Click
@@ -165,10 +189,77 @@ with no anchor needed (e.g. a ladder of water losses). Its match window
 is your instrument’s mass accuracy at the two peaks, so set the
 tolerance to fit the instrument and raise the minimum intensity to drop
 noise pairs. Isotope-spaced differences are ignored.</li>
+<li>
+<strong>Isotope pattern (formula)</strong> — overlays a
+<em>theoretical fine isotope pattern</em> on the spectrum. Unlike the
+M+1/M+2 labels above (which only assume ¹³C spacing), this resolves the
+true fine structure (¹³C vs ¹⁵N vs ³⁴S vs ²H …), which needs a formula.
+Set the anchor peak and its adduct; the neutral mass is inverted and <a href="https://bioconductor.org/packages/Rdisop" class="external-link">Rdisop</a> lists
+candidate formulas (with mass error and DBE) from the
+<strong>Elements</strong> you select — the default is the organic set
+(CHNOPS + halogens); add metals when you need them. Pick a row and its
+pattern — <a href="https://cran.r-project.org/package=enviPat" class="external-link">enviPat</a>
+isotopologues simulated as a profile envelope at the <strong>Resolving
+power</strong> you set — is drawn as a translucent green envelope over
+the data (so the raw peaks show through), scaled to the anchor. Higher
+resolving power separates the fine structure; lower merges it, as your
+instrument would. <strong>From data</strong> estimates the resolving
+power from the width of the profile peak at the anchor. This is
+identification-adjacent — it proposes formulas — so treat the candidate
+list as hypotheses to confirm against the observed isotopes, not as an
+answer.</li>
 </ul>
+<div class="float">
+<img src="figures/isotope.png" style="width:100.0%" alt="The formula-based fine isotope pattern: the simulated envelope (green) overlaid on the raw profile isotope cluster, zoomed to the anchor"><div class="figcaption">The formula-based fine isotope pattern: the
+simulated envelope (green) overlaid on the raw profile isotope cluster,
+zoomed to the anchor</div>
+</div>
+<p><strong>Metal-complex ions</strong> (e.g. the iron-formate background
+series <code>[Fe(HCOO)(CH₃OH)]⁺</code> that leaches from stainless
+steel) need three things: add the metal(s) to <strong>Elements</strong>;
+choose the <strong>[M]+</strong> / <strong>[M]−</strong> adduct — the
+peak <em>is</em> the ion, its charge coming from the metal’s oxidation
+state, not a proton, so the mass is decomposed directly; and turn
+<strong>off</strong> <em>Chemically valid only</em>, because a metal’s
+fractional valence makes Rdisop flag the formula “invalid”. A ✓ in the
+table marks the organically-valid formulas. Note that free formula
+generation is only a proposer — for a definitive metal-complex
+assignment you also need the oxidation state and the actual ligand set
+(see the contaminant-ID methodology write-up), which this tool does not
+encode.</p>
+<div class="section level3">
+<h3 id="how-annotation-reduces-the-spectrum-what-actually-gets-matched">How annotation reduces the spectrum (what actually gets
+matched)<a class="anchor" aria-label="anchor" href="#how-annotation-reduces-the-spectrum-what-actually-gets-matched"></a>
+</h3>
+<p>Matching a raw profile scan directly would be meaningless — every one
+of its ~17 000 detector samples is a non-zero point that could coincide
+with <em>some</em> adduct or mass difference. So annotation never
+matches the raw trace. It matches a <strong>centroid list</strong>,
+produced transparently and under your control:</p>
+<ol style="list-style-type: decimal">
+<li>
+<strong>Peak picking.</strong> The scan is peak-picked with
+<code><a href="https://rdrr.io/pkg/Spectra/man/addProcessing.html" class="external-link">Spectra::pickPeaks()</a></code> at the <strong>Match S/N</strong> you
+set (profile levels are picked; a file that is already centroided passes
+through). This is the <em>same</em> engine as the tab’s Peak-picking
+control — not a separate hidden reducer.</li>
+<li>
+<strong>Intensity floor.</strong> <strong>Min intensity</strong>
+then drops centroids below that fraction of the base peak.</li>
+<li>The panel shows a live <strong>“N candidate peaks feed
+matching”</strong> readout, so the size of the pool being matched is
+never a mystery — raise Match S/N or Min intensity until it is sane for
+your data.</li>
+</ol>
+<p>Only then are adducts/fragments projected and matched within
+<strong>± tol</strong>. Two assumptions remain, both deliberate: isotope
+satellites are removed before adduct matching (an M+1 is never labelled
+an adduct — see <strong>Isotope tol</strong> below), and the
+<code>findMAIN</code> auto mode additionally ranks only the 200 most
+intense centroids. Nothing else is silently dropped.</p>
 <p>The <strong>± tol</strong> is the adduct/fragment match window (ppm
-or Da); <strong>Min intensity</strong> drops peaks below that fraction
-of the base peak before matching; <strong>Max charge</strong> limits the
+or Da); <strong>Match S/N</strong> and <strong>Min intensity</strong>
+set the candidate pool as above; <strong>Max charge</strong> limits the
 charge states projected; <strong>Annotate only top N peaks</strong>
 keeps the N most intense <em>annotated</em> peaks. <strong>Isotope tol
 (mDa)</strong> is a separate, usually wider window for the isotope
@@ -180,6 +271,7 @@ treated as a real loss (e.g. −H₂) rather than an isotope. Labels are
 written vertically and multiple hits on one peak are joined with “;”.
 <strong>Show expected-but-absent</strong> ghost ticks can be toggled.
 Annotations are part of the plot, so they carry through to exports.</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="export">Export<a class="anchor" aria-label="anchor" href="#export"></a>
@@ -198,7 +290,7 @@ Annotations are part of the plot, so they carry through to exports.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

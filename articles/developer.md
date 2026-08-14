@@ -10,14 +10,21 @@ in the repository.
 Working: async file ingestion; settings (ColorBrewer/viridis palette,
 retention-time unit, default EIC tolerance, export defaults — persisted
 across restarts); global filters (rt / *m/z* / MS level / polarity /
-intensity / repeatable spectrum-id rules); and all raw-data plot views —
-TIC/BPC, multi-EIC, click-to-spectrum (+ scan-list browser), 2D MS map,
-3D points/surface, and DDA precursor ions. The Spectrum view also does
-single-spectrum adduct / isotope / in-source-fragment annotation (manual
-anchor, findMAIN auto-suggest, or difference network).
+intensity / repeatable spectrum-id rules); per-view profile-mode peak
+picking
+([`Spectra::pickPeaks`](https://rdrr.io/pkg/Spectra/man/addProcessing.html),
+with S/N / half-window / m/z-refinement); and all raw-data plot views —
+TIC/BPC, multi-EIC (with intensity scaling), click-to-spectrum (+
+scan-list browser), 2D MS map, 3D points/surface, and DDA precursor
+ions. The Spectrum view also does single-spectrum adduct / isotope /
+in-source-fragment annotation (manual anchor, findMAIN auto-suggest,
+difference network, and formula-based fine isotope patterns via Rdisop +
+enviPat).
 
-Scope is **raw visualisation only** — no peak picking / grouping /
-alignment (deferred; see the architecture doc).
+Scope is **raw visualisation** — profile scans are centroided on the fly
+for display/annotation, but there is no cross-sample peak picking /
+feature grouping / retention-time alignment (deferred; see the
+architecture doc).
 
 Extraction results are cached to disk (qs2), so re-opening the app with
 the same files + filter is instant. Figures export as png/svg/pdf, or as
@@ -61,19 +68,46 @@ select the same spectra. Real-data tests use the `msdata` / `faahKO`
 Bioconductor packages and skip if absent. CI runs `R CMD check` on
 push/PR (`.github/workflows/R-CMD-check.yaml`).
 
-## Regenerating the documentation screenshots
+## Regenerating the documentation figures
 
-The article screenshots are captured headlessly with
-[`chromote`](https://rstudio.github.io/chromote/) against a running app
-(`run_app(port = 7799)`):
+The figures are captured headlessly with
+[`chromote`](https://rstudio.github.io/chromote/) against a running app.
+Start the app on port 7799, then run a capture script in a second
+process:
 
 ``` r
 
-# source("tools/shoot.R")                              # TIC + Filters (faahKO)
-# source("tools/shoot_annot.R")  # args: <mzML-path> <scan>  -> annotation.png
+# terminal 1 — serve the app on the port the scripts expect:
+# Rscript -e "pkgload::load_all('.'); run_app(port = 7799, launch.browser = FALSE)"
+
+# terminal 2 — full-UI PNG screenshots (sidebar + plot) at 1440x900:
+# Rscript data-raw/capture-screenshots.R      # -> vignettes/articles/figures/*.png
+
+# ...or crisp vector SVGs of the PLOT only (no sidebar):
+# Rscript data-raw/capture-plots-svg.R        # -> vignettes/articles/figures/svg/*.svg
 ```
 
-They are saved at 1440x900 into `vignettes/articles/figures/`.
+Two scripts because Chrome’s screenshot is **raster only** — good for
+the full UI, but not vector. For SVG, `capture-plots-svg.R` calls
+plotly’s own `Plotly.toImage(format = "svg")` on each plot’s graph div,
+which is true vector for the line/scatter plots (TIC, EIC, spectra,
+precursors). The 2-D MS map draws with scattergl (WebGL) for speed, so
+its “SVG” embeds a raster image for the points — use the PNG for that
+one, or export from a non-gl view. Both scripts include files by driving
+the DataTable Shiny binding directly
+(`$('#..').data('datatable') .shinyMethods.selectRows`), since a
+synthetic click on the All button doesn’t fire under chromote.
+
+The formula-based isotope-pattern overlay (`isotope.png`) is captured
+too. Driving that mode headlessly needs two things the script handles:
+the `conditionalPanel` annotation widgets don’t transmit their values
+until interacted with, so the script sets them explicitly with
+`Shiny.setInputValue(..., {priority: "event"})`; and the
+candidate-formula table renders client-side and computes even while
+hidden (see `suspendWhenHidden = FALSE` on `iso_cands` in
+`mod_plot_spectrum.R`), so it is populated by the time the shot is
+taken. The plot is zoomed to the anchor’s isotope cluster **last**
+(after the inputs settle) so no pending re-render resets the range.
 
 ## Project layout
 
@@ -95,12 +129,13 @@ They are saved at 1440x900 into `vignettes/articles/figures/`.
       mod_plot_precursors.R# DDA precursor-ion map
       mod_export.R         # reusable png/svg/pdf/rds export modal
       fct_extract.R        # data extraction (summaries, chromatograms, peaks, spectra)
-      fct_filters.R        # compose filter state into Spectra/xcms calls
+      fct_filters.R        # compose filter state into Spectra/xcms calls; profile peak-picking
       fct_annotate.R       # the single-spectrum annotation engine (pure, testable)
+      fct_isotope.R        # fine isotope-pattern engine: Rdisop formulas + enviPat envelope
       fct_export.R         # ggsave-based export (+ rds = the ggplot object itself)
       fct_palettes.R       # ColorBrewer / viridis helpers
       fct_cache.R          # layered mem+disk (qs2) cache backing bindCache, persistent across restarts
       fct_settings_store.R # persist settings to the per-user config dir
-      utils_reactive.R     # central reactive state (rv) + plotly/zoom helpers
+      utils_reactive.R     # central reactive state (rv) + plotly/zoom + peak-picking UI helpers
     tests/testthat/        # unit + real-data tests
-    tools/                 # screenshot-capture scripts (chromote)
+    data-raw/              # throwaway scripts, incl. capture-screenshots.R (chromote)

@@ -119,6 +119,25 @@ targets come from <a href="getting_started.html#settings">Settings</a>.</p>
 <em>Sample group</em>. When not colouring by target, multiple targets
 are distinguished by line type.</li>
 <li>
+<strong>Scale intensity</strong> — how the y-axis is scaled:
+<ul>
+<li>
+<em>Raw</em> — absolute intensity.</li>
+<li>
+<em>Normalise each trace (÷ own max)</em> — every EIC peaks at 1, so
+you compare peak <strong>shapes</strong> / co-elution regardless of
+abundance.</li>
+<li>
+<em>Normalise per target (÷ target max)</em> — a compound’s traces
+across files share one 0–1 scale, so their <strong>relative
+abundances</strong> are comparable.</li>
+<li>
+<em>Log10 (y-axis)</em> — <code>log10(intensity + 1)</code>,
+compressing the dynamic range so weak traces are visible (the +1 keeps
+the many baseline zeros).</li>
+</ul>
+The tooltip always shows the raw intensity, whatever the scale.</li>
+<li>
 <strong>Show data points</strong> — overlay scan points.</li>
 <li>
 <strong>Facet by file</strong> — one panel per file instead of a
@@ -152,7 +171,7 @@ ion or checking peak purity.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

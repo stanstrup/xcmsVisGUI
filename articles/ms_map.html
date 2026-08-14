@@ -86,6 +86,16 @@ settings.</p>
 <div class="float">
 <img src="figures/msmap.png" style="width:100.0%" alt="2-D MS map"><div class="figcaption">2-D MS map</div>
 </div>
+<p><strong>Profile-mode files are peak-picked first</strong> (the
+<strong>Peak picking</strong> control in this tab’s panel, default
+<em>Centroid profile scans</em>). This is the view that needs it:
+mapping a profile file raw means tens of millions of points — one test
+file goes from 29 million points (690 MB) to 2 million (48 MB) once
+picked. (The <a href="spectrum.html">Spectrum</a> view defaults to raw —
+it can afford to.) Set it to <em>Raw</em> to map every sample, but
+expect it to be slow. The setting, and its S/N / half-window /
+<em>m/z</em>-refinement sub-options, take effect on the next
+<strong>Plot</strong>. See <a href="getting_started.html#profile-mode-data">Getting started</a>.</p>
 <div class="section level2">
 <h2 id="d-views">3D views<a class="anchor" aria-label="anchor" href="#d-views"></a>
 </h2>
@@ -121,7 +131,7 @@ spectrum.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

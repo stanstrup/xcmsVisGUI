@@ -718,15 +718,15 @@ mod_plot_spectrum_server <- function(id, rv, included) {
     output$scantable <- renderDT({
       tab <- filtered_scans()
       disp <- tab[, c("scan", "rt_disp", "msLevel", "polarity", "precursorMZ",
-                      "tic", "basePeakMZ", "spectrumId")]
+                      "tic", "basePeakMZ", "basePeakIntensity", "spectrumId")]
       rtcol <- paste0("rt(", rv$settings$time_unit, ")")
       names(disp)[2] <- rtcol
-      # Round rt / m/z / TIC in the DT render, not the data.
+      # Round rt / m/z / intensities in the DT render, not the data.
       datatable(disp, rownames = FALSE, selection = "single",
                     options = list(pageLength = 15, scrollX = TRUE)) %>%
         DT::formatRound(rtcol, 4) %>%
         DT::formatRound(c("precursorMZ", "basePeakMZ"), 4) %>%
-        DT::formatRound("tic", 0)
+        DT::formatRound(c("tic", "basePeakIntensity"), 0)
     })
     observeEvent(input$scantable_rows_selected, {
       i <- input$scantable_rows_selected; req(length(i) == 1)

@@ -55,3 +55,29 @@ test_that("extract_over_files isolates a bad file", {
   expect_identical(failed, "missing.mzML")
   expect_identical(unique(d$sample_id), "x")
 })
+
+test_that("file_scan_table carries base peak intensity (mzML header)", {
+  skip_if_not_installed("msdata")
+  p <- normalizePath(list.files(system.file("proteomics", package = "msdata"),
+                                full.names = TRUE, pattern = "mzML$")[1])
+  st <- file_scan_table(p)
+  expect_true("basePeakIntensity" %in% names(st))
+  expect_false(anyNA(st$basePeakIntensity))
+  expect_true(all(st$basePeakIntensity > 0))
+  # The header value is the scan's most intense peak (checked on a few MS2s;
+  # the vendor-reported MS1 value can differ slightly from the stored peaks).
+  x <- mzR::openMSfile(p); on.exit(mzR::close(x))
+  i <- head(which(st$msLevel > 1), 5)
+  pk_max <- vapply(mzR::peaks(x, i), function(m) max(m[, 2]), numeric(1))
+  expect_equal(st$basePeakIntensity[i], pk_max, tolerance = 1e-6)
+})
+
+test_that("file_scan_table maps the CDF base peak sentinel to NA", {
+  skip_if_not_installed("faahKO")
+  p <- list.files(system.file("cdf", package = "faahKO"), recursive = TRUE,
+                  full.names = TRUE, pattern = "CDF$")[1]
+  skip_if(is.na(p))
+  st <- file_scan_table(p)
+  expect_true("basePeakIntensity" %in% names(st))
+  expect_true(all(is.na(st$basePeakIntensity)))
+})

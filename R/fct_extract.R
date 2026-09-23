@@ -177,7 +177,8 @@ bin_peaks <- function(df, rt_bin = 10, mz_bin = 1, aggfun = max) {
                    intensity = aggfun(intensity), .groups = "drop")
 }
 
-#' Cached per-file scan table (rt seconds, acquisition number, MS level) via mzR.
+#' Cached per-file scan table (rt seconds, acquisition number, MS level, TIC,
+#' base peak m/z + intensity) via mzR.
 #' @noRd
 .scan_cache <- new.env(parent = emptyenv())
 file_scan_table <- function(path) {
@@ -191,8 +192,11 @@ file_scan_table <- function(path) {
     scan = h$acquisitionNum, rt = h$retentionTime, msLevel = h$msLevel,
     polarity = col("polarity"), precursorMZ = col("precursorMZ"),
     tic = col("totIonCurrent"), basePeakMZ = col("basePeakMZ"),
+    basePeakIntensity = col("basePeakIntensity"),
     spectrumId = if ("spectrumId" %in% colnames(h)) h$spectrumId else NA_character_,
     stringsAsFactors = FALSE)
+  # CDF headers don't record the base peak: mzR reports the sentinel -1.
+  tab$basePeakIntensity[tab$basePeakIntensity < 0] <- NA
   assign(key, tab, envir = .scan_cache)
   tab
 }

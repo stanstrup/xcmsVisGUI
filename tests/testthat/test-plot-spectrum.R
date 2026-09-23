@@ -58,3 +58,25 @@ test_that("show-points and overlay add the expected profile plot layers", {
     expect_equal(nrow(overlay_df()), 0)
   }))
 })
+
+test_that("scan list table shows the base peak intensity column", {
+  p <- profile_file()
+  files <- tibble::tibble(
+    id = "f1", path = p, name = basename(p), sample_group = "g1",
+    include = TRUE, status = "ready", n_spectra = 1L,
+    rt_min = 0, rt_max = 1e5, mz_min = 0, mz_max = 1e4,
+    ms_levels = "1", polarities = "1", charges = NA_character_,
+    spec_mode = "mixed", message = NA_character_)
+  rv <- make_rv(); rv$files <- files
+  included <- reactive(files)
+  suppressWarnings(shiny::testServer(mod_plot_spectrum_server,
+                    args = list(rv = rv, included = included), {
+    session$setInputs(layout = "single", rt = 0, scan = NA, annotate = FALSE,
+                      cmode = "off", csnr = 0, chws = 2, ck = 0, showpts = FALSE)
+    tab <- filtered_scans()
+    expect_true("basePeakIntensity" %in% names(tab))
+    expect_true(all(tab$basePeakIntensity > 0))
+    html <- output$scantable
+    expect_match(html, "basePeakIntensity", fixed = TRUE)
+  }))
+})

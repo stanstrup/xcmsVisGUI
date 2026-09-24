@@ -320,9 +320,9 @@ Imports. Three modes share one dictionary so manual and auto annotate
 identically: - **Manual anchor** — user designates a peak as a known
 ion; we invert to the neutral mass
 (`m/z = (nmol·M + massdiff)/|charge|`, massdiff from
-[`commonMZ::MZ_CAMERA`](https://rdrr.io/pkg/commonMZ/man/MZ_CAMERA.html))
+[`commonMZ::MZ_CAMERA`](https://stanstrup.github.io/commonMZ/reference/MZ_CAMERA.html))
 and project all adducts + M+1 isotopes + in-source neutral losses
-([`commonMZ::adducts_fragments`](https://rdrr.io/pkg/commonMZ/man/package.html)),
+([`commonMZ::adducts_fragments`](https://stanstrup.github.io/commonMZ/reference/package.html)),
 matching within the shared ppm/Da tol. - **Auto-suggest** — `findMAIN`
 (constrained to commonMZ’s quasi-molecular adducts) ranks (M,
 main-adduct) hypotheses; the chosen row fills the anchor. - **Difference

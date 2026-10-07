@@ -214,9 +214,10 @@ mod_plot_eic_server <- function(id, rv, dataset, meta, data_key) {
       df$rt_disp <- rt_to_disp(df$rt, unit)
       df$.color <- df[[cby]]
       pal <- brewer_named(unique(df$.color), rv$settings$qual_palette)
-      df$.tip <- sprintf("%s | %s\nscan: %s\nrt: %.4g %s\nint: %.3g",
+      df <- add_precursor_mz(df, m)
+      df$.tip <- sprintf("%s | %s\nscan: %s\nrt: %.4g %s\nint: %.3g%s",
                          df$target, df$sample_name, ifelse(is.na(df$scan), "?", df$scan),
-                         df$rt_disp, unit, df$intensity)
+                         df$rt_disp, unit, df$intensity, precursor_tip(df$precursorMZ))
       # Intensity scaling. `y` is what's plotted; the tooltip keeps the raw
       # intensity either way. Normalise within a group by dividing by its max
       # (guarding an all-zero trace); log uses log10(x+1) so the many baseline

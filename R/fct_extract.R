@@ -271,6 +271,32 @@ add_scan_numbers <- function(df, meta) {
   df
 }
 
+#' Add a `precursorMZ` column to a chromatogram tibble (needs sample_id + scan),
+#' looked up per file in the cached scan table. NA for MS1 (mzR reports 0 there).
+#' Applied at plot time, not inside the bindCache'd extraction: chromatogram
+#' tibbles persist on disk, so a column added there would be missing from every
+#' entry cached before it existed.
+#' @noRd
+add_precursor_mz <- function(df, meta) {
+  df$precursorMZ <- NA_real_
+  if (!nrow(df) || is.null(meta$path) || is.null(df$scan)) return(df)
+  for (fid in unique(df$sample_id)) {
+    p <- meta$path[meta$id == fid]
+    if (!length(p) || is.na(p)) next
+    st <- file_scan_table(p)
+    idx <- df$sample_id == fid
+    df$precursorMZ[idx] <- st$precursorMZ[match(df$scan[idx], st$scan)]
+  }
+  df$precursorMZ[!is.finite(df$precursorMZ) | df$precursorMZ <= 0] <- NA_real_
+  df
+}
+
+#' Tooltip line for a precursor m/z: "\nprecursor m/z: …" for MSn points, "" otherwise.
+#' @noRd
+precursor_tip <- function(pmz) {
+  ifelse(is.na(pmz), "", sprintf("\nprecursor m/z: %.4f", pmz))
+}
+
 #' Precursor ions (rt, precursor m/z, scan) for MS>1 spectra in a file (DDA map).
 #'
 #' The global filter `f` is applied with PRECURSOR semantics, because every point

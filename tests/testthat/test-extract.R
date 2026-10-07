@@ -116,3 +116,18 @@ test_that("extract_precursors applies the global filter with precursor semantics
     expect_true(all(!known | d$precursorIntensity >= f$int_min))
   }
 })
+
+test_that("chromatogram tooltips get the precursor m/z of MSn scans only", {
+  f <- system.file("proteomics", "MS3TMT11.mzML", package = "msdata")
+  skip_if(!nzchar(f), "msdata MS3TMT11 not available")
+  meta <- data.frame(id = "a", name = "x", sample_group = "g", path = f)
+  x <- build_msexp(meta)
+  chr_df <- function(ms) add_precursor_mz(add_scan_numbers(chrom_to_df(
+    xcms::chromatogram(x, msLevel = ms), meta), meta), meta)
+  ms1 <- chr_df(1L); ms2 <- chr_df(2L)
+  expect_true(all(is.na(ms1$precursorMZ)))
+  expect_true(all(ms2$precursorMZ > 0))
+  st <- file_scan_table(f)
+  expect_equal(ms2$precursorMZ, st$precursorMZ[match(ms2$scan, st$scan)])
+  expect_equal(precursor_tip(c(NA, 500.12346)), c("", "\nprecursor m/z: 500.1235"))
+})

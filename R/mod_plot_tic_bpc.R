@@ -65,9 +65,10 @@ mod_plot_tic_bpc_server <- function(id, rv, dataset, meta, data_key) {
       df$.color <- df[[cby]]
       unit <- rv$settings$time_unit
       df$rt_disp <- rt_to_disp(df$rt, unit)
-      df$.tip <- sprintf("%s\nscan: %s\nrt: %.4g %s\nint: %.3g",
+      df <- add_precursor_mz(df, m)
+      df$.tip <- sprintf("%s\nscan: %s\nrt: %.4g %s\nint: %.3g%s",
                          df$sample_name, ifelse(is.na(df$scan), "?", df$scan),
-                         df$rt_disp, unit, df$intensity)
+                         df$rt_disp, unit, df$intensity, precursor_tip(df$precursorMZ))
       p <- ggplot(df, aes(
         x = rt_disp, y = intensity, group = sample_id, color = .color,
         key = sample_id, text = .tip)) +

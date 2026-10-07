@@ -20,6 +20,36 @@ preview_dims <- function(w, h, box = c(420, 420)) {
   list(w = round(dw), h = round(dh))
 }
 
+#' CSS for the Save-plot modal: the content box is drag-resizable (bottom-right
+#' corner) and a column flex chain stretches the preview box over whatever
+#' height the dialog has, so a taller/wider dialog means a bigger preview box.
+#' Scoped with :has() to the dialog holding this module's preview.
+#' @noRd
+export_modal_css <- function(box_id) {
+  dlg <- sprintf(".modal-dialog:has(#%s)", box_id)
+  tags$style(HTML(paste0(
+    dlg, " .modal-content{resize:both;overflow:auto;min-width:560px;min-height:420px}",
+    dlg, " .modal-body{display:flex;flex-direction:column;min-height:0}",
+    dlg, " .xvg-export-cols{flex:1 1 auto;min-height:0;grid-template-rows:1fr}",
+    dlg, " .xvg-export-preview{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}",
+    "#", box_id, "{flex:1 1 auto;min-height:200px;overflow:hidden;",
+    "background:var(--bs-tertiary-bg)}",
+    "#", box_id, " img{max-width:100%;height:auto !important}")))
+}
+
+#' Script that reports an element's content size to Shiny input `input_id` as
+#' list(w, h) whenever it changes (ResizeObserver). Placed after the element so
+#' it exists when the script runs.
+#' @noRd
+observe_size_js <- function(el_id, input_id) {
+  tags$script(HTML(sprintf(paste0(
+    "(function(){var el=document.getElementById('%s');",
+    "if(!el||!window.ResizeObserver)return;",
+    "new ResizeObserver(function(e){var r=e[0].contentRect;",
+    "Shiny.setInputValue('%s',{w:Math.floor(r.width),h:Math.floor(r.height)});",
+    "}).observe(el);})();"), el_id, input_id)))
+}
+
 #' Apply a zoom_keeper()$ranges value to a ggplot as coordinate limits. NULL per
 #' axis means "unzoomed", and coord_cartesian() reads NULL limits as the data
 #' range — so a partially zoomed plot needs no special case.
@@ -54,17 +84,21 @@ mod_export_server <- function(id, plot_gg, rv, basename = "plot", zoom = NULL) {
       sel <- if (s$export_format %in% fmts) s$export_format else "png"
       showModal(modalDialog(
         title = "Save plot", size = "l", easyClose = TRUE,
+        export_modal_css(ns("preview_box")),
         layout_columns(
-          col_widths = c(5, 7),
+          col_widths = c(5, 7), class = "xvg-export-cols",
           # --- controls -----------------------------------------------------
           div(
-            selectInput(ns("format"), "Format", fmts, selected = sel),
+            # Native selects: a selectize dropdown would be clipped by the
+            # resizable (overflow:auto) dialog.
+            selectInput(ns("format"), "Format", fmts, selected = sel,
+                        selectize = FALSE),
             layout_columns(
               col_widths = c(4, 4, 4),
               numericInput(ns("width"),  "Width",  s$export_width,  min = 1),
               numericInput(ns("height"), "Height", s$export_height, min = 1),
               selectInput(ns("units"),   "Units",  c("in", "cm", "mm", "px"),
-                          selected = s$export_units)
+                          selected = s$export_units, selectize = FALSE)
             ),
             conditionalPanel(
               sprintf("input['%s'] == 'png'", ns("format")),
@@ -82,16 +116,14 @@ mod_export_server <- function(id, plot_gg, rv, basename = "plot", zoom = NULL) {
           ),
           # --- preview ------------------------------------------------------
           div(
+            class = "xvg-export-preview",
             tags$label(class = "control-label", "Preview"),
-            # The box is sized to the modal's 7/12 column; the CSS clamp keeps the
-            # image inside it on narrow windows too (scaled, aspect preserved).
-            tags$style(HTML(sprintf(
-              "#%s{max-width:100%%;min-width:0} #%s img{max-width:100%%;height:auto !important}",
-              ns("preview"), ns("preview")))),
-            div(class = "border rounded p-1 d-flex justify-content-center align-items-center",
-                style = "min-height:200px;background:var(--bs-tertiary-bg);overflow:hidden",
+            div(id = ns("preview_box"),
+                class = "border rounded p-1 d-flex justify-content-center align-items-center",
                 plotOutput(ns("preview"), width = "auto", height = "auto")),
-            helpText("True aspect ratio of the file; on-screen DPI only.")
+            helpText("True aspect ratio of the file; on-screen DPI only. ",
+                     "Drag the dialog's corner to enlarge the preview."),
+            observe_size_js(ns("preview_box"), ns("box"))
           )
         ),
         footer = tagList(modalButton("Cancel"),
@@ -103,7 +135,14 @@ mod_export_server <- function(id, plot_gg, rv, basename = "plot", zoom = NULL) {
     # Re-proportion the preview as Width/Height change (debounced so it doesn't
     # re-render on every keystroke). Rendering the actual ggplot — not the plotly
     # — is what makes the preview faithful to the exported png/svg/pdf.
-    pdims <- debounce(reactive(preview_dims(input$width, input$height)), 250)
+    # The preview fits the box it sits in (reported by observe_size_js), so
+    # resizing the dialog resizes the preview; the fixed box is the fallback
+    # until the first report arrives.
+    pdims <- debounce(reactive({
+      b <- input$box
+      box <- if (isTRUE(b$w > 50 && b$h > 50)) c(b$w, b$h) else c(420, 420)
+      preview_dims(input$width, input$height, box)
+    }), 250)
     output$preview <- renderPlot(plot_out(),
                                  width  = function() pdims()$w,
                                  height = function() pdims()$h)

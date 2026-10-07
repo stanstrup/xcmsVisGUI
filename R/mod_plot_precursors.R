@@ -17,7 +17,10 @@ mod_plot_precursors_ui <- function(id) {
                     c("File" = "sample_name", "Sample group" = "sample_group",
                       "None" = "none")),
         helpText("Uses the included files that contain MS2. Click a point to ",
-                 "view its spectrum.")
+                 "view its spectrum."),
+        helpText("Filters apply to the precursors: rt, polarity and spectrum id ",
+                 "as usual; m/z and intensity act on the precursor m/z / ",
+                 "intensity. An MS1 level filter is ignored here.")
       ),
       plotlyOutput(ns("plot"), height = "100%")
     )
@@ -43,14 +46,16 @@ mod_plot_precursors_server <- function(id, rv, included) {
       validate(need(nrow(f2) > 0,
                     "No included file contains MS2 spectra (need DDA data)."))
       withProgress(message = "Reading precursors\u2026", value = 0.5, {
-        extract_over_files(f2, extract_precursors,
+        flt <- rv$filter
+        extract_over_files(f2, function(p) extract_precursors(p, flt),
                            cols = c("sample_id", "sample_name", "sample_group"),
                            on_error = notify_read_failures)
       })
     })
 
     plot_gg <- reactive({
-      df <- prec_df(); validate(need(nrow(df) > 0, "No precursor ions found."))
+      df <- prec_df()
+      validate(need(nrow(df) > 0, "No precursor ions found (check the Filters)."))
       df$sample_name <- strip_ext(df$sample_name)   # display label: drop extension
       unit <- rv$settings$time_unit
       df$rt_disp <- rt_to_disp(df$rt, unit)

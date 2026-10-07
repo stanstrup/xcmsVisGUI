@@ -81,3 +81,38 @@ test_that("file_scan_table maps the CDF base peak sentinel to NA", {
   expect_true("basePeakIntensity" %in% names(st))
   expect_true(all(is.na(st$basePeakIntensity)))
 })
+
+test_that("extract_precursors applies the global filter with precursor semantics", {
+  skip_if_not_installed("msdata")
+  p <- normalizePath(list.files(system.file("proteomics", package = "msdata"),
+                                full.names = TRUE, pattern = "mzML$")[1])
+  all <- extract_precursors(p)
+  expect_gt(nrow(all), 0)
+  # The default MS1 level filter must not empty the map.
+  expect_identical(nrow(extract_precursors(p, empty_filter())), nrow(all))
+
+  f <- empty_filter()
+  rr <- stats::quantile(all$rt, c(0.25, 0.75), names = FALSE)
+  f$rt_min <- rr[1]; f$rt_max <- rr[2]
+  d <- extract_precursors(p, f)
+  expect_true(nrow(d) > 0 && nrow(d) < nrow(all))
+  expect_true(all(d$rt >= rr[1] & d$rt <= rr[2]))
+
+  # m/z acts on the precursor m/z (the map's y axis).
+  f <- empty_filter()
+  mr <- stats::quantile(all$precursorMZ, c(0.25, 0.75), names = FALSE)
+  f$mz_min <- mr[1]; f$mz_max <- mr[2]
+  d <- extract_precursors(p, f)
+  expect_true(nrow(d) > 0 && nrow(d) < nrow(all))
+  expect_true(all(d$precursorMZ >= mr[1] & d$precursorMZ <= mr[2]))
+
+  # Intensity acts on the precursor intensity when the file reports it.
+  if (any(is.finite(all$precursorIntensity) & all$precursorIntensity > 0)) {
+    f <- empty_filter()
+    f$int_min <- stats::median(all$precursorIntensity, na.rm = TRUE)
+    d <- extract_precursors(p, f)
+    expect_lt(nrow(d), nrow(all))
+    known <- is.finite(d$precursorIntensity) & d$precursorIntensity > 0
+    expect_true(all(!known | d$precursorIntensity >= f$int_min))
+  }
+})

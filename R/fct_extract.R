@@ -272,14 +272,40 @@ add_scan_numbers <- function(df, meta) {
 }
 
 #' Precursor ions (rt, precursor m/z, scan) for MS>1 spectra in a file (DDA map).
+#'
+#' The global filter `f` is applied with PRECURSOR semantics, because every point
+#' here is an MSn spectrum seen through its precursor:
+#' - rt / polarity / spectrum-id select which MSn spectra are shown, as usual;
+#' - the MS level is honoured only when it is an MSn level — the default filter is
+#'   MS1, and taken literally it would empty the map every time;
+#' - m/z and intensity are peak-level filters on a spectrum, but the map has no
+#'   fragment axis: they are applied to the precursor m/z / precursor intensity
+#'   (the y axis and what was isolated). A precursor whose intensity the file
+#'   does not report is kept rather than dropped on a missing value.
 #' @importFrom tibble tibble
 #' @noRd
-extract_precursors <- function(path) {
+extract_precursors <- function(path, f = empty_filter()) {
   sp <- get_spectra(path)
+  sf <- f
+  if (!isTRUE(is.finite(sf$ms_level) && sf$ms_level > 1)) sf$ms_level <- NA_integer_
+  sf$mz_min <- sf$mz_max <- sf$int_min <- sf$int_max <- NA_real_
+  sp <- apply_filters_spectra(sp, sf)
   ms <- Spectra::msLevel(sp); pmz <- Spectra::precursorMz(sp); rt <- Spectra::rtime(sp)
+  pint <- tryCatch(Spectra::precursorIntensity(sp),
+                   error = function(e) rep(NA_real_, length(sp)))
   scn <- tryCatch(Spectra::acquisitionNum(sp), error = function(e) rep(NA_integer_, length(sp)))
-  idx <- which(ms > 1 & is.finite(pmz) & pmz > 0)
-  tibble(rt = rt[idx], precursorMZ = pmz[idx], scan = scn[idx])
+  keep <- ms > 1 & is.finite(pmz) & pmz > 0
+  if (isTRUE(is.finite(f$mz_min) || is.finite(f$mz_max))) {
+    r <- .flt_mz(f); keep <- keep & pmz >= r[1] & pmz <= r[2]
+  }
+  ii <- .flt_int(f)
+  if (!is.null(ii)) {
+    known <- is.finite(pint) & pint > 0
+    keep <- keep & (!known | (pint >= ii[1] & pint <= ii[2]))
+  }
+  idx <- which(keep)
+  tibble(rt = rt[idx], precursorMZ = pmz[idx], precursorIntensity = pint[idx],
+         scan = scn[idx])
 }
 
 #' Spectrum-mode label for the file list, from the per-spectrum centroided counts

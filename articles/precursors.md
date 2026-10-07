@@ -13,6 +13,19 @@ DDA precursor-ion map
 - Only files that contain MS2 spectra contribute; if none do, the view
   says so.
 
+## Filters
+
+The global **Filters** apply here too, read as filters on the
+*precursors*:
+
+- **Retention time**, **polarity** and **spectrum id** rules select
+  which MS2 scans are shown, as everywhere else.
+- **m/z** and **intensity** act on the precursor *m/z* (the y axis) and
+  the precursor intensity. A precursor whose intensity the file does not
+  report is kept.
+- The **MS level** filter is ignored unless it names an MSn level (2, 3,
+  …): the default MS1 setting would otherwise leave the map empty.
+
 ## Moving between tabs
 
 **Click a precursor point** to send its file, retention time and

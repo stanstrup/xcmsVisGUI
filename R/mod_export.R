@@ -12,7 +12,7 @@ mod_export_ui <- function(id, label = "Save") {
 # Fit a width x height box (in the chosen units — only the ratio matters) into a
 # display box, preserving aspect. Returns integer px so the preview reads as the
 # real output would: change Width/Height and the preview re-proportions exactly.
-preview_dims <- function(w, h, box = c(560, 460)) {
+preview_dims <- function(w, h, box = c(420, 420)) {
   if (!is.finite(w) || !is.finite(h) || w <= 0 || h <= 0) { w <- 8; h <- 5 }
   r <- h / w
   dw <- box[1]; dh <- dw * r
@@ -83,8 +83,13 @@ mod_export_server <- function(id, plot_gg, rv, basename = "plot", zoom = NULL) {
           # --- preview ------------------------------------------------------
           div(
             tags$label(class = "control-label", "Preview"),
+            # The box is sized to the modal's 7/12 column; the CSS clamp keeps the
+            # image inside it on narrow windows too (scaled, aspect preserved).
+            tags$style(HTML(sprintf(
+              "#%s{max-width:100%%;min-width:0} #%s img{max-width:100%%;height:auto !important}",
+              ns("preview"), ns("preview")))),
             div(class = "border rounded p-1 d-flex justify-content-center align-items-center",
-                style = "min-height:200px;background:var(--bs-tertiary-bg)",
+                style = "min-height:200px;background:var(--bs-tertiary-bg);overflow:hidden",
                 plotOutput(ns("preview"), width = "auto", height = "auto")),
             helpText("True aspect ratio of the file; on-screen DPI only.")
           )

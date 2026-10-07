@@ -53,3 +53,20 @@ test_that("zoom_keeper$reset drops only the axes it is given", {
     expect_null(z$ranges()$y)
   })
 })
+
+test_that("spectrum_table exports the drawn spectrum; table_tsv is tab-separated", {
+  df <- tibble::tibble(mz = c(100.12345, 200.5), intensity = c(10, 2000),
+                       rt = c(120, 120), scan = c(7L, 7L), profile = c(TRUE, TRUE),
+                       sample_name = "a")
+  tab <- spectrum_table(df, "min")
+  expect_named(tab, c("file", "scan", "rt_min", "mz", "intensity", "mode"))
+  expect_equal(tab$rt_min, c(2, 2))
+  expect_equal(tab$mz, df$mz)                     # full precision, no rounding
+  expect_identical(tab$mode, c("profile", "profile"))
+  expect_identical(spectrum_table(df[0, ], "sec")$mz, numeric())
+
+  tsv <- strsplit(table_tsv(tab), "\n")[[1]]
+  expect_length(tsv, 3)
+  expect_identical(tsv[1], "file\tscan\trt_min\tmz\tintensity\tmode")
+  expect_identical(strsplit(tsv[2], "\t")[[1]][4], "100.12345")
+})

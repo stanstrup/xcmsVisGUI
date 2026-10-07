@@ -47,3 +47,30 @@ save_gg <- function(gg, file, settings) {
   }
   do.call(ggsave, args)
 }
+
+#' The spectrum as an export table: one row per peak (or profile sample) with
+#' file, scan, rt in the display `unit`, m/z, intensity and whether it is a raw
+#' profile sample. Input is the spectrum view's own (already filtered and, if
+#' asked, peak-picked) data, so the table is exactly what is drawn.
+#' @noRd
+spectrum_table <- function(df, unit = "sec") {
+  out <- data.frame(
+    file = df$sample_name %||% rep(NA_character_, nrow(df)),
+    scan = df$scan, rt = rt_to_disp(df$rt, unit),
+    mz = df$mz, intensity = df$intensity,
+    mode = ifelse(df$profile %in% TRUE, "profile", "centroid"),
+    stringsAsFactors = FALSE)
+  names(out)[3] <- paste0("rt_", unit)
+  out
+}
+
+#' Tab-separated text of a table (header + rows) for the clipboard: TSV is what
+#' spreadsheets split into cells on paste. Full precision — no rounding.
+#' @importFrom utils write.table
+#' @noRd
+table_tsv <- function(tab) {
+  con <- textConnection("out", "w", local = TRUE)
+  on.exit(close(con))
+  write.table(tab, con, sep = "\t", quote = FALSE, row.names = FALSE, na = "")
+  paste(textConnectionValue(con), collapse = "\n")
+}

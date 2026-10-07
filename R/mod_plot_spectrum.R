@@ -19,6 +19,8 @@ mod_plot_spectrum_ui <- function(id) {
       "Spectrum",
       div(class = "float-end d-flex gap-2",
           actionButton(ns("scanlist"), "Scan list", class = "btn-sm btn-outline-secondary"),
+          actionButton(ns("table"), "Table", icon = icon("table"),
+                       class = "btn-sm btn-outline-secondary"),
           mod_export_ui(ns("export")))
     ),
     layout_sidebar(
@@ -735,8 +737,64 @@ mod_plot_spectrum_server <- function(id, rv, included) {
       removeModal()
     })
 
+    # --- peak table export ------------------------------------------------------
+    # The table is spec_df() itself — the spectrum as drawn, so the global filters
+    # and this tab's peak picking are already applied. Copy runs in the browser
+    # from text embedded in the modal: a server round trip would lose the click's
+    # user activation, which some browsers require for clipboard writes.
+    spec_tab <- reactive(spectrum_table(spec_df(), rv$settings$time_unit))
+    spec_stem <- reactive({
+      d <- spec_df()
+      if (identical(input$layout, "single") && nrow(d))
+        sprintf("spectrum_%s_scan%s", cur_disp(), d$scan[1])
+      else sprintf("spectrum_rt%s", input$rt)
+    })
+    observeEvent(input$table, {
+      tab <- spec_tab()
+      showModal(modalDialog(
+        title = "Spectrum table", size = "l", easyClose = TRUE,
+        helpText(sprintf("%d rows, filters and peak picking applied. ", nrow(tab)),
+                 "Copy pastes as tab-separated cells (spreadsheets split it)."),
+        DTOutput(ns("spec_table")),
+        tags$textarea(id = ns("spec_tsv"), style = "display:none", table_tsv(tab)),
+        footer = tagList(
+          modalButton("Close"),
+          tags$button(type = "button", class = "btn btn-outline-secondary",
+                      onclick = copy_js(ns("spec_tsv")), icon("copy"), "Copy"),
+          downloadButton(ns("spec_csv"), "Download CSV", class = "btn-primary"))
+      ))
+    })
+    output$spec_table <- renderDT({
+      tab <- spec_tab()
+      datatable(tab, rownames = FALSE, selection = "none",
+                options = list(pageLength = 10, scrollX = TRUE)) %>%
+        DT::formatRound(c(names(tab)[3], "mz"), 4) %>%
+        DT::formatRound("intensity", 0)
+    })
+    output$spec_csv <- downloadHandler(
+      filename = function() paste0(spec_stem(), ".csv"),
+      content = function(file) utils::write.csv(spec_tab(), file, row.names = FALSE)
+    )
+
     mod_export_server("export", plot_gg, rv, "spectrum", zoom = zoom$ranges)
   })
+}
+
+#' onclick JS that copies a (hidden) textarea's text to the clipboard and flags
+#' the button "Copied". Falls back to execCommand where the async Clipboard API
+#' is unavailable (non-secure context, older browsers); the fallback textarea goes
+#' inside the modal, whose focus trap would otherwise block selecting it.
+#' @noRd
+copy_js <- function(textarea_id) {
+  sprintf(paste0(
+    "(function(b){var t=document.getElementById('%s').value;",
+    "var ok=function(){b.lastChild.textContent=' Copied';};",
+    "var fb=function(){var a=document.createElement('textarea');a.value=t;",
+    "(b.closest('.modal')||document.body).appendChild(a);a.select();document.execCommand('copy');",
+    "a.remove();ok();};",
+    "if(navigator.clipboard&&window.isSecureContext)",
+    "navigator.clipboard.writeText(t).then(ok,fb);else fb();})(this)"),
+    textarea_id)
 }
 
 #' Add adduct/isotope/fragment (or difference-network) layers to the single-view

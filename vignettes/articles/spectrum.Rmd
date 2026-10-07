@@ -167,3 +167,10 @@ Annotations are part of the plot, so they carry through to exports.
 
 **Save** writes a static png/svg/pdf (or the raw ggplot `.rds`); annotations are
 included.
+
+**Table** opens the spectrum as a peak table: file, scan, retention time, *m/z*,
+intensity and whether each point is a raw profile sample or a centroid. It is
+exactly what is drawn, with the global filters and this tab's peak picking
+applied (in Facet/Stacked layout, one block per file). **Download CSV** saves
+it; **Copy** puts it on the clipboard as tab-separated text, which pastes into a
+spreadsheet as cells.

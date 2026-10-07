@@ -80,3 +80,31 @@ test_that("scan list table shows the base peak intensity column", {
     expect_match(html, "basePeakIntensity", fixed = TRUE)
   }))
 })
+
+test_that("the spectrum table is the filtered spectrum, as CSV and as TSV", {
+  p <- profile_file()
+  raw <- get_spectra(p)
+  rt_min <- Spectra::rtime(raw)[which(Spectra::msLevel(raw) == 1)[1]] / 60
+  files <- tibble::tibble(
+    id = "f1", path = p, name = basename(p), sample_group = "g1",
+    include = TRUE, status = "ready", n_spectra = length(raw),
+    rt_min = 0, rt_max = 1e5, mz_min = 0, mz_max = 1e4,
+    ms_levels = "1", polarities = "1", charges = NA_character_,
+    spec_mode = "mixed", message = NA_character_)
+  rv <- make_rv(); rv$files <- files
+  rv$filter <- modifyList(empty_filter(), list(ms_level = 1L, mz_min = 500, mz_max = 600))
+  included <- shiny::reactive({ f <- rv$files; f$disp_name <- strip_ext(f$name); f })
+
+  suppressWarnings(shiny::testServer(mod_plot_spectrum_server,
+                    args = list(rv = rv, included = included), {
+    session$setInputs(layout = "single", rt = rt_min, scan = NA, annotate = FALSE,
+                      cmode = "off", csnr = 0, chws = 2, ck = 0, showpts = FALSE)
+    tab <- spec_tab()
+    expect_gt(nrow(tab), 0)
+    expect_identical(nrow(tab), nrow(spec_df()))
+    expect_true(all(tab$mz >= 500 & tab$mz <= 600))         # m/z filter applied
+    csv <- utils::read.csv(output$spec_csv)
+    expect_equal(csv$mz, tab$mz)
+    expect_match(spec_stem(), "^spectrum_.*_scan[0-9]+$")
+  }))
+})
